@@ -9,7 +9,15 @@ import { render, screen } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 
 vi.mock('@/hooks/auth.context', () => ({
-  useAuth: () => ({ session: { user: { id: '1', email: 'nitej.mithinti@bizmetric.com' } } }),
+  useAuth: () => ({ session: { user: { id: 'u1', email: 'nitej.mithinti@bizmetric.com' } } }),
+}));
+
+const execute = vi.fn().mockResolvedValue([{ id: 'n1', title: 'hello from test', createdBy: 'nitej', createdAt: new Date() }]);
+vi.mock('@/lib/rayfin-client', () => ({
+  getRayfinClient: () =>
+    Promise.resolve({
+      connectors: { atlassqldb: { TestNote: { select: () => ({ orderBy: () => ({ first: () => ({ execute }) }) }), create: vi.fn() } } },
+    }),
 }));
 
 import App from '@/App';
@@ -21,8 +29,8 @@ describe('App', () => {
     expect(screen.getByText('Signed in as nitej.mithinti@bizmetric.com')).toBeInTheDocument();
   });
 
-  it('shows the empty state', () => {
+  it('reads notes back from ATLAS_SQL_DB', async () => {
     render(<App />);
-    expect(screen.getByText('No data is available')).toBeInTheDocument();
+    expect(await screen.findByText('hello from test')).toBeInTheDocument();
   });
 });

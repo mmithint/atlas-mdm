@@ -18,8 +18,8 @@
   "scripts": {
     "dev": "rayfin dev",
     "dev:frontend": "npm run -w @rayfin-app/frontend dev",
-    "build": "npm run -w @rayfin-app/shared build && npm run -w @rayfin-app/data build && npm run -w @rayfin-app/frontend build",
-    "build:fabric": "npm run -w @rayfin-app/shared build && npm run -w @rayfin-app/data build && npm run -w @rayfin-app/frontend build:fabric",
+    "build": "npm run -w @rayfin-app/data build && npm run -w @rayfin-app/frontend build",
+    "build:fabric": "npm run -w @rayfin-app/data build && npm run -w @rayfin-app/frontend build:fabric",
     "lint": "npm run -w @rayfin-app/frontend lint",
     "preview": "npm run -w @rayfin-app/frontend preview",
     "test": "npm run -w @rayfin-app/frontend test",
@@ -33,5 +33,17 @@
     "@microsoft/rayfin-cli": "^1.36.0-alpha",
     "@microsoft/rayfin-guide": "^1.36.0-alpha",
     "typescript": "~5.7.2"
+  },
+  "rayfinScriptBases": {
+    "build": "npm run -w @rayfin-app/data build && npm run -w @rayfin-app/frontend build",
+    "build:fabric": "npm run -w @rayfin-app/data build && npm run -w @rayfin-app/frontend build:fabric",
+    "typecheck": "tsc -b"
+  },
+  "rayfinPacks": [
+    "connectors"
+  ],
+  "dependencies": {
+    "@microsoft/rayfin-connector-fabric-graphql": "^1.36.2",
+    "@microsoft/rayfin-connectors": "^1.36.2"
   }
 }

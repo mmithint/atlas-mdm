@@ -18,6 +18,7 @@
     "@microsoft/rayfin-auth": "^1.36.0-alpha",
     "@microsoft/rayfin-auth-provider-fabric": "^1.36.0-alpha",
     "@microsoft/rayfin-client": "^1.36.0-alpha",
+    "@microsoft/rayfin-connectors": "^1.36.0-alpha",
     "@microsoft/rayfin-data": "^1.36.0-alpha",
     "@microsoft/rayfin-lib": "^1.36.0-alpha",
     "@rayfin-app/shared": "*",

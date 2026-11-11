@@ -32,3 +32,14 @@ services:
     enabled: false
   functions:
     enabled: false
+connectors:
+  - name: atlassqldb
+    type: fabric-sqldatabase
+    config:
+      workspaceId: 918924c8-a56a-41a9-b1fe-f6bfcd07c3c5
+      itemId: a832d11c-c075-46a5-95c5-8473cff8bf44
+    auth:
+      type: application
+    operations:
+      - name: read
+      - name: create
