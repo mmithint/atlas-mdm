@@ -40,10 +40,6 @@
     "typecheck": "tsc -b"
   },
   "rayfinPacks": [
-    "connectors"
-  ],
-  "dependencies": {
-    "@microsoft/rayfin-connector-fabric-graphql": "^1.36.2",
-    "@microsoft/rayfin-connectors": "^1.36.2"
-  }
+    "data-modeling"
+  ]
 }
