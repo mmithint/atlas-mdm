@@ -10,20 +10,20 @@ import type {
   ConnectorsRuntime,
 } from '@microsoft/rayfin-connectors';
 
-import type { AtlasSqlDbSchema } from '../../../../rayfin/connectors/atlassqldb/schema';
+import type { AtlasSqlDbSchema } from '../../../../rayfin/connectors/atlas_sql_db/schema';
 
 /**
  * App-owned wiring (the CLI's generated block was removed on purpose).
  *
- * `atlassqldb` must match the connector `name` in rayfin/rayfin.yml. The schema
+ * `atlas_sql_db` must match the connector `name` in rayfin/rayfin.yml. The schema
  * is imported as a type only; the runtime config lists field names instead of
  * the decorated entity classes, which live outside the frontend package and
  * would otherwise be bundled with untransformed decorators.
  */
-export type AppConnectorsSchema = { atlassqldb: AtlasSqlDbSchema };
+export type AppConnectorsSchema = { atlas_sql_db: AtlasSqlDbSchema };
 
 export const connectorConfigs = {
-  atlassqldb: {
+  atlas_sql_db: {
     connector: 'fabric-sqldatabase',
     operations: ['read', 'create'],
     entities: { TestNote: ['id', 'title', 'createdBy', 'createdAt'] },

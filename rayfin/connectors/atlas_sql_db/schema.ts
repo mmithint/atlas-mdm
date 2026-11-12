@@ -1,6 +1,18 @@
-// Source: atlas_sql_db (fabric-sqldatabase)
-// Placeholder — entity files are generated from metadata.json.
-// Overwrite this file with the aggregate that re-exports the
-// generated entities and exports a connectorConfig value.
+import type { GraphQLBackedConnector } from '@microsoft/rayfin-connector-fabric-graphql';
+import type { ConnectorConfig } from '@microsoft/rayfin-connectors';
 
-export const schema = [];
+import { TestNote } from './TestNote.js';
+
+export { TestNote } from './TestNote.js';
+
+// ATLAS_SQL_DB (Fabric SQL database): read and create only.
+export const connectorConfig = {
+  connector: 'fabric-sqldatabase',
+  operations: ['read', 'create'],
+  entities: { TestNote },
+} as const satisfies ConnectorConfig;
+
+export type AtlasSqlDbSchema = GraphQLBackedConnector<
+  { TestNote: typeof TestNote },
+  typeof connectorConfig
+>;
