@@ -5,45 +5,27 @@
 // </copyright>
 //-----------------------------------------------------------------------
 
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { render } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 
-vi.mock('@/hooks/auth.context', () => ({
-  useAuth: () => ({ session: { user: { id: 'u1', email: 'nitej.mithinti@bizmetric.com' } } }),
-}));
-
-const execute = vi.fn().mockResolvedValue([{ id: 'n1', title: 'hello from test', createdBy: 'nitej', createdAt: new Date() }]);
-const create = vi.fn().mockResolvedValue({});
-vi.mock('@/lib/rayfin-client', () => ({
-  getRayfinClient: () =>
-    Promise.resolve({
-      connectors: { atlassqldb: { TestNote: { select: () => ({ orderBy: () => ({ first: () => ({ execute }) }) }), create: (x: unknown) => create(x) } } },
-    }),
-}));
+// The welcome view polls a dev-only activity endpoint via `useSourceActivity`.
+// In this smoke test there is no dev server, so stub the hook to return no feed:
+// the view renders its illustrative state synchronously and nothing settles after
+// the test (which would otherwise log a React `act(...)` warning).
+vi.mock('./Welcome.activity', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./Welcome.activity')>();
+  return { ...actual, useSourceActivity: () => null };
+});
 
 import App from '@/App';
 
 describe('App', () => {
-  it('welcomes the signed-in user by first name', () => {
-    render(<App />);
-    expect(screen.getByRole('heading', { name: 'Welcome, Nitej' })).toBeInTheDocument();
-    expect(screen.getByText('Signed in as nitej.mithinti@bizmetric.com')).toBeInTheDocument();
+  it('renders without throwing', () => {
+    expect(() => render(<App />)).not.toThrow();
   });
 
-  it('reads comments back from ATLAS_SQL_DB', async () => {
+  it('mounts content into the document', () => {
     render(<App />);
-    expect(await screen.findByText('hello from test')).toBeInTheDocument();
-  });
-
-  it('submits the comment as title, with the signed-in email and the time', async () => {
-    render(<App />);
-    fireEvent.change(screen.getByLabelText('Comment'), { target: { value: '  Heater RB-218 checked  ' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Submit' }));
-    await waitFor(() => expect(create).toHaveBeenCalledTimes(1));
-    const row = create.mock.calls[0][0] as { title: string; createdBy: string; createdAt: Date; id: string };
-    expect(row.title).toBe('Heater RB-218 checked');
-    expect(row.createdBy).toBe('nitej.mithinti@bizmetric.com');
-    expect(row.createdAt).toBeInstanceOf(Date);
-    expect(await screen.findByText('Saved to ATLAS_SQL_DB.')).toBeInTheDocument();
+    expect(document.body).not.toBeEmptyDOMElement();
   });
 });

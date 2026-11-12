@@ -1,0 +1,7 @@
+{
+  "source": "atlas_sql_db",
+  "connector": "fabric-sqldatabase",
+  "connectionString": "vm2n6jcyunrexoqu4xp3io45mm-zasitelkuwuudmp662742b6dyu.database.fabric.microsoft.com",
+  "discoveredAt": "2026-11-10T21:13:36.725Z",
+  "schemas": []
+}
