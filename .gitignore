@@ -51,4 +51,8 @@ rayfin.config.json
 db/seed/local/
 *.secrets
 
+# ATLAS: the generated SQL bundles in db/dist are committed on purpose (the template's
+# `dist` rule above would hide them). db/dist/README is not needed: tools/bundle_sql.py builds them.
+!db/dist/
+
 extra/
