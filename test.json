@@ -1,0 +1,110 @@
+{
+  "status": "ok",
+  "query": "",
+  "scope": {
+    "allWorkspaces": true
+  },
+  "count": 5,
+  "sources": [
+    {
+      "connectorType": "fabric-sqldatabase",
+      "itemType": "SQLDatabase",
+      "workspaceId": "208e0a9a-445b-4016-a380-4196adb2fc3f",
+      "workspaceName": "POC Workspace",
+      "itemId": "4799d425-1f25-4691-bca7-12b010aa5dd3",
+      "displayName": "OXY-Fabric",
+      "capabilities": {
+        "operations": [
+          "read",
+          "create",
+          "update",
+          "delete"
+        ],
+        "defaultAuth": "application",
+        "requiresVersion": false
+      },
+      "suggestedName": "oxy-fabric",
+      "addCommand": "rayfin connector add --type fabric-sqldatabase --workspace-id 208e0a9a-445b-4016-a380-4196adb2fc3f --item-id 4799d425-1f25-4691-bca7-12b010aa5dd3 --name oxy-fabric"
+    },
+    {
+      "connectorType": "fabric-sqldatabase",
+      "itemType": "SQLDatabase",
+      "workspaceId": "208e0a9a-445b-4016-a380-4196adb2fc3f",
+      "workspaceName": "POC Workspace",
+      "itemId": "3fcfdf74-b611-4773-968f-550fe796014a",
+      "displayName": "sales-demo",
+      "capabilities": {
+        "operations": [
+          "read",
+          "create",
+          "update",
+          "delete"
+        ],
+        "defaultAuth": "application",
+        "requiresVersion": false
+      },
+      "suggestedName": "sales-demo",
+      "addCommand": "rayfin connector add --type fabric-sqldatabase --workspace-id 208e0a9a-445b-4016-a380-4196adb2fc3f --item-id 3fcfdf74-b611-4773-968f-550fe796014a --name sales-demo"
+    },
+    {
+      "connectorType": "fabric-sqldatabase",
+      "itemType": "SQLDatabase",
+      "workspaceId": "208e0a9a-445b-4016-a380-4196adb2fc3f",
+      "workspaceName": "POC Workspace",
+      "itemId": "e505b912-6a47-4770-b378-9f6de29f3bbd",
+      "displayName": "sales-poc",
+      "capabilities": {
+        "operations": [
+          "read",
+          "create",
+          "update",
+          "delete"
+        ],
+        "defaultAuth": "application",
+        "requiresVersion": false
+      },
+      "suggestedName": "sales-poc",
+      "addCommand": "rayfin connector add --type fabric-sqldatabase --workspace-id 208e0a9a-445b-4016-a380-4196adb2fc3f --item-id e505b912-6a47-4770-b378-9f6de29f3bbd --name sales-poc"
+    },
+    {
+      "connectorType": "fabric-sqldatabase",
+      "itemType": "SQLDatabase",
+      "workspaceId": "208e0a9a-445b-4016-a380-4196adb2fc3f",
+      "workspaceName": "POC Workspace",
+      "itemId": "e7405c6c-dbb8-4f63-9c35-16c729133b73",
+      "displayName": "Test1031",
+      "capabilities": {
+        "operations": [
+          "read",
+          "create",
+          "update",
+          "delete"
+        ],
+        "defaultAuth": "application",
+        "requiresVersion": false
+      },
+      "suggestedName": "test1031",
+      "addCommand": "rayfin connector add --type fabric-sqldatabase --workspace-id 208e0a9a-445b-4016-a380-4196adb2fc3f --item-id e7405c6c-dbb8-4f63-9c35-16c729133b73 --name test1031"
+    },
+    {
+      "connectorType": "fabric-sqldatabase",
+      "itemType": "SQLDatabase",
+      "workspaceId": "208e0a9a-445b-4016-a380-4196adb2fc3f",
+      "workspaceName": "POC Workspace",
+      "itemId": "dad7230f-4d0e-4f2d-9e29-f3db3b4dc0e9",
+      "displayName": "wd40",
+      "capabilities": {
+        "operations": [
+          "read",
+          "create",
+          "update",
+          "delete"
+        ],
+        "defaultAuth": "application",
+        "requiresVersion": false
+      },
+      "suggestedName": "wd40",
+      "addCommand": "rayfin connector add --type fabric-sqldatabase --workspace-id 208e0a9a-445b-4016-a380-4196adb2fc3f --item-id dad7230f-4d0e-4f2d-9e29-f3db3b4dc0e9 --name wd40"
+    }
+  ]
+}

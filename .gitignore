@@ -45,3 +45,10 @@ rayfin.config.json
 *.njsproj
 *.sln
 *.sw?
+
+# ATLAS: rows that name people (e-mails) and any secret file stay on the laptop.
+# (rayfin/.env* and packages/functions/local.settings.json are already ignored above.)
+db/seed/local/
+*.secrets
+
+extra/

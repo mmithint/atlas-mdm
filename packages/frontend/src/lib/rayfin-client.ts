@@ -9,6 +9,7 @@ import {
   ConnectorsRayfinClient,
   resolveRayfinConfig,
 } from '@microsoft/rayfin-client';
+import type { AppFunctionsSchema } from '@rayfin-app/functions/types';
 import type { UniversalAppSchema } from '@rayfin-app/shared';
 import {
   connectorConfigs,
@@ -18,7 +19,7 @@ import {
 
 export type AppClient = ConnectorsRayfinClient<
   UniversalAppSchema,
-  Record<string, never>,
+  AppFunctionsSchema,
   AppConnectorsSchema
 >;
 
@@ -31,7 +32,15 @@ export class MissingRayfinConfigError extends Error {
   }
 }
 
-/** Returns the app's typed data, auth, and connector client. */
+/**
+ * Returns the app's typed data, auth, functions, and connector client.
+ *
+ * ATLAS note: the functions pack replaced this file with the plain
+ * `RayfinClient` (it does not know about the hand-added `atlas_sql_db`
+ * connector). This is the template's connectors-plus-functions shape
+ * (`.agents/skills/connectors/kit/rayfin-client.with-functions.ts`), so both
+ * `client.connectors.atlas_sql_db` and `client.functions.<name>` are typed.
+ */
 export async function getRayfinClient(): Promise<AppClient> {
   if (!_client) {
     _client = createClient().catch((error) => {
@@ -61,7 +70,7 @@ async function createClient(): Promise<AppClient> {
 
   return new ConnectorsRayfinClient<
     UniversalAppSchema,
-    Record<string, never>,
+    AppFunctionsSchema,
     AppConnectorsSchema
   >(
     {
