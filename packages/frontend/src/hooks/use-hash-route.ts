@@ -1,15 +1,16 @@
-import { useSyncExternalStore } from 'react';
+import { useMemo, useSyncExternalStore } from 'react';
+
+import { parseHash, type HashLocation } from '@/app/router';
+import { matchRoute, type RouteMatch } from '@/app/routes';
 
 /**
- * Minimal address-bar routing for APP-0: `#/spikes` shows the temporary spike
- * page, anything else shows the Notes page. APP-2 replaces this with the real
- * app shell and router. A hash needs no server-side fallback on static hosting.
+ * The current page, read from the address bar hash. A static host needs no server-side
+ * fallback for a hash. The route table is in `app/routes.ts`; `app/router.ts` builds
+ * links and moves between pages.
  */
-export type AppRoute = 'notes' | 'spikes';
-
-export function parseRoute(hash: string): AppRoute {
-  const first = hash.replace(/^#\/?/, '').split(/[/?]/)[0];
-  return first === 'spikes' ? 'spikes' : 'notes';
+export interface CurrentRoute extends HashLocation {
+  /** The matching screen and its path parameters, or null for an unknown address. */
+  match: RouteMatch | null;
 }
 
 function subscribe(onChange: () => void): () => void {
@@ -20,6 +21,10 @@ function subscribe(onChange: () => void): () => void {
 const getHash = (): string => window.location.hash;
 const getServerHash = (): string => '';
 
-export function useHashRoute(): AppRoute {
-  return parseRoute(useSyncExternalStore(subscribe, getHash, getServerHash));
+export function useHashRoute(): CurrentRoute {
+  const hash = useSyncExternalStore(subscribe, getHash, getServerHash);
+  return useMemo(() => {
+    const location = parseHash(hash);
+    return { ...location, match: matchRoute(location.path) };
+  }, [hash]);
 }

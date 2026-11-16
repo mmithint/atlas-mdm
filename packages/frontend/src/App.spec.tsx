@@ -5,27 +5,62 @@
 // </copyright>
 //-----------------------------------------------------------------------
 
-import { render } from '@testing-library/react';
-import { describe, it, expect, vi } from 'vitest';
+import { render, screen } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-// The welcome view polls a dev-only activity endpoint via `useSourceActivity`.
-// In this smoke test there is no dev server, so stub the hook to return no feed:
-// the view renders its illustrative state synchronously and nothing settles after
-// the test (which would otherwise log a React `act(...)` warning).
-vi.mock('./Welcome.activity', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('./Welcome.activity')>();
-  return { ...actual, useSourceActivity: () => null };
-});
+const PROFILE = vi.hoisted(() => ({
+  status: 'OK',
+  userId: '11111111-2222-3333-4444-555555555555',
+  email: 'tester.one@example.test',
+  displayName: 'Tester One',
+  roles: ['GeneralViewer'],
+  groups: [],
+  canView: true,
+  canSubmitRequests: true,
+  canEditRules: false,
+  canPublishRules: false,
+  canResponsibleApprove: false,
+  canAccountableApprove: false,
+  canManageAdmin: false,
+  responsibleScope: { allOrcm: false, profitCenters: [] },
+  accountableScope: { allOrcm: false, profitCenters: [] },
+}));
+
+// The app asks the server who is signed in; here the server is a stub.
+vi.mock('@/lib/rayfin-client', () => ({
+  getRayfinClient: async () => ({ functions: { getMyProfile: { invoke: async () => PROFILE } } }),
+}));
 
 import App from '@/App';
+import { AuthContext, type AuthContextValue } from '@/hooks/auth.context';
+
+const auth = { session: { user: { id: 'u', email: 'tester.one@example.test' }, isAuthenticated: true, isAnonymous: false } } as unknown as AuthContextValue;
 
 describe('App', () => {
-  it('renders without throwing', () => {
-    expect(() => render(<App />)).not.toThrow();
+  beforeEach(() => {
+    window.location.hash = '#/';
+  });
+  afterEach(() => {
+    window.location.hash = '';
   });
 
-  it('mounts content into the document', () => {
-    render(<App />);
-    expect(document.body).not.toBeEmptyDOMElement();
+  it('renders the ATLAS shell with its menu', async () => {
+    render(
+      <AuthContext.Provider value={auth}>
+        <App />
+      </AuthContext.Provider>
+    );
+    expect(screen.getByText('ATLAS')).toBeInTheDocument();
+    expect(screen.getByRole('navigation', { name: 'Main' })).toBeInTheDocument();
+    expect(await screen.findByLabelText('Signed in as')).toHaveTextContent('Tester One');
+  });
+
+  it('opens on the home screen', async () => {
+    render(
+      <AuthContext.Provider value={auth}>
+        <App />
+      </AuthContext.Provider>
+    );
+    expect(await screen.findByRole('heading', { level: 1, name: 'Home' })).toBeInTheDocument();
   });
 });

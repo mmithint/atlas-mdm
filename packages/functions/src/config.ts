@@ -16,3 +16,13 @@ export const SQL_SERVER_FQDN =
 
 /** "Initial Catalog" from SQL database > Settings > Connection strings. */
 export const SQL_DATABASE = 'ATLAS_SQL_DB-a832d11c-c075-46a5-95c5-8473cff8bf44';
+
+/**
+ * OneLake, for the photo-storage probe (spike S4, `storage.ts`). Display names, as
+ * in the environment register (`FINAL PLAN/01` section 8): workspace `ATLAS`,
+ * lakehouse `ATLAS_LH`. OneLake accepts names in both places; it does not reliably
+ * accept a name in one and an id in the other. If the probe answers 404, switch both
+ * to ids (workspace id and lakehouse item id from the portal URLs).
+ */
+export const ONELAKE_WORKSPACE = 'ATLAS';
+export const ONELAKE_LAKEHOUSE_ITEM = 'ATLAS_LH.Lakehouse';

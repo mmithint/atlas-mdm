@@ -5,10 +5,32 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Root } from './Root';
 import type { AuthConfig, IAuthService } from './services/rayfin-auth.service';
 
-vi.mock('./Welcome.activity', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('./Welcome.activity')>();
-  return { ...actual, useSourceActivity: () => null };
-});
+// Once signed in, the app asks the server who the person is; here the server is a stub.
+vi.mock('@/lib/rayfin-client', () => ({
+  getRayfinClient: async () => ({
+    functions: {
+      getMyProfile: {
+        invoke: async () => ({
+          status: 'NOT_REGISTERED',
+          userId: '11111111-2222-3333-4444-555555555555',
+          email: null,
+          displayName: null,
+          roles: [],
+          groups: [],
+          canView: false,
+          canSubmitRequests: false,
+          canEditRules: false,
+          canPublishRules: false,
+          canResponsibleApprove: false,
+          canAccountableApprove: false,
+          canManageAdmin: false,
+          responsibleScope: { allOrcm: false, profitCenters: [] },
+          accountableScope: { allOrcm: false, profitCenters: [] },
+        }),
+      },
+    },
+  }),
+}));
 
 const authenticated: OpaqueSession = {
   user: null,
@@ -41,14 +63,14 @@ describe('protected app content with standalone sign-in', () => {
     vi.unstubAllGlobals();
   });
 
-  it('does not render the welcome while session resolution is pending', () => {
+  it('does not render the app while session resolution is pending', () => {
     const auth = service();
     auth.resolveSession = vi.fn(
       () => new Promise<OpaqueSession | null>(() => {})
     );
     render(<Root rayfinAuthService={auth} />);
     expect(
-      screen.queryByRole('heading', { name: 'Your app is taking shape' })
+      screen.queryByRole('navigation', { name: 'Main' })
     ).toBeNull();
     expect(screen.getByText('Connecting to Fabric…')).toBeVisible();
   });
@@ -59,17 +81,17 @@ describe('protected app content with standalone sign-in', () => {
       await screen.findByRole('button', { name: 'Sign in with Microsoft' })
     ).toBeVisible();
     expect(
-      screen.queryByRole('heading', { name: 'Your app is taking shape' })
+      screen.queryByRole('navigation', { name: 'Main' })
     ).toBeNull();
     expect(screen.queryByText(/outside Fabric/)).toBeNull();
   });
 
-  it('renders the welcome only after a silent authenticated session resolves', async () => {
+  it('renders the app only after a silent authenticated session resolves', async () => {
     const auth = service();
     auth.resolveSession = vi.fn(async () => authenticated);
     render(<Root rayfinAuthService={auth} />);
     expect(
-      await screen.findByRole('heading', { name: 'Your app is taking shape' })
+      await screen.findByRole('navigation', { name: 'Main' })
     ).toBeVisible();
     expect(auth.signIn).not.toHaveBeenCalled();
   });
@@ -85,7 +107,7 @@ describe('protected app content with standalone sign-in', () => {
       await screen.findByRole('button', { name: 'Sign in with Microsoft' })
     ).toBeVisible();
     expect(
-      screen.queryByRole('heading', { name: 'Your app is taking shape' })
+      screen.queryByRole('navigation', { name: 'Main' })
     ).toBeNull();
   });
 
@@ -99,12 +121,12 @@ describe('protected app content with standalone sign-in', () => {
       name: 'Try Sign in with Microsoft',
     });
     expect(
-      screen.queryByRole('heading', { name: 'Your app is taking shape' })
+      screen.queryByRole('navigation', { name: 'Main' })
     ).toBeNull();
     await act(async () => fireEvent.click(button));
     expect(auth.signIn).toHaveBeenCalledTimes(1);
     expect(
-      await screen.findByRole('heading', { name: 'Your app is taking shape' })
+      await screen.findByRole('navigation', { name: 'Main' })
     ).toBeVisible();
   });
 
@@ -122,7 +144,7 @@ describe('protected app content with standalone sign-in', () => {
       'Sign-in was cancelled.'
     );
     expect(
-      screen.queryByRole('heading', { name: 'Your app is taking shape' })
+      screen.queryByRole('navigation', { name: 'Main' })
     ).toBeNull();
   });
 
@@ -137,14 +159,14 @@ describe('protected app content with standalone sign-in', () => {
     });
     render(<Root rayfinAuthService={auth} />);
     expect(
-      await screen.findByRole('heading', { name: 'Your app is taking shape' })
+      await screen.findByRole('navigation', { name: 'Main' })
     ).toBeVisible();
     await act(async () => notify?.(null));
     expect(
       await screen.findByRole('button', { name: 'Sign in with Microsoft' })
     ).toBeVisible();
     expect(
-      screen.queryByRole('heading', { name: 'Your app is taking shape' })
+      screen.queryByRole('navigation', { name: 'Main' })
     ).toBeNull();
     expect(unsubscribe).toHaveBeenCalled();
   });
@@ -156,7 +178,7 @@ describe('protected app content with standalone sign-in', () => {
   ])('fails closed for $kind configuration', async (config) => {
     await act(async () => render(<Root rayfinAuthService={service(config)} />));
     expect(
-      screen.queryByRole('heading', { name: 'Your app is taking shape' })
+      screen.queryByRole('navigation', { name: 'Main' })
     ).toBeNull();
     expect(
       screen.queryByRole('button', { name: 'Sign in with Microsoft' })

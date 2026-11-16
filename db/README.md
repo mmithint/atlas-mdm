@@ -45,6 +45,17 @@ Run order and how to run a file: `FINAL PLAN/04_Your_Runbook.md` RB-02. No clien
 | Stub (temporary) | `dev/gold_stub.sql`, `dev/merge_stub.sql`, `dev/drop_stub.sql` (removes only objects marked `-- ATLAS-STUB`) |
 | Tests | `t_app_schema` (generated), `t_security_seed`, `t_identity_resolve`, `t_route_resolve`, `t_gold_contract` |
 
+## APP-2 files
+
+| Kind | Files |
+|---|---|
+| Views | `vw_field_ownership` (owners per catalogue field, read by S-5 and later S-13), `vw_equipment_search` (the 26 gold columns plus three counters; reads `gold.vw_equipment_current` and `gold.vw_verification_score`, so it needs the gold stub or the real gold first) |
+| Tests | `t_field_ownership` (21 checks, agrees with `usp_route_resolve`), `t_equipment_search` (9 checks; inserts three fake requests in a transaction and rolls them back) |
+| Bundle | `dist/app2_1_views_tests.sql` (views, then tests) |
+| Read procedures (read path C, D-17) | `usp_equipment_search` (searchable columns, closest-match order, row caps, offset paging; refusals 50011 to 50016), `usp_equipment_detail` (four result sets: heater, location, field values, field owners) |
+| Test | `t_equipment_read` (12 checks; R8 changes four stub rows inside a transaction and rolls them back) |
+| Bundle | `dist/app2_2_read_procs_tests.sql` (the two procedures, then the test; run after `app2_1`) |
+
 ## APP-0 spike scripts (`dev/`)
 
 | File | Spike | Run when |
@@ -52,3 +63,4 @@ Run order and how to run a file: `FINAL PLAN/04_Your_Runbook.md` RB-02. No clien
 | `spike_s2_setup.sql` | S2: creates the empty `dev.spike` table that `sqlPing` writes to and rolls back | before the `sqlPing` test |
 | `spike_s3_rule_reader.sql` | S3: proves a read-only user can run draft SQL; prints `PASS` / `FAIL` per step | once, then paste the Messages tab to Claude |
 | `probe_engine.sql` | diagnostic: which engine the editor is connected to and which `CREATE TABLE` forms it accepts | only if a spike script fails with Msg 24584 |
+| `probe_s7_views.sql`, `probe_s7_views_drop.sql` | S7 follow-up (15 Nov): a control table and four views in schema `dev` for `tools/probe_view_vs_table.ps1`, and their removal | B3c of `your_steps/APP-2.md`; the drop script when the result is recorded |

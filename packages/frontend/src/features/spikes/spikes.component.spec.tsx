@@ -1,9 +1,12 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { whoAmIInvoke, sqlPingInvoke } = vi.hoisted(() => ({
+const { whoAmIInvoke, sqlPingInvoke, storageProbeInvoke, searchInvoke, detailInvoke } = vi.hoisted(() => ({
   whoAmIInvoke: vi.fn(),
   sqlPingInvoke: vi.fn(),
+  storageProbeInvoke: vi.fn(),
+  searchInvoke: vi.fn(),
+  detailInvoke: vi.fn(),
 }));
 
 vi.mock('@/lib/rayfin-client', () => ({
@@ -11,6 +14,9 @@ vi.mock('@/lib/rayfin-client', () => ({
     functions: {
       whoAmI: { invoke: whoAmIInvoke },
       sqlPing: { invoke: sqlPingInvoke },
+      storageProbe: { invoke: storageProbeInvoke },
+      searchEquipment: { invoke: searchInvoke },
+      getEquipmentDetail: { invoke: detailInvoke },
     },
   }),
 }));
@@ -23,14 +29,82 @@ describe('Spikes page', () => {
   beforeEach(() => {
     whoAmIInvoke.mockReset();
     sqlPingInvoke.mockReset();
+    storageProbeInvoke.mockReset();
+    searchInvoke.mockReset();
+    detailInvoke.mockReset();
   });
 
-  it('shows both spike buttons and calls nothing until clicked', () => {
+  it('shows every spike button and calls nothing until clicked', () => {
     render(<Spikes />);
-    expect(screen.getByRole('button', { name: 'Who am I' })).toBeEnabled();
-    expect(screen.getByRole('button', { name: 'SQL ping' })).toBeEnabled();
+    for (const name of ['Who am I', 'SQL ping', 'Run timing test', 'Run OneLake test']) {
+      expect(screen.getByRole('button', { name })).toBeEnabled();
+    }
     expect(whoAmIInvoke).not.toHaveBeenCalled();
     expect(sqlPingInvoke).not.toHaveBeenCalled();
+    expect(storageProbeInvoke).not.toHaveBeenCalled();
+    expect(searchInvoke).not.toHaveBeenCalled();
+    expect(detailInvoke).not.toHaveBeenCalled();
+  });
+
+  it('times the read functions (the latency gate) page by page and shows counts and timings only', async () => {
+    const total = 250;
+    const timing = { connectMs: 40, queryMs: 20, totalMs: 65 };
+    searchInvoke.mockImplementation(async (args: { mode: string; offset: number; pageSize: number }) => {
+      if (args.mode === 'MATCH') {
+        return { rows: Array.from({ length: 8 }, (_, i) => ({ equipmentId: i + 1 })), totalMatches: 8, hasMore: false, truncated: false, timing, error: null };
+      }
+      const start = args.offset;
+      const end = Math.min(total, start + args.pageSize);
+      return {
+        rows: Array.from({ length: end - start }, (_, i) => ({ equipmentId: start + i + 1 })),
+        totalMatches: total,
+        hasMore: end < total,
+        truncated: false,
+        timing,
+        error: null,
+      };
+    });
+    detailInvoke.mockResolvedValue({ found: true, heater: {}, floc: null, fieldValues: [], ownership: [], timing, error: null });
+
+    render(<Spikes />);
+    fireEvent.click(screen.getByRole('button', { name: 'Run timing test' }));
+
+    const result = await screen.findByRole('status');
+    expect(result).toHaveTextContent('"ok": true');
+    expect(result).toHaveTextContent('"rows": 250');
+    expect(result).toHaveTextContent('"pages": 3');
+    expect(result).toHaveTextContent('"duplicateKeys": 0');
+    expect(result).toHaveTextContent('"stopped": "last page"');
+    expect(result).toHaveTextContent('"detailFound": true');
+    expect(result).toHaveTextContent('"firstPageServerMs": 65');
+    expect(detailInvoke).toHaveBeenCalledTimes(1);
+    // the pages were read by offset, 100 rows per call
+    const paging = searchInvoke.mock.calls.map((c) => c[0]).filter((a) => a.mode === 'SORTED' && a.searchText === '' && a.pageSize === 100);
+    expect(paging.map((a) => a.offset)).toEqual([0, 100, 200]);
+  });
+
+  it('shows the function\'s own error text when the detail read fails (the platform hides thrown messages)', async () => {
+    const timing = { connectMs: 0, queryMs: 0, totalMs: 5 };
+    searchInvoke.mockResolvedValue({ rows: [{ equipmentId: 1 }], totalMatches: 1, hasMore: false, truncated: false, timing, error: null });
+    detailInvoke.mockResolvedValue({ found: false, heater: null, floc: null, fieldValues: [], ownership: [], timing, error: 'Could not read the equipment (229): permission denied.' });
+
+    render(<Spikes />);
+    fireEvent.click(screen.getByRole('button', { name: 'Run timing test' }));
+
+    const result = await screen.findByRole('status');
+    expect(result).toHaveTextContent('"ok": false');
+    expect(result).toHaveTextContent('permission denied');
+    expect(result).toHaveTextContent('the browser sent equipmentId as number 1');
+  });
+
+  it('runs the OneLake probe (S4) only when asked and shows its answer', async () => {
+    storageProbeInvoke.mockResolvedValue({ ok: false, step: 'create', path: 'ATLAS/ATLAS_LH.Lakehouse/Files/photos/_probe/x', httpStatus: 403, readBackMatches: null, totalMs: 120, error: 'Forbidden (403).' });
+    render(<Spikes />);
+    fireEvent.click(screen.getByRole('button', { name: 'Run OneLake test' }));
+    const result = await screen.findByRole('status');
+    expect(result).toHaveTextContent('"httpStatus": 403');
+    expect(storageProbeInvoke).toHaveBeenCalledTimes(1);
+    expect(whoAmIInvoke).not.toHaveBeenCalled();
   });
 
   it('shows the Who am I result as JSON', async () => {

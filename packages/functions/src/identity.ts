@@ -81,6 +81,37 @@ export function pickCallerEmail(
   return null;
 }
 
+/**
+ * The per-user id at the end of the token's `sub` (`…/users/<id>`), lower case, or
+ * `null` when `sub` is missing, does not end that way, or the id is not a GUID.
+ * Contract: FINAL PLAN/01 section 6.8 step 1 ("accept only a GUID; lower-case it").
+ * The id is looked up in `app.principal_identity`; it is never used as an e-mail.
+ */
+export function userIdFromSub(sub: unknown): string | null {
+  if (typeof sub !== 'string') return null;
+  const match = /\/users\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i.exec(
+    sub.trim()
+  );
+  return match?.[1] ? match[1].toLowerCase() : null;
+}
+
+export type CallerId =
+  | { status: 'OK'; id: string }
+  | { status: 'NOT_AUTHENTICATED' };
+
+/**
+ * Who is calling, as the id the database can map to a person. Anything that is not
+ * a readable token with a GUID user id is `NOT_AUTHENTICATED` and nothing else runs.
+ * The payload is decoded, not signature-checked (Rayfin has authenticated the call
+ * before the function runs [INFERRED]); the decision on hardening this is taken in
+ * APP-3 (`08` section 2, S1).
+ */
+export function callerId(accessToken: string | null | undefined): CallerId {
+  const decoded = decodeToken(accessToken);
+  const id = decoded.kind === 'jwt' ? userIdFromSub(decoded.claims['sub']) : null;
+  return id ? { status: 'OK', id } : { status: 'NOT_AUTHENTICATED' };
+}
+
 /** The allow-listed claims as short strings (arrays joined by a space). */
 export function safeClaimValues(
   claims: Record<string, unknown>

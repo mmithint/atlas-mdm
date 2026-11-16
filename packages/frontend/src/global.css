@@ -8,42 +8,59 @@
    `useCssTheme()` and project them into a JS theme object (Vega's SVG output
    cannot resolve `var()` references). */
 @theme static {
-  --color-brand: #0f6cbd; /* bar/area fills, button-like brand surfaces */
-  --color-brand-foreground: #0f6cbd; /* line/point marks, branded text & emphasis */
-  --color-hover: #f5f5f5; /* row/cell hover surface in DataGrid + visuals */
+  --color-brand: #0b5c8a; /* bar/area fills, button-like brand surfaces */
+  --color-brand-foreground: #0b5c8a; /* line/point marks, branded text & emphasis */
+  --color-hover: #eef1f4; /* row/cell hover surface in DataGrid + visuals */
 }
 
 @theme {
   /* Color tokens — light theme
      Usage: bg-*, text-*, border-* (e.g. bg-primary text-primary-foreground)
      Each token has a -foreground pair for text on that surface. */
-  --color-background: #ffffff; /* page background */
-  --color-foreground: #242424; /* default text */
+  --color-background: #f5f6f8; /* page background: cool light grey */
+  --color-foreground: #1b2430; /* default text: ink */
 
   --color-card: #ffffff; /* card surfaces */
-  --color-card-foreground: #242424;
+  --color-card-foreground: #1b2430;
 
   --color-popover: #ffffff; /* popover/dropdown surfaces */
-  --color-popover-foreground: #242424;
+  --color-popover-foreground: #1b2430;
 
-  --color-primary: #0f6cbd; /* primary actions & buttons */
+  --color-primary: #0b5c8a; /* primary actions & buttons: steel blue */
   --color-primary-foreground: #ffffff;
 
-  --color-secondary: #fafafa; /* secondary actions */
-  --color-secondary-foreground: #242424;
+  --color-secondary: #eef1f4; /* secondary actions */
+  --color-secondary-foreground: #1b2430;
 
-  --color-muted: #f0f0f0; /* subtle backgrounds */
-  --color-muted-foreground: #616161; /* subdued text */
+  --color-muted: #e9edf1; /* subtle backgrounds */
+  --color-muted-foreground: #566271; /* subdued text */
 
-  --color-accent: #f5f5f5; /* accent highlights */
-  --color-accent-foreground: #242424;
+  --color-accent: #e3eaf1; /* accent highlights */
+  --color-accent-foreground: #1b2430;
 
   --color-destructive: #c50f1f; /* errors & destructive actions */
   --color-destructive-foreground: #ffffff;
 
-  --color-border: #e0e0e0; /* default border */
-  --color-input: #e0e0e0; /* input field borders */
-  --color-ring: #0f6cbd; /* focus rings */
+  --color-border: #d5dbe2; /* default border */
+  --color-input: #c3ccd6; /* input field borders */
+  --color-ring: #0b5c8a; /* focus rings */
+
+  /* ATLAS additions. Attention (amber) is for "needs a person": an invalid rule, an open
+     request. Success is for "done and verified". Each has a -foreground pair for text on it. */
+  --color-warning: #fff1d6;
+  --color-warning-foreground: #7a4500;
+  --color-success: #dff3e6;
+  --color-success-foreground: #17643a;
+  --color-info: #e1eefa;
+  --color-info-foreground: #0b4a70;
+
+  /* Navigation rail: dark slate in both themes, like an instrument panel. */
+  --color-sidebar: #17212b;
+  --color-sidebar-foreground: #dde5ec;
+  --color-sidebar-muted: #8a99a8;
+  --color-sidebar-accent: #25333f;
+  --color-sidebar-border: #2c3b48;
+  --color-sidebar-active: #f2a93b; /* safety amber: the current page */
 
   --radius-none: 0;
   --radius-sm: 2px;
@@ -56,7 +73,7 @@
   --radius-5xl: 32px;
   --radius-6xl: 40px;
   --radius-full: 9999px;
-  --radius: 6px;
+  --radius: 4px;
 
   /* Spacing — 4px grid; use only these tokens, no interpolation. *-nudge = base − 2px.
      Usage: p-*, m-*, gap-* (e.g. p-400 gap-300) */
@@ -72,6 +89,7 @@
   --spacing-600: 24px;
   --spacing-700: 28px;
   --spacing-800: 32px;
+  --spacing-sidebar: 248px; /* width of the navigation rail */
 
   /* Font Sizes — 100-based scale 
      Usage: text-* (e.g. text-300, text-hero-900) */
@@ -109,17 +127,18 @@
   /* Font Families
      Usage: font-* (e.g. font-heading, font-base) */
   --font-heading:
-    'Segoe UI', 'Segoe UI Web (West European)',
+    'IBM Plex Sans', 'Segoe UI', 'Segoe UI Web (West European)',
     /* headings, titles, display text */ -apple-system, BlinkMacSystemFont,
     Roboto, 'Helvetica Neue', sans-serif;
   --font-base:
-    'Segoe UI', 'Segoe UI Web (West European)',
+    'IBM Plex Sans', 'Segoe UI', 'Segoe UI Web (West European)',
     /* body text, labels, UI controls */ -apple-system, BlinkMacSystemFont,
     Roboto, 'Helvetica Neue', sans-serif;
   --font-monospace:
-    Consolas, 'Courier New', Courier, monospace; /* code, pre-formatted text */
+    'IBM Plex Mono', Consolas, 'Courier New', Courier,
+    monospace; /* identifiers: tags, serial numbers, FLOCs; code */
   --font-numeric:
-    Bahnschrift, 'Segoe UI',
+    'IBM Plex Mono', Bahnschrift, 'Segoe UI',
     /* KPI values, numeric displays */ 'Segoe UI Web (West European)',
     -apple-system, BlinkMacSystemFont, Roboto, 'Helvetica Neue', sans-serif;
 
@@ -142,37 +161,48 @@
 @layer base {
   .dark {
     /* Color tokens — dark theme */
-    --color-background: #292929;
+    --color-background: #11171e;
     --color-foreground: #ffffff;
 
-    --color-card: #292929;
+    --color-card: #19222c;
     --color-card-foreground: #ffffff;
 
-    --color-popover: #292929;
+    --color-popover: #19222c;
     --color-popover-foreground: #ffffff;
 
-    --color-primary: #115ea3;
+    --color-primary: #1e74ad; /* white text on it stays readable (4.6:1) */
     --color-primary-foreground: #ffffff;
 
-    --color-secondary: #1f1f1f;
+    --color-secondary: #1f2a35;
     --color-secondary-foreground: #ffffff;
 
-    --color-muted: #141414;
-    --color-muted-foreground: #adadad;
+    --color-muted: #141c24;
+    --color-muted-foreground: #9fb0c0;
 
-    --color-accent: #3d3d3d;
+    --color-accent: #2a3846;
     --color-accent-foreground: #ffffff;
 
     --color-destructive: #c50f1f;
     --color-destructive-foreground: #ffffff;
 
-    --color-border: #525252;
-    --color-input: #525252;
-    --color-ring: #479ef5;
+    --color-border: #34424f;
+    --color-input: #3f4f5e;
+    --color-ring: #5eb1ea;
 
-    --color-brand: #115ea3;
-    --color-brand-foreground: #479ef5;
-    --color-hover: #3d3d3d;
+    --color-brand: #1e74ad;
+    --color-brand-foreground: #5eb1ea;
+    --color-hover: #25313d;
+
+    --color-warning: #3d2c0d;
+    --color-warning-foreground: #f6c971;
+    --color-success: #12301f;
+    --color-success-foreground: #7fd6a2;
+    --color-info: #11293a;
+    --color-info-foreground: #8ccbf0;
+
+    --color-sidebar: #0d1319;
+    --color-sidebar-accent: #1b2732;
+    --color-sidebar-border: #243241;
   }
 }
 
@@ -183,7 +213,36 @@
 
   body {
     @apply bg-background text-foreground antialiased;
+    font-family: var(--font-base);
   }
+
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-heading);
+  }
+
+  /* Form controls do not inherit the page font by themselves. */
+  select,
+  input,
+  textarea,
+  button {
+    font-family: inherit;
+  }
+}
+
+/* Identifiers (engineering tag, serial number, equipment number, FLOC) are what field
+   people search for, so they are set like an engraved nameplate: monospace, a thin
+   border, a slightly raised surface. Use on a <span> or <a>. */
+@utility id-plate {
+  font-family: var(--font-monospace);
+  font-size: var(--text-200);
+  letter-spacing: 0.02em;
+  padding: 1px var(--spacing-200-nudge);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-card);
+  white-space: nowrap;
 }
 
 html,

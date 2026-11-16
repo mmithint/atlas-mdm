@@ -43,8 +43,7 @@ connectors:
       itemId: a832d11c-c075-46a5-95c5-8473cff8bf44
     auth:
       type: application
+    # Read only (decision D-02, APP-2 step 3): no browser code may change a table.
+    # Every write goes through a Rayfin function and a stored procedure.
     operations:
       - name: read
-      - name: create
-      - name: update
-      - name: delete

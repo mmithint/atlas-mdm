@@ -37,9 +37,18 @@ def files(folder: str, pattern: str) -> list[str]:
 STAGES: dict[str, tuple[str, list[str]]] = {
     "app1_1_migrations": ("APP-1 stage 1: tables (migrations 0001-0007)", files("db/migrations", "000*.sql")),
     "app1_2_seeds": ("APP-1 stage 2: configuration seeds (0101-0107)", files("db/seed", "010*.sql")),
+    # Explicit list, not a glob: later phases add views that need the gold stub (stage 4),
+    # so they must not slip into this stage. They get their own stage below.
     "app1_3_procs_views": (
         "APP-1 stage 3: functions, procedures and views",
-        files("db/procs", "*.sql") + files("db/views", "*.sql"),
+        [
+            "db/procs/fn_group_for_role.sql",
+            "db/procs/usp_identity_resolve.sql",
+            "db/procs/usp_principal_profile.sql",
+            "db/procs/usp_route_resolve.sql",
+            "db/views/vw_group_member_count.sql",
+            "db/views/vw_route_check.sql",
+        ],
     ),
     "app1_4_gold_stub": (
         "APP-1 stage 4: synthetic gold stub and merge stub",
@@ -55,10 +64,60 @@ STAGES: dict[str, tuple[str, list[str]]] = {
             "db/tests/t_gold_contract.sql",
         ],
     ),
+    # APP-2: views for the search and detail screens, then their tests. One stage: the
+    # views come first in the list, so one paste creates them and then checks them.
+    "app2_1_views_tests": (
+        "APP-2 stage 1: field-ownership and equipment-search views, then their tests",
+        [
+            "db/views/vw_field_ownership.sql",
+            "db/views/vw_equipment_search.sql",
+            "db/tests/t_field_ownership.sql",
+            "db/tests/t_equipment_search.sql",
+        ],
+    ),
+    # APP-2, read path C (decided 15 Nov, D-17): the two read procedures behind the search and
+    # detail functions, then their test. Needs stage app2_1 (the views) and the gold stub.
+    "app2_2_read_procs_tests": (
+        "APP-2 stage 2: equipment search and detail read procedures, then their test",
+        [
+            "db/procs/usp_equipment_search.sql",
+            "db/procs/usp_equipment_detail.sql",
+            "db/tests/t_equipment_read.sql",
+        ],
+    ),
 }
 
 GO_LINE = re.compile(r"^\s*GO\s*;?\s*$", re.I | re.M)
 EMAIL = re.compile(r"[A-Za-z0-9._%+-]+@([A-Za-z0-9-]+\.)+[A-Za-z]{2,}")
+
+
+# Engine rules that a laptop cannot see by running SQL but CAN see in the text (FINAL PLAN/01 section 5).
+# Both were found the hard way: Msg 1046 on 14 Nov (APP-1) and again on 15 Nov, Msg 102 on 15 Nov (APP-2).
+# One left-to-right pass drops comments and the contents of string literals, so a word inside either
+# can neither hide a problem nor raise a false one.
+CODE_NOISE = re.compile(r"/\*.*?\*/|--[^\n]*|N?'(?:[^']|'')*'", re.S)
+PRINT_STATEMENT = re.compile(r"\bPRINT\b[^;\n]*(?:\n[ \t]*\+[^;\n]*)*", re.I)
+EXEC_STATEMENT = re.compile(r"\bEXEC(?:UTE)?[ \t]+(?!\()[A-Za-z_@][\w.@]*[^;]*;", re.I | re.S)
+EXEC_ARGUMENT = re.compile(r"(@\w+)[ \t\r\n]*=[ \t\r\n]*([^,;]+)")
+PLAIN_ARGUMENT = re.compile(r"(?:@\w+|-?\d+(?:\.\d+)?|NULL|DEFAULT|'')(?:\s+(?:OUTPUT|OUT))?", re.I)
+
+
+def code_only(text: str) -> str:
+    """The SQL with comments removed and every string literal reduced to ''."""
+    return CODE_NOISE.sub(lambda m: "''" if "'" in m.group(0)[:2] else " ", text)
+
+
+def engine_rule_problems(text: str) -> list[str]:
+    code = code_only(text)
+    problems: list[str] = []
+    for m in PRINT_STATEMENT.finditer(code):
+        if re.search(r"\(\s*SELECT\b", m.group(0), re.I):
+            problems.append(f"PRINT with a subquery (Msg 1046): put it into a variable first: {m.group(0).strip()[:70]}")
+    for m in EXEC_STATEMENT.finditer(code):
+        for name, value in EXEC_ARGUMENT.findall(m.group(0)):
+            if not PLAIN_ARGUMENT.fullmatch(value.strip()):
+                problems.append(f"EXEC argument {name} is an expression (Msg 102): use a variable or a constant: {name} = {value.strip()[:50]}")
+    return problems
 
 
 def read_source(rel: str) -> str:
@@ -68,6 +127,9 @@ def read_source(rel: str) -> str:
     text = path.read_text(encoding="utf-8").replace("\r\n", "\n").replace("\r", "\n")
     if GO_LINE.search(text):
         raise ValueError(f"{rel}: contains a GO line; the bundler wraps files in EXEC, so GO must not be used")
+    found = engine_rule_problems(text)
+    if found:
+        raise ValueError(f"{rel}: breaks a Fabric SQL engine rule (FINAL PLAN/01 section 5): " + "; ".join(found))
     for m in EMAIL.finditer(text):
         if not m.group(0).lower().endswith(".test"):
             raise ValueError(f"{rel}: contains an e-mail address ({m.group(0)[:3]}...); e-mails belong only in db/seed/local/")

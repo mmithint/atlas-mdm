@@ -65,8 +65,14 @@ export function describeSqlError(err: unknown, token?: string): SqlErrorInfo {
 }
 
 function hintFor(number: number | null, message: string): string | null {
-  if (number === 208) {
+  if (number === 208 && /dev\.spike/i.test(message)) {
     return 'The table dev.spike is missing. Run db/dev/spike_s2_setup.sql in the SQL database first.';
+  }
+  if (number === 2812 || (number === 208 && /\bapp\.|\bgold\./i.test(message))) {
+    return 'A database object is missing. Run the SQL stages of the current phase (db/dist) in the SQL database first.';
+  }
+  if (number === 229) {
+    return 'The app identity may not use that database object. Check its rights on the SQL database.';
   }
   if (number === 4060 || /cannot open database/i.test(message)) {
     return 'The database name is not accepted. Compare SQL_DATABASE in packages/functions/src/config.ts with Initial Catalog under SQL database > Settings > Connection strings.';

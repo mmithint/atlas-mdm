@@ -1,6 +1,6 @@
 # Build notes: what `atlas-mdm` looks like and how it is wired
 
-Written in APP-0 on 13 Nov 2026 from reading the repository, updated the same day after the functions pack. Update it when something here changes. The plan lives in the project folder `OxyProject -Info` (`FINAL PLAN/`); this file only records facts about the code.
+Written in APP-0 on 13 Nov 2026 from reading the repository, updated the same day after the functions pack and again in APP-1 and APP-2 (14 Nov). Update it when something here changes. The plan lives in the project folder `OxyProject -Info` (`FINAL PLAN/`); this file only records facts about the code.
 
 ## 1. Tool versions seen on the build laptop
 
@@ -20,7 +20,7 @@ atlas-mdm/
 ├─ package.json            npm workspaces root (packages/*); build and typecheck now build functions first
 ├─ rayfin/
 │  ├─ rayfin.yml           services and the connector (section 3)
-│  └─ connectors/atlas_sql_db/   TestNote.ts (entity), schema.ts, metadata.json
+│  └─ connectors/atlas_sql_db/   one entity file (FieldCatalog, hand-written), schema.ts, metadata.json
 ├─ packages/
 │  ├─ frontend/            React 19 + Vite 8 + Tailwind 4 + Vitest (@rayfin-app/frontend)
 │  ├─ functions/           Rayfin functions (@rayfin-app/functions); section 5
@@ -40,38 +40,46 @@ atlas-mdm/
 - `services.data`: off. `services.storage`: off.
 - `services.functions`: **on** since the pack (`path: packages/functions`, `auth.type: application`).
 - `services.staticHosting`: on, `assetAccess: protected`, build command `npm run build:fabric`.
-- `connectors`: one entry, `atlas_sql_db`, type `fabric-sqldatabase`, `auth.type: application`, operations read, create, update, delete. Narrowing it to `read` is APP-2 step 3 (decision of 13 Nov; the Notes test page still saves through `create` until then).
+- `connectors`: one entry, `atlas_sql_db`, type `fabric-sqldatabase`, `auth.type: application`, operations **read only** since APP-2 (decision D-02; the Notes test page and the `TestNote` entity were removed with it).
 
-## 4. Read path (connector)
+## 4. Read path (functions for views, the connector for plain tables; decision D-17)
 
-1. `rayfin/connectors/atlas_sql_db/TestNote.ts` declares the entity for `dbo.TestNote` (authenticated users: read, create).
-2. `packages/frontend/src/lib/connectors.ts` is **hand-maintained** (its generated block was removed on purpose). It lists the connector, its operations (`read`, `create`) and each entity's fields by name, because the decorated classes live outside the frontend package.
-3. `packages/frontend/src/lib/rayfin-client.ts` builds `ConnectorsRayfinClient<UniversalAppSchema, AppFunctionsSchema, AppConnectorsSchema>`. **The functions pack overwrote this file** with the plain `RayfinClient` (it picks that variant because `connectors` is not in `rayfinPacks`; the connector was added by hand), which dropped the connector. It was restored to the template's connectors-plus-functions shape (`.agents/skills/connectors/kit/rayfin-client.with-functions.ts`). If a pack is applied again, check this file afterwards.
-4. `packages/frontend/src/components/notes.component.tsx` reads and writes `TestNote` through `getRayfinClient().connectors.atlas_sql_db.TestNote`.
-5. `rayfin/connectors/atlas_sql_db/metadata.json` has `schemas: []`: the connector's table list has not been rediscovered since 10 Nov. APP-2 refreshes it when views exist (RB-05).
+The deployed connector refuses every view (spike S7 and the table-versus-view probe, 14-15 Nov), so:
+
+1. **Composed reads go through functions.** `packages/functions/src/equipment.ts` holds `runEquipmentSearch` and `runEquipmentDetail`; `function_app.ts` registers them as `searchEquipment` and `getEquipmentDetail` (inline handlers, plain text and number parameters). Each checks the caller, checks the input, runs ONE procedure (`app.usp_equipment_search`, `app.usp_equipment_detail`) and returns typed rows plus `timing`. **A failure comes back as text in the answer (`error`), it is not thrown**: on the deployed app the platform showed the browser only "InternalError: An internal execution error occured" for a function that failed, hiding the message. `unwrapRead` in `equipment-api.ts` turns `error` back into an exception. The frontend calls them as `getRayfinClient().functions.<name>.invoke(...)` in `features/equipment/equipment-api.ts`; the row types are the functions' own output types (`AppFunctionsSchema` in `types.ts`).
+2. **Plain tables go through the connector.** `rayfin/connectors/atlas_sql_db/` has one hand-written entity, `FieldCatalog` (a table with a real key), plus `schema.ts` (`operations: ['read']`) and `metadata.json`. `rayfin connector add` writes only `metadata.json` and a placeholder, and `connector remove` / `add` would delete or overwrite the entity files, so do not run them. One refused entity fails the whole apply, so **never add an entity whose source is a view**.
+3. `packages/frontend/src/lib/connectors.ts` is **hand-maintained**: the connector, its operations and the entity's fields by name (the decorated classes live outside the frontend package). `src/lib/connectors.spec.ts` compares it with the entity file and checks the read-only, no-view, key and length rules.
+4. `packages/frontend/src/lib/rayfin-client.ts` builds `ConnectorsRayfinClient<UniversalAppSchema, AppFunctionsSchema, AppConnectorsSchema>`. **The functions pack overwrote this file** with the plain `RayfinClient` (it picks that variant because `connectors` is not in `rayfinPacks`; the connector was added by hand), which dropped the connector. It was restored to the template's connectors-plus-functions shape (`.agents/skills/connectors/kit/rayfin-client.with-functions.ts`). If a pack is applied again, check this file afterwards.
+5. `rayfin/connectors/atlas_sql_db/metadata.json` has `schemas: []` and is not used. `rayfin connector inspect` lists tables and views live and needs no metadata, but listing a view proves nothing about whether the connector can attach it. Connectors do not run under `rayfin dev`: reads are tested on the deployed app.
+6. **Latency gate:** the S7 card in `features/spikes/` times the read functions (first call apart from warm calls, browser time beside the function's own `timing.totalMs`). The rule is in `FINAL PLAN/03` APP-2.
 
 ## 5. Write path (functions)
 
 - `packages/functions/src/function_app.ts` registers the functions. Rayfin's type generation reads each handler **inline** (an arrow function written inside `udf.func`), so handlers stay in this file and delegate to modules.
-- Modules: `config.ts` (SQL server and database identifiers, no secrets), `identity.ts` (decode the caller's token claims), `sql.ts` (open a connection with `mssql` and the app identity's token, describe errors without leaking the token), `spikes.ts` (the APP-0 spikes).
+- Modules: `config.ts` (SQL server and database identifiers, no secrets), `identity.ts` (decode the caller's token claims), `sql.ts` (open a connection with `mssql` and the app identity's token, describe errors without leaking the token), `spikes.ts` (the APP-0 spikes), `equipment.ts` (`searchEquipment` and `getEquipmentDetail`, read path C).
 - `packages/functions/src/types.ts` is **generated** by `npx rayfin dev functions apply`; never edit it. `scripts/validate-functions.mjs` fails the build if a registered function is missing from it.
 - The root `typecheck`, `build` and `build:fabric` scripts build `shared` and `functions` before the frontend, so the frontend can import `AppFunctionsSchema` from `@rayfin-app/functions/types`.
 - The frontend calls a function with `(await getRayfinClient()).functions.<name>.invoke()`.
-- Spikes: `whoAmI` (S1) and `sqlPing` (S2) are registered. Both and the `#/spikes` page are removed in APP-10.
+- Spikes: `whoAmI` (S1), `sqlPing` (S2) and `storageProbe` (S4, OneLake write test) are registered. All three and the `#/spikes` page are removed in APP-10.
+- `getMyProfile` (APP-2, `profile.ts`): token user id (`identity.ts` `callerId`, a GUID after `/users/`) → `app.usp_identity_resolve` → `app.usp_principal_profile` → one folded answer (status, roles, groups, flags, approval scopes). It only shapes the screen; procedures re-check every action.
+- Function unit tests: `packages/functions/src/*.spec.ts`, run by `npm test` (vitest, no database; `sql.js` is mocked). The specs are excluded from `tsc` so they are never deployed.
+- `types.ts`: the entries for `getMyProfile` and `storageProbe` were first written by hand in the generator's style (the generator needs `npx rayfin dev`, which is the user's step). `scripts/validate-functions.mjs` compares each entry with the handler's real type but does not print the expected text when they differ; to see it, copy the script and print `serialized.output`. Union members come out in the checker's order (not the written order), and `boolean | null` is `null | false | true`.
 
 ## 6. Frontend shell
 
-`main.tsx` → `Root.tsx` (theme, error boundary, auth provider, `AuthGate`) → `App.tsx`. Until APP-2 there is no router: `use-hash-route.ts` reads the address bar hash (`#/spikes` shows the spike page in `features/spikes/`; anything else shows Notes), and `App.tsx` has a temporary link for each. Local `npx rayfin dev` signs in automatically through `@microsoft/rayfin-local-dev`.
+`main.tsx` → `Root.tsx` (theme, error boundary, auth provider, `AuthGate`) → `App.tsx` → `ProfileProvider` → `AppShell` (APP-2). `src/app/`: `routes.ts` (every screen S-1 to S-13 and the spike page, with the phase that builds it), `router.ts` (hash addresses: parse, link, navigate), `profile.context.ts` / `profile.provider.tsx` (the `getMyProfile` answer, loaded once), `app-shell.component.tsx` (rail, header, notices), `nav.component.tsx` (role-aware menu), `screens.tsx` (route to screen; unbuilt screens show `placeholder.component.tsx`). `hooks/use-hash-route.ts` reads the address bar hash; `hooks/use-load.ts` is the loading/error/ready helper. Built screens: `features/equipment/` (S-4 search, S-5 detail) and `features/spikes/`. Styling: tokens in `global.css` (dark slate rail, steel-blue primary, amber for attention, `id-plate` utility for identifiers); shared class strings in `components/ui.ts`; join them with `clsx`, not `cn` (tailwind-merge mixes up the text-size tokens and text colours). Local `npx rayfin dev` signs in automatically through `@microsoft/rayfin-local-dev`.
 
 ## 7. Test baseline
 
 `npm test` on 13 Nov before any APP-0 frontend change: 45 passed, **5 failed**, all from template tests that still expect the template's welcome page: `App.spec.tsx` renders `App` without an auth provider (`useAuth must be used within an AuthProvider`) and three tests in `Root.spec.tsx` look for the heading "Your app is taking shape". They fail since the Notes page replaced the welcome page (commit "added notes ui"), not because of the functions pack. They are to be replaced when the app shell lands in APP-2. New APP-0 tests (`use-hash-route.spec.ts`, `spikes.component.spec.tsx`) pass.
 
-After type generation (14 Nov): `npm run typecheck`, `npm run lint`, `npm run build` and `npm run validate:functions` all pass; `npm test` gives 58 passed, 5 failed (the same 5: two in `App.spec.tsx`, three in `Root.spec.tsx`).
+After type generation (14 Nov): `npm run typecheck`, `npm run lint`, `npm run build` and `npm run validate:functions` all pass; `npm test` gave 58 passed, 5 failed (the same 5).
+
+**APP-2 (14 Nov):** the 5 stale tests are replaced (`App.spec.tsx` renders the shell, `Root.spec.tsx` recognises it by its menu). `npm test` now runs the frontend suite (187 tests, 19 files) and the functions suite (24 tests, 2 files); typecheck, build and lint are clean.
 
 ## 8. Known drift between notes and code
 
-- `DEPLOY.md` still names the connector `atlassqldb`; the real name is `atlas_sql_db` (`rayfin.yml`).
+- `DEPLOY.md` still names the connector `atlassqldb`, and describes the Comment box and `dbo.TestNote` that APP-2 removed; the real connector name is `atlas_sql_db` (`rayfin.yml`).
 - `DEPLOY.md` lists a deploy blocker from 11 Nov (403 while saving project settings for a guest account) that the tenant settings were meant to fix; the first full deploy in APP-0 is the proof.
 - The plan said a function had been deployed and tested before 12 Nov; the repository had none until the pack was applied on 13 Nov.
 
@@ -102,3 +110,22 @@ All SQL; no function or frontend code changed. File list and conventions: `db/RE
 Decisions made while building: the column `trigger` of `app.business_rule_run` is `run_trigger` (TRIGGER is a reserved word; `09` §6.4); the types of three gold views are now stated in `01` §6.1; rule drafts get no read-only user (S3), so APP-5 guards the SQL text.
 | Functions schema wired back into the client | `packages/frontend/src/lib/rayfin-client.ts` |
 | Git-ignore for local seeds and secrets | `.gitignore` |
+
+## 11. Added in APP-2 (14 Nov; read path C added 15 Nov; not yet run in Fabric)
+
+| What | Where |
+|---|---|
+| Views for the search and detail screens | `db/views/vw_field_ownership.sql`, `db/views/vw_equipment_search.sql` |
+| Their tests, and the paste-ready bundle | `db/tests/t_field_ownership.sql`, `db/tests/t_equipment_search.sql`; `db/dist/app2_1_views_tests.sql` (stage list in `tools/bundle_sql.py`; `app1_3` is now an explicit list so later views cannot slip into it) |
+| One read-only connector entity (the five view entities were removed 15 Nov: the connector refuses views) | `rayfin/connectors/atlas_sql_db/` (`FieldCatalog`), `schema.ts`, `packages/frontend/src/lib/connectors.ts`, guard `connectors.spec.ts` (also fails if an entity names a view) |
+| Read procedures and their test (read path C, D-17) | `db/procs/usp_equipment_search.sql`, `db/procs/usp_equipment_detail.sql`, `db/tests/t_equipment_read.sql`; bundle `db/dist/app2_2_read_procs_tests.sql` |
+| Read functions | `packages/functions/src/equipment.ts` (`searchEquipment`, `getEquipmentDetail`; tests `equipment.spec.ts`), registered in `function_app.ts`, types in `types.ts`; frontend calls in `features/equipment/equipment-api.ts` (`equipment-api.spec.ts`) |
+| Connector narrowed to read | `rayfin/rayfin.yml`, `schema.ts`, `connectors.ts` |
+| Functions | `getMyProfile` (`packages/functions/src/profile.ts`, `identity.ts` `callerId`), `storageProbe` (`storage.ts`, config in `config.ts`) |
+| App shell and screens | `packages/frontend/src/app/`, `features/equipment/`, `hooks/use-load.ts`, `lib/format.ts`, `components/states.tsx`, `components/ui.ts` |
+| Spike cards | `features/spikes/spikes.component.tsx` (S7 latency gate in `s7-paging.ts`, S4 OneLake test) |
+| Tests | frontend 185 tests, functions 61 tests (`npm test`) |
+
+Decisions made while building (details in `FINAL PLAN/08` decision log, 14 Nov): `app.vw_equipment_search` had not been built in APP-1; Rayfin storage is not enabled in Fabric, so S4 became a OneLake probe; entity files are hand-written; the Notes page and `TestNote` entity were removed.
+
+Behaviour worth knowing: search has two modes, and both are one function call (`searchEquipment`). With a text and no chosen sort (`MATCH`) the procedure returns the closest matches first (equal, then starts with, then contains), capped at 200, 500 and 500 rows per group, and the screen pages through that list in memory; with a chosen sort, or no text (`SORTED`), it returns one page per call, ordered by the chosen column with `equipment_id` as the last key, and the "cursor" is the row offset of the next page (the offsets already seen are kept so "Previous" works). The column being searched is always shown. A blank value is shown as a dash, never as zero. Dates arrive from the functions as ISO text.

@@ -2,6 +2,171 @@
   "runtime": "TypeScript",
   "functionsMetadata": [
     {
+      "name": "getMyProfile",
+      "scriptFile": "src\\function_app.ts",
+      "bindings": [
+        {
+          "name": "req",
+          "type": "httpTrigger",
+          "direction": "in",
+          "authLevel": "anonymous",
+          "methods": [
+            "post"
+          ],
+          "route": "getMyProfile"
+        },
+        {
+          "name": "$return",
+          "type": "http",
+          "direction": "out"
+        },
+        {
+          "name": "__generic_Sql",
+          "direction": "in",
+          "type": "FabricItem",
+          "alias": "",
+          "audienceType": "Sql"
+        }
+      ],
+      "fabricProperties": {
+        "fabricMetadataSchemaVersion": "1.0",
+        "fabricFunctionReturnType": "Promise<MyProfile>",
+        "fabricFunctionParameters": [
+          {
+            "name": "ctx",
+            "dataType": "RayfinContext<Record<string, any>, AudienceType.Sql>",
+            "hasDefaultValue": false
+          }
+        ]
+      },
+      "functionCode": "udf.func(\n  'getMyProfile',\n  async (\n    ctx: RayfinContext<Record<string, any>, AudienceType.Sql>\n  ): Promise<MyProfile> => loadMyProfile(ctx.accessToken, () => ctx.Tokens.Sql),\n  []\n)"
+    },
+    {
+      "name": "searchEquipment",
+      "scriptFile": "src\\function_app.ts",
+      "bindings": [
+        {
+          "name": "req",
+          "type": "httpTrigger",
+          "direction": "in",
+          "authLevel": "anonymous",
+          "methods": [
+            "post"
+          ],
+          "route": "searchEquipment"
+        },
+        {
+          "name": "$return",
+          "type": "http",
+          "direction": "out"
+        },
+        {
+          "name": "__generic_Sql",
+          "direction": "in",
+          "type": "FabricItem",
+          "alias": "",
+          "audienceType": "Sql"
+        }
+      ],
+      "fabricProperties": {
+        "fabricMetadataSchemaVersion": "1.0",
+        "fabricFunctionReturnType": "Promise<EquipmentSearchResult>",
+        "fabricFunctionParameters": [
+          {
+            "name": "mode",
+            "dataType": "string",
+            "hasDefaultValue": false
+          },
+          {
+            "name": "searchColumn",
+            "dataType": "string",
+            "hasDefaultValue": false
+          },
+          {
+            "name": "searchText",
+            "dataType": "string",
+            "hasDefaultValue": false
+          },
+          {
+            "name": "facility",
+            "dataType": "string",
+            "hasDefaultValue": false
+          },
+          {
+            "name": "sortColumn",
+            "dataType": "string",
+            "hasDefaultValue": false
+          },
+          {
+            "name": "sortDirection",
+            "dataType": "string",
+            "hasDefaultValue": false
+          },
+          {
+            "name": "offset",
+            "dataType": "number",
+            "hasDefaultValue": false
+          },
+          {
+            "name": "pageSize",
+            "dataType": "number",
+            "hasDefaultValue": false
+          },
+          {
+            "name": "ctx",
+            "dataType": "RayfinContext<Record<string, any>, AudienceType.Sql>",
+            "hasDefaultValue": false
+          }
+        ]
+      },
+      "functionCode": "udf.func(\n  'searchEquipment',\n  async (\n    mode: string,\n    searchColumn: string,\n    searchText: string,\n    facility: string,\n    sortColumn: string,\n    sortDirection: string,\n    offset: number,\n    pageSize: number,\n    ctx: RayfinContext<Record<string, any>, AudienceType.Sql>\n  ): Promise<EquipmentSearchResult> =>\n    runEquipmentSearch(\n      { mode, searchColumn, searchText, facility, sortColumn, sortDirection, offset, pageSize },\n      ctx.accessToken,\n      () => ctx.Tokens.Sql\n    ),\n  []\n)"
+    },
+    {
+      "name": "getEquipmentDetail",
+      "scriptFile": "src\\function_app.ts",
+      "bindings": [
+        {
+          "name": "req",
+          "type": "httpTrigger",
+          "direction": "in",
+          "authLevel": "anonymous",
+          "methods": [
+            "post"
+          ],
+          "route": "getEquipmentDetail"
+        },
+        {
+          "name": "$return",
+          "type": "http",
+          "direction": "out"
+        },
+        {
+          "name": "__generic_Sql",
+          "direction": "in",
+          "type": "FabricItem",
+          "alias": "",
+          "audienceType": "Sql"
+        }
+      ],
+      "fabricProperties": {
+        "fabricMetadataSchemaVersion": "1.0",
+        "fabricFunctionReturnType": "Promise<EquipmentDetailResult>",
+        "fabricFunctionParameters": [
+          {
+            "name": "equipmentId",
+            "dataType": "number",
+            "hasDefaultValue": false
+          },
+          {
+            "name": "ctx",
+            "dataType": "RayfinContext<Record<string, any>, AudienceType.Sql>",
+            "hasDefaultValue": false
+          }
+        ]
+      },
+      "functionCode": "udf.func(\n  'getEquipmentDetail',\n  async (\n    equipmentId: number,\n    ctx: RayfinContext<Record<string, any>, AudienceType.Sql>\n  ): Promise<EquipmentDetailResult> =>\n    runEquipmentDetail(equipmentId, ctx.accessToken, () => ctx.Tokens.Sql),\n  []\n)"
+    },
+    {
       "name": "whoAmI",
       "scriptFile": "src\\function_app.ts",
       "bindings": [
@@ -73,6 +238,46 @@
         ]
       },
       "functionCode": "udf.func(\n  'sqlPing',\n  async (\n    ctx: RayfinContext<Record<string, any>, AudienceType.Sql>\n  ): Promise<SqlPingResult> => sqlPing(() => ctx.Tokens.Sql),\n  []\n)"
+    },
+    {
+      "name": "storageProbe",
+      "scriptFile": "src\\function_app.ts",
+      "bindings": [
+        {
+          "name": "req",
+          "type": "httpTrigger",
+          "direction": "in",
+          "authLevel": "anonymous",
+          "methods": [
+            "post"
+          ],
+          "route": "storageProbe"
+        },
+        {
+          "name": "$return",
+          "type": "http",
+          "direction": "out"
+        },
+        {
+          "name": "__generic_Storage",
+          "direction": "in",
+          "type": "FabricItem",
+          "alias": "",
+          "audienceType": "Storage"
+        }
+      ],
+      "fabricProperties": {
+        "fabricMetadataSchemaVersion": "1.0",
+        "fabricFunctionReturnType": "Promise<StorageProbeResult>",
+        "fabricFunctionParameters": [
+          {
+            "name": "ctx",
+            "dataType": "RayfinContext<Record<string, any>, AudienceType.Storage>",
+            "hasDefaultValue": false
+          }
+        ]
+      },
+      "functionCode": "udf.func(\n  'storageProbe',\n  async (\n    ctx: RayfinContext<Record<string, any>, AudienceType.Storage>\n  ): Promise<StorageProbeResult> => storageProbe(() => ctx.Tokens.Storage),\n  []\n)"
     }
   ]
 }
