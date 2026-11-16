@@ -36,7 +36,9 @@ def files(folder: str, pattern: str) -> list[str]:
 
 STAGES: dict[str, tuple[str, list[str]]] = {
     "app1_1_migrations": ("APP-1 stage 1: tables (migrations 0001-0007)", files("db/migrations", "000*.sql")),
-    "app1_2_seeds": ("APP-1 stage 2: configuration seeds (0101-0107)", files("db/seed", "010*.sql")),
+    # 0101-0107 only: seeds added by later phases get their own stage, so a finished
+    # phase's bundle never changes.
+    "app1_2_seeds": ("APP-1 stage 2: configuration seeds (0101-0107)", files("db/seed", "010[1-7]_*.sql")),
     # Explicit list, not a glob: later phases add views that need the gold stub (stage 4),
     # so they must not slip into this stage. They get their own stage below.
     "app1_3_procs_views": (
@@ -84,6 +86,12 @@ STAGES: dict[str, tuple[str, list[str]]] = {
             "db/procs/usp_equipment_detail.sql",
             "db/tests/t_equipment_read.sql",
         ],
+    ),
+    # APP-3 stage 0 (decided 16 Nov, D-18): the equipment status list the request checks use.
+    # Needs app1_2 (seed 0106). Run it before the APP-3 procedures and tests.
+    "app3_0_seed_status": (
+        "APP-3 stage 0: equipment status allowed values (AVFS, NOPE, OPER, DECM)",
+        ["db/seed/0108_equipment_status_values.sql"],
     ),
 }
 

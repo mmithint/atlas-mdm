@@ -56,6 +56,13 @@ Run order and how to run a file: `FINAL PLAN/04_Your_Runbook.md` RB-02. No clien
 | Test | `t_equipment_read` (12 checks; R8 changes four stub rows inside a transaction and rolls them back) |
 | Bundle | `dist/app2_2_read_procs_tests.sql` (the two procedures, then the test; run after `app2_1`) |
 
+## APP-3 files
+
+| Kind | Files |
+|---|---|
+| Seed (stage 0, decided 16 Nov, D-18) | `0108_equipment_status_values` (EQUIPMENT_USER_STATUS becomes a list: AVFS, NOPE, OPER, DECM, the codes the EVOLVE equipment header accepts; re-runnable, never overwrites an admin's change) |
+| Bundle | `dist/app3_0_seed_status.sql` (run after `app1_2`, before the APP-3 procedures and tests). `app1_2` now lists 0101 to 0107 explicitly, so later seeds never change a finished phase's bundle |
+
 ## APP-0 spike scripts (`dev/`)
 
 | File | Spike | Run when |
