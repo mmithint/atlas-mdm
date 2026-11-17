@@ -3,6 +3,7 @@
  * Both are removed in APP-10 together with the `#/spikes` page.
  *
  * S1 `whoAmI`   can a function learn who is calling?     (answers Q-495)
+ *               S8: the answer also carries `tokenCheck`, what the signature check saw (tokenverify.ts)
  * S2 `sqlPing`  can a function reach the ATLAS database as the app identity,
  *               run a transaction, and roll it back?
  *
@@ -18,6 +19,7 @@ import {
   type TokenKind,
 } from './identity.js';
 import { describeSqlError, openPool, type SqlErrorInfo } from './sql.js';
+import type { TokenCheckReport } from './tokenverify.js';
 
 const elapsed = (since: number): number => Math.round(performance.now() - since);
 
@@ -36,15 +38,17 @@ export interface WhoAmIResult {
   email: string | null;
   /** Values of the allow-listed claims only. */
   claims: Record<string, string>;
+  /** S8: did the token's signature verify, against which keys, and would `enforce` refuse it. */
+  tokenCheck: TokenCheckReport;
 }
 
-export function whoAmI(accessToken: string | null | undefined): WhoAmIResult {
+export function whoAmI(accessToken: string | null | undefined, tokenCheck: TokenCheckReport): WhoAmIResult {
   const decoded = decodeToken(accessToken);
   const picked = pickCallerEmail(decoded.claims);
   const claimNames = Object.keys(decoded.claims).sort();
 
   // Names only: a claim value can be personal data.
-  console.log(`whoAmI: token=${decoded.kind} claims=${claimNames.join(',')}`);
+  console.log(`whoAmI: token=${decoded.kind} claims=${claimNames.join(',')} check=${tokenCheck.verdict}`);
 
   return {
     tokenKind: decoded.kind,
@@ -52,6 +56,7 @@ export function whoAmI(accessToken: string | null | undefined): WhoAmIResult {
     emailClaim: picked?.claim ?? null,
     email: picked?.value ?? null,
     claims: safeClaimValues(decoded.claims),
+    tokenCheck,
   };
 }
 

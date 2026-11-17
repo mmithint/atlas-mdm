@@ -102,6 +102,158 @@ async function runReadTiming() {
   });
 }
 
+// ---- APP-3 scratch card: the request write path, one call at a time -------------------------
+// Removed with the rest of this page in APP-10. It creates and decides REAL requests on the synthetic stub as
+// the signed-in person (the server finds out who from the token; nothing here sends an e-mail address).
+
+/** The field the scratch request changes: Manufacturer is a plain text field every heater has. */
+const SCRATCH_FIELD = 'MANUFACTURER';
+
+async function runScratchCreate(heaterId: number) {
+  const { functions } = await getRayfinClient();
+  // The value the person "saw" comes from the same detail read the heater screen uses.
+  const detail = unwrapRead(await functions.getEquipmentDetail.invoke({ equipmentId: heaterId }));
+  if (!detail.found || detail.heater === null) return { ok: false, error: `Heater ${String(heaterId)} was not found.` };
+  const stamp = new Date().toISOString().slice(11, 19).replace(/:/g, '');
+  return functions.createChangeRequest.invoke({
+    source: 'MANUAL',
+    entityType: 'EQUIPMENT',
+    equipmentId: heaterId,
+    functionalLocation: '',
+    fieldCode: SCRATCH_FIELD,
+    oldValue: detail.heater.manufacturer ?? '',
+    newValue: `SCRATCH ${stamp}`,
+    reason: 'APP-3 scratch call from the spikes page',
+    comment: '',
+    evidenceJson: '',
+  });
+}
+
+function WritePathCard() {
+  const [heaterId, setHeaterId] = useState('2');
+  const [requestId, setRequestId] = useState('');
+  const [decision, setDecision] = useState('APPROVE');
+  const [comment, setComment] = useState('');
+  const [state, setState] = useState<SpikeState>({ status: 'idle' });
+  const [copied, setCopied] = useState(false);
+
+  const requestNumber = Number(requestId);
+  const heaterNumber = Number(heaterId);
+
+  const go = async (run: () => Promise<unknown>) => {
+    setCopied(false);
+    setState({ status: 'running' });
+    try {
+      const result = await run();
+      setState({ status: 'done', text: JSON.stringify(result, null, 2) });
+      // Hand the new request number to the other buttons.
+      const made = (result as { requestId?: unknown } | null)?.requestId;
+      if (typeof made === 'number') setRequestId(String(made));
+    } catch (e) {
+      setState({ status: 'failed', text: describe(e) });
+    }
+  };
+
+  const input = 'mt-100 w-full rounded-md border border-border bg-background px-300 py-100';
+  const button = 'rounded-md bg-primary px-400 py-200 font-medium text-primary-foreground disabled:opacity-50';
+
+  return (
+    <section aria-labelledby="app3-title" className="rounded-xl border border-border bg-card p-500 md:col-span-2">
+      <h2 id="app3-title" className="font-semibold">
+        APP-3 · Request write path (scratch)
+      </h2>
+      <p className="mt-200 text-muted-foreground">
+        Creates a real request on a synthetic heater as you, shows its live approval checks, and decides it. The server
+        works out who you are from your sign-in; you are never asked for an e-mail. Press the three buttons in order.
+        A decision needs you to belong to the request's responsible (then accountable) group, and one person may not
+        approve both stages.
+      </p>
+
+      <div className="mt-300 grid gap-300 md:grid-cols-4">
+        <label className="block text-sm">
+          Heater id
+          <input className={input} inputMode="numeric" value={heaterId} onChange={(e) => setHeaterId(e.target.value)} />
+        </label>
+        <label className="block text-sm">
+          Request number
+          <input className={input} inputMode="numeric" value={requestId} onChange={(e) => setRequestId(e.target.value)} />
+        </label>
+        <label className="block text-sm">
+          Decision
+          <select className={input} value={decision} onChange={(e) => setDecision(e.target.value)}>
+            <option>APPROVE</option>
+            <option>REJECT</option>
+            <option>RETURN</option>
+          </select>
+        </label>
+        <label className="block text-sm">
+          Comment (needed to reject or return)
+          <input className={input} value={comment} onChange={(e) => setComment(e.target.value)} />
+        </label>
+      </div>
+
+      <div className="mt-300 flex flex-wrap gap-300">
+        <button
+          type="button"
+          className={button}
+          disabled={state.status === 'running' || !Number.isInteger(heaterNumber) || heaterNumber < 0}
+          onClick={() => void go(() => runScratchCreate(heaterNumber))}
+        >
+          Create test request
+        </button>
+        <button
+          type="button"
+          className={button}
+          disabled={state.status === 'running' || !Number.isInteger(requestNumber) || requestNumber < 1}
+          onClick={() => void go(async () => (await getRayfinClient()).functions.getRequestChecks.invoke({ requestId: requestNumber }))}
+        >
+          Show checks
+        </button>
+        <button
+          type="button"
+          className={button}
+          disabled={state.status === 'running' || !Number.isInteger(requestNumber) || requestNumber < 1}
+          onClick={() =>
+            void go(async () =>
+              (await getRayfinClient()).functions.decideRequest.invoke({ requestId: requestNumber, decision, comment, expectedStatus: '' })
+            )
+          }
+        >
+          Decide request
+        </button>
+      </div>
+
+      {state.status === 'done' ? (
+        <div className="mt-300">
+          <pre
+            role="status"
+            className="max-h-96 overflow-auto whitespace-pre-wrap break-words rounded-md border border-border bg-background p-300 text-sm"
+          >
+            {state.text}
+          </pre>
+          <button
+            type="button"
+            onClick={() => {
+              void navigator.clipboard.writeText(state.text).then(
+                () => setCopied(true),
+                () => setCopied(false)
+              );
+            }}
+            className="mt-200 rounded-md border border-border px-300 py-100 text-sm"
+          >
+            {copied ? 'Copied' : 'Copy result'}
+          </button>
+        </div>
+      ) : null}
+      {state.status === 'failed' ? (
+        <p role="alert" className="mt-300 break-words text-destructive">
+          The call failed: {state.text}
+        </p>
+      ) : null}
+    </section>
+  );
+}
+
 function SpikeCard({
   id,
   title,
@@ -191,7 +343,7 @@ export function Spikes() {
       <SpikeCard
         id="s1"
         title="S1 · Who am I"
-        question="Can the server see who is calling? It should tell two different people apart. The server token has no e-mail field, so the result also shows what this browser's own session knows (browserSession) and whether the ids match."
+        question="Can the server see who is calling? It should tell two different people apart. The server token has no e-mail field, so the result also shows what this browser's own session knows (browserSession) and whether the ids match. S8: tokenCheck shows whether the token's signature verified against the Rayfin service's published keys, and whether a tampered copy was refused (tamper.rejected should be true)."
         buttonLabel="Who am I"
         run={() => runWhoAmI(browserUser)}
       />
@@ -216,6 +368,7 @@ export function Spikes() {
         buttonLabel="Run OneLake test"
         run={runStorageProbe}
       />
+      <WritePathCard />
     </div>
   );
 }

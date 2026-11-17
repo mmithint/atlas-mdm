@@ -29,9 +29,37 @@ export type AppFunctionsSchema = {
     input: { equipmentId: number };
     output: { found: boolean; heater: null | { equipmentId: number; equipmentNumber: null | string; equipmentDescription: null | string; functionalLocation: null | string; flocDescription: null | string; superiorFunctionalLocation: null | string; equipmentTagNumber: null | string; equipClass: null | string; classType: null | string; objectType: null | string; flocClass: null | string; techObjectType: null | string; manufacturer: null | string; modelNumber: null | string; manufacturerSerialNumber: null | string; firedUnfired: null | string; heatDutyMmbtuHr: null | number; heatDutySource: null | string; equipmentUserStatus: null | string; flocUserStatus: null | string; profitCenterName: null | string; plannerGroup: null | string; heaterPopulationMethod: null | string; goldenVersionId: null | number; lastChangedAtUtc: null | string; baselineAsOfUtc: null | string }; floc: null | { functionalLocation: string; flocDescription: null | string; superiorFunctionalLocation: null | string; flocClass: null | string; techObjectType: null | string; flocUserStatus: null | string; profitCenterName: null | string; level1Id: null | string; level2Id: null | string; level3Id: null | string; level4Id: null | string; level5Id: null | string; level6Id: null | string; goldenVersionId: null | number; lastChangedAtUtc: null | string }; fieldValues: { equipmentFieldKey: string; equipmentId: number; fieldCode: string; currentValue: null | string; baselineValue: null | string; unit: null | string; valueSource: null | string; lastRequestId: null | string; lastChangedAtUtc: null | string }[]; ownership: { fieldOwnershipKey: string; entityType: null | string; fieldCode: null | string; label: null | string; responsibleRole: null | string; accountableRole: null | string; routeId: null | number }[]; timing: { connectMs: number; queryMs: number; totalMs: number }; error: null | string };
   };
+  createChangeRequest: {
+    input: { source: string; entityType: string; equipmentId: number; functionalLocation: string; fieldCode: string; oldValue: string; newValue: string; reason: string; comment: string; evidenceJson: string };
+    output: { ok: boolean; status: string; error: null | string; errorCode: null | number; userId: null | string; timing: { connectMs: number; queryMs: number; totalMs: number }; requestId: null | number; requestRef: null | string; outcome: null | string; responsibleGroup: null | string; accountableGroup: null | string };
+  };
+  decideRequest: {
+    input: { requestId: number; decision: string; comment: string; expectedStatus: string };
+    output: { ok: boolean; status: string; error: null | string; errorCode: null | number; userId: null | string; timing: { connectMs: number; queryMs: number; totalMs: number }; requestId: null | number; requestRef: null | string; decision: null | string; previousStatus: null | string; newStatus: null | string; stage: null | string; needsMerge: boolean; merge: null | { outcome: string; message: null | string; goldenVersionId: null | number; recorded: null | string; error: null | string } };
+  };
+  bulkApprove: {
+    input: { requestIds: string; comment: string };
+    output: { ok: boolean; status: string; error: null | string; errorCode: null | number; userId: null | string; timing: { connectMs: number; queryMs: number; totalMs: number }; decided: number; skipped: number; results: { requestId: null | number; requestRef: null | string; outcome: string; newStatus: null | string; reason: null | string; merge: null | { outcome: string; message: null | string; goldenVersionId: null | number; recorded: null | string; error: null | string } }[] };
+  };
+  resubmitRequest: {
+    input: { requestId: number; newValue: string; comment: string };
+    output: { ok: boolean; status: string; error: null | string; errorCode: null | number; userId: null | string; timing: { connectMs: number; queryMs: number; totalMs: number }; requestId: null | number; requestRef: null | string; newStatus: null | string; newValue: null | string };
+  };
+  cancelRequest: {
+    input: { requestId: number; comment: string };
+    output: { ok: boolean; status: string; error: null | string; errorCode: null | number; userId: null | string; timing: { connectMs: number; queryMs: number; totalMs: number }; requestId: null | number; requestRef: null | string; previousStatus: null | string; newStatus: null | string };
+  };
+  getRequestChecks: {
+    input: { requestId: number };
+    output: { ok: boolean; status: string; error: null | string; errorCode: null | number; userId: null | string; timing: { connectMs: number; queryMs: number; totalMs: number }; requestStatus: null | string; checks: { order: number; code: string; checkStatus: string; message: string; checkedAtUtc: null | string }[] };
+  };
+  getRequestEvidence: {
+    input: { requestId: number };
+    output: { ok: boolean; status: string; error: null | string; errorCode: null | number; userId: null | string; timing: { connectMs: number; queryMs: number; totalMs: number }; requestRef: null | string; createdAtUtc: null | string; createdBy: null | string; detailsJson: null | string };
+  };
   whoAmI: {
     input: Record<string, never>;
-    output: { tokenKind: 'jwt' | 'opaque' | 'missing'; claimNames: string[]; emailClaim: null | string; email: null | string; claims: { [k: string]: string } };
+    output: { tokenKind: 'jwt' | 'opaque' | 'missing'; claimNames: string[]; emailClaim: null | string; email: null | string; claims: { [k: string]: string }; tokenCheck: { mode: 'report' | 'enforce'; anchor: 'pinned' | 'request' | 'none'; endpoint: null | string; requestEndpoint: string; pinMatchesRequest: null | false | true; configProblem: null | string; verdict: string; header: null | { alg: null | string; kid: null | string; typ: null | string }; expiresInSec: null | number; lifetimeSec: null | number; jwks: null | { status: null | number; ms: null | number; keyCount: number; kids: string[]; algs: string[]; kinds: string[]; fromCache: boolean; ageSec: number; stale: boolean; error: null | string }; tamper: null | { verdict: string; rejected: boolean } } };
   };
   sqlPing: {
     input: Record<string, never>;

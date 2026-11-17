@@ -1,12 +1,15 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { whoAmIInvoke, sqlPingInvoke, storageProbeInvoke, searchInvoke, detailInvoke } = vi.hoisted(() => ({
+const { whoAmIInvoke, sqlPingInvoke, storageProbeInvoke, searchInvoke, detailInvoke, createInvoke, checksInvoke, decideInvoke } = vi.hoisted(() => ({
   whoAmIInvoke: vi.fn(),
   sqlPingInvoke: vi.fn(),
   storageProbeInvoke: vi.fn(),
   searchInvoke: vi.fn(),
   detailInvoke: vi.fn(),
+  createInvoke: vi.fn(),
+  checksInvoke: vi.fn(),
+  decideInvoke: vi.fn(),
 }));
 
 vi.mock('@/lib/rayfin-client', () => ({
@@ -17,6 +20,9 @@ vi.mock('@/lib/rayfin-client', () => ({
       storageProbe: { invoke: storageProbeInvoke },
       searchEquipment: { invoke: searchInvoke },
       getEquipmentDetail: { invoke: detailInvoke },
+      createChangeRequest: { invoke: createInvoke },
+      getRequestChecks: { invoke: checksInvoke },
+      decideRequest: { invoke: decideInvoke },
     },
   }),
 }));
@@ -32,13 +38,22 @@ describe('Spikes page', () => {
     storageProbeInvoke.mockReset();
     searchInvoke.mockReset();
     detailInvoke.mockReset();
+    createInvoke.mockReset();
+    checksInvoke.mockReset();
+    decideInvoke.mockReset();
   });
 
   it('shows every spike button and calls nothing until clicked', () => {
     render(<Spikes />);
-    for (const name of ['Who am I', 'SQL ping', 'Run timing test', 'Run OneLake test']) {
+    for (const name of ['Who am I', 'SQL ping', 'Run timing test', 'Run OneLake test', 'Create test request']) {
       expect(screen.getByRole('button', { name })).toBeEnabled();
     }
+    // no request number yet: nothing to check or decide
+    expect(screen.getByRole('button', { name: 'Show checks' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Decide request' })).toBeDisabled();
+    expect(createInvoke).not.toHaveBeenCalled();
+    expect(checksInvoke).not.toHaveBeenCalled();
+    expect(decideInvoke).not.toHaveBeenCalled();
     expect(whoAmIInvoke).not.toHaveBeenCalled();
     expect(sqlPingInvoke).not.toHaveBeenCalled();
     expect(storageProbeInvoke).not.toHaveBeenCalled();
@@ -95,6 +110,52 @@ describe('Spikes page', () => {
     expect(result).toHaveTextContent('"ok": false');
     expect(result).toHaveTextContent('permission denied');
     expect(result).toHaveTextContent('the browser sent equipmentId as number 1');
+  });
+
+  it('APP-3 scratch card: creates a request from the heater\'s current value without sending any e-mail, then fills in the request number', async () => {
+    detailInvoke.mockResolvedValue({ found: true, heater: { manufacturer: 'SYNTHETIC MFR A' }, floc: null, fieldValues: [], ownership: [], timing: { connectMs: 0, queryMs: 0, totalMs: 1 }, error: null });
+    createInvoke.mockResolvedValue({ ok: true, status: 'OK', error: null, requestId: 77, requestRef: 'CR-000077', outcome: 'CREATED' });
+
+    render(<Spikes />);
+    fireEvent.change(screen.getByLabelText('Heater id'), { target: { value: '5' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Create test request' }));
+
+    const result = await screen.findByText(/CR-000077/);
+    expect(result).toBeInTheDocument();
+    expect(detailInvoke).toHaveBeenCalledWith({ equipmentId: 5 });
+    const sent = createInvoke.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(sent).toMatchObject({ source: 'MANUAL', entityType: 'EQUIPMENT', equipmentId: 5, fieldCode: 'MANUFACTURER', oldValue: 'SYNTHETIC MFR A' });
+    expect(String(sent['newValue'])).toMatch(/^SCRATCH \d{6}$/);
+    expect(Object.keys(sent).some((k) => /mail|user|actor|requestedBy/i.test(k))).toBe(false);
+    // the new number is offered to the other buttons
+    expect(screen.getByLabelText('Request number')).toHaveValue('77');
+    expect(screen.getByRole('button', { name: 'Show checks' })).toBeEnabled();
+  });
+
+  it('APP-3 scratch card: shows the checks and sends the decision with the comment', async () => {
+    checksInvoke.mockResolvedValue({ ok: true, status: 'OK', checks: [{ code: 'OLD_VALUE_CURRENT', checkStatus: 'PASS' }] });
+    decideInvoke.mockResolvedValue({ ok: false, status: 'REFUSED', errorCode: 50141, error: 'You are not an active member of the group for this stage (X).' });
+
+    render(<Spikes />);
+    fireEvent.change(screen.getByLabelText('Request number'), { target: { value: '9' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Show checks' }));
+    expect(await screen.findByText(/OLD_VALUE_CURRENT/)).toBeInTheDocument();
+    expect(checksInvoke).toHaveBeenCalledWith({ requestId: 9 });
+
+    fireEvent.change(screen.getByLabelText('Decision'), { target: { value: 'RETURN' } });
+    fireEvent.change(screen.getByLabelText('Comment (needed to reject or return)'), { target: { value: 'check the nameplate' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Decide request' }));
+    expect(await screen.findByText(/not an active member/)).toBeInTheDocument();
+    expect(decideInvoke).toHaveBeenCalledWith({ requestId: 9, decision: 'RETURN', comment: 'check the nameplate', expectedStatus: '' });
+  });
+
+  it('APP-3 scratch card: says so when the heater does not exist, without creating anything', async () => {
+    detailInvoke.mockResolvedValue({ found: false, heater: null, floc: null, fieldValues: [], ownership: [], timing: { connectMs: 0, queryMs: 0, totalMs: 1 }, error: null });
+    render(<Spikes />);
+    fireEvent.change(screen.getByLabelText('Heater id'), { target: { value: '999999' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Create test request' }));
+    expect(await screen.findByText(/was not found/)).toBeInTheDocument();
+    expect(createInvoke).not.toHaveBeenCalled();
   });
 
   it('runs the OneLake probe (S4) only when asked and shows its answer', async () => {

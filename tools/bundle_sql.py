@@ -89,9 +89,49 @@ STAGES: dict[str, tuple[str, list[str]]] = {
     ),
     # APP-3 stage 0 (decided 16 Nov, D-18): the equipment status list the request checks use.
     # Needs app1_2 (seed 0106). Run it before the APP-3 procedures and tests.
+    # 0109 (added 16 Nov, while building APP-3, before this stage was run) joins it: the list of fields
+    # only an admin may request. The stage name stays so the run lists that name it stay true.
     "app3_0_seed_status": (
-        "APP-3 stage 0: equipment status allowed values (AVFS, NOPE, OPER, DECM)",
-        ["db/seed/0108_equipment_status_values.sql"],
+        "APP-3 stage 0: seeds (equipment status allowed values AVFS, NOPE, OPER, DECM; admin-only fields)",
+        ["db/seed/0108_equipment_status_values.sql", "db/seed/0109_admin_only_fields.sql"],
+    ),
+    # APP-3 stage 1: everything the request write path is made of, in dependency order. Helper functions
+    # first (the checks function uses two of them), the notification helper, the procedures (the bulk
+    # procedure calls decide), then the four request views (the detail view reads the queue view).
+    # Needs app1 (tables, route procedure), the gold stub or the real gold, and app3_0.
+    "app3_1_request_objects": (
+        "APP-3 stage 1: request helper functions, procedures and views",
+        [
+            "db/procs/fn_requester_rights.sql",
+            "db/procs/fn_stage_eligibility.sql",
+            "db/procs/fn_value_check.sql",
+            "db/procs/fn_request_checks.sql",
+            "db/procs/usp_notification_enqueue.sql",
+            "db/procs/usp_request_create.sql",
+            "db/procs/usp_request_checks.sql",
+            "db/procs/usp_request_decide.sql",
+            "db/procs/usp_request_bulk_decide.sql",
+            "db/procs/usp_request_resubmit.sql",
+            "db/procs/usp_request_cancel.sql",
+            "db/procs/usp_request_record_merge.sql",
+            "db/procs/usp_request_mark_exported.sql",
+            "db/procs/usp_request_evidence.sql",
+            "db/views/vw_request_queue.sql",
+            "db/views/vw_request_event.sql",
+            "db/views/vw_equipment_request.sql",
+            "db/views/vw_request_detail.sql",
+        ],
+    ),
+    # APP-3 stages 2 and 3: the tests, apart from the objects so that a compile error in a test never
+    # hides whether the objects themselves compiled, and apart from each other because the lifecycle
+    # test is long (about 100 KB pasted). Both roll back everything they write.
+    "app3_2_request_views_test": (
+        "APP-3 stage 2: request views test",
+        ["db/tests/t_request_views.sql"],
+    ),
+    "app3_3_request_lifecycle_test": (
+        "APP-3 stage 3: request lifecycle test (16 scenarios and 2 extras)",
+        ["db/tests/t_request_lifecycle.sql"],
     ),
 }
 

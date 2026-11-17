@@ -12,12 +12,29 @@ import {
 } from './equipment.js';
 import { loadMyProfile, type MyProfile } from './profile.js';
 import {
+  runBulkApprove,
+  runCancelRequest,
+  runCreateRequest,
+  runDecideRequest,
+  runRequestChecks,
+  runRequestEvidence,
+  runResubmitRequest,
+  type BulkApproveResult,
+  type CancelRequestResult,
+  type CreateRequestResult,
+  type DecideRequestResult,
+  type RequestChecksResult,
+  type RequestEvidenceResult,
+  type ResubmitRequestResult,
+} from './requests.js';
+import {
   sqlPing,
   whoAmI,
   type SqlPingResult,
   type WhoAmIResult,
 } from './spikes.js';
 import { storageProbe, type StorageProbeResult } from './storage.js';
+import { tokenCheckReport, trustedAccessToken } from './tokenverify.js';
 
 const udf = new UserDataFunctions();
 
@@ -25,13 +42,19 @@ const udf = new UserDataFunctions();
 // inside `udf.func`), so handlers stay here and delegate to the modules.
 // Every business rule lives in a T-SQL procedure; functions only resolve the
 // caller, validate input and call one procedure.
+//
+// WHO IS CALLING (D-19, 01 section 6.8): a handler that acts for a person passes
+// `await trustedAccessToken(ctx)` to its module, never `ctx.accessToken`. That call
+// checks the token's signature (tokenverify.ts); a token that fails comes back as
+// null and the module answers NOT_AUTHENTICATED. tokenverify.spec.ts fails if a
+// handler here skips it.
 
 // APP-2: who is signed in and what may they do. Reads only (profile.ts).
 udf.func(
   'getMyProfile',
   async (
     ctx: RayfinContext<Record<string, any>, AudienceType.Sql>
-  ): Promise<MyProfile> => loadMyProfile(ctx.accessToken, () => ctx.Tokens.Sql),
+  ): Promise<MyProfile> => loadMyProfile(await trustedAccessToken(ctx), () => ctx.Tokens.Sql),
   []
 );
 
@@ -53,7 +76,7 @@ udf.func(
   ): Promise<EquipmentSearchResult> =>
     runEquipmentSearch(
       { mode, searchColumn, searchText, facility, sortColumn, sortDirection, offset, pageSize },
-      ctx.accessToken,
+      await trustedAccessToken(ctx),
       () => ctx.Tokens.Sql
     ),
   []
@@ -65,16 +88,110 @@ udf.func(
     equipmentId: number,
     ctx: RayfinContext<Record<string, any>, AudienceType.Sql>
   ): Promise<EquipmentDetailResult> =>
-    runEquipmentDetail(equipmentId, ctx.accessToken, () => ctx.Tokens.Sql),
+    runEquipmentDetail(equipmentId, await trustedAccessToken(ctx), () => ctx.Tokens.Sql),
+  []
+);
+
+// APP-3, the request write path (FINAL PLAN/01 section 2.2). Plain text and number parameters on purpose;
+// requests.ts checks them. No function takes an e-mail address: the caller is identified from the token
+// (01 section 6.8) and the procedure receives the e-mail as @actor_email / @requested_by. Every failure
+// comes back inside the answer (status, error), never thrown.
+udf.func(
+  'createChangeRequest',
+  async (
+    source: string,
+    entityType: string,
+    equipmentId: number,
+    functionalLocation: string,
+    fieldCode: string,
+    oldValue: string,
+    newValue: string,
+    reason: string,
+    comment: string,
+    evidenceJson: string,
+    ctx: RayfinContext<Record<string, any>, AudienceType.Sql>
+  ): Promise<CreateRequestResult> =>
+    runCreateRequest(
+      { source, entityType, equipmentId, functionalLocation, fieldCode, oldValue, newValue, reason, comment, evidenceJson },
+      await trustedAccessToken(ctx),
+      () => ctx.Tokens.Sql
+    ),
+  []
+);
+
+udf.func(
+  'decideRequest',
+  async (
+    requestId: number,
+    decision: string,
+    comment: string,
+    expectedStatus: string,
+    ctx: RayfinContext<Record<string, any>, AudienceType.Sql>
+  ): Promise<DecideRequestResult> =>
+    runDecideRequest({ requestId, decision, comment, expectedStatus }, await trustedAccessToken(ctx), () => ctx.Tokens.Sql),
+  []
+);
+
+udf.func(
+  'bulkApprove',
+  async (
+    requestIds: string,
+    comment: string,
+    ctx: RayfinContext<Record<string, any>, AudienceType.Sql>
+  ): Promise<BulkApproveResult> =>
+    runBulkApprove({ requestIds, comment }, await trustedAccessToken(ctx), () => ctx.Tokens.Sql),
+  []
+);
+
+udf.func(
+  'resubmitRequest',
+  async (
+    requestId: number,
+    newValue: string,
+    comment: string,
+    ctx: RayfinContext<Record<string, any>, AudienceType.Sql>
+  ): Promise<ResubmitRequestResult> =>
+    runResubmitRequest({ requestId, newValue, comment }, await trustedAccessToken(ctx), () => ctx.Tokens.Sql),
+  []
+);
+
+udf.func(
+  'cancelRequest',
+  async (
+    requestId: number,
+    comment: string,
+    ctx: RayfinContext<Record<string, any>, AudienceType.Sql>
+  ): Promise<CancelRequestResult> =>
+    runCancelRequest({ requestId, comment }, await trustedAccessToken(ctx), () => ctx.Tokens.Sql),
+  []
+);
+
+udf.func(
+  'getRequestChecks',
+  async (
+    requestId: number,
+    ctx: RayfinContext<Record<string, any>, AudienceType.Sql>
+  ): Promise<RequestChecksResult> => runRequestChecks(requestId, await trustedAccessToken(ctx), () => ctx.Tokens.Sql),
+  []
+);
+
+udf.func(
+  'getRequestEvidence',
+  async (
+    requestId: number,
+    ctx: RayfinContext<Record<string, any>, AudienceType.Sql>
+  ): Promise<RequestEvidenceResult> => runRequestEvidence(requestId, await trustedAccessToken(ctx), () => ctx.Tokens.Sql),
   []
 );
 
 // APP-0 spikes. Removed in APP-10 together with the `#/spikes` page.
 
 // S1: which claims does the invocation token carry? (Q-495)
+// S8: does the token's signature verify against the Rayfin service's published keys? (`tokenCheck` in the answer)
+// This spike reads the raw token on purpose, to show what the platform sends; no other handler may.
 udf.func(
   'whoAmI',
-  async (ctx: RayfinContext): Promise<WhoAmIResult> => whoAmI(ctx.accessToken),
+  async (ctx: RayfinContext): Promise<WhoAmIResult> => whoAmI(ctx.accessToken, await tokenCheckReport(ctx)),
   []
 );
 

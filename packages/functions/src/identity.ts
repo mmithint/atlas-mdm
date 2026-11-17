@@ -5,9 +5,12 @@
  * claims (the fields inside the token, such as the caller's e-mail) so the spike
  * can show which claim names exist and which one carries the e-mail.
  *
- * Spike scope: the payload is decoded, not signature-checked. The decision on
- * how `identity.ts` is hardened for the request procedures is taken in APP-3
- * from the S1 result. The token itself is never returned or logged.
+ * This module only READS a token's payload; it does not check the signature. The
+ * signature is checked before any function reads the payload, at the handler
+ * boundary in `function_app.ts`: `trustedAccessToken(ctx)` (tokenverify.ts, spike S8,
+ * decision D-19) returns the token only when it verifies, else null, and null
+ * becomes NOT_AUTHENTICATED below. Pass `callerId` nothing but such a token.
+ * The token itself is never returned or logged.
  */
 
 export type TokenKind = 'jwt' | 'opaque' | 'missing';
@@ -102,9 +105,9 @@ export type CallerId =
 /**
  * Who is calling, as the id the database can map to a person. Anything that is not
  * a readable token with a GUID user id is `NOT_AUTHENTICATED` and nothing else runs.
- * The payload is decoded, not signature-checked (Rayfin has authenticated the call
- * before the function runs [INFERRED]); the decision on hardening this is taken in
- * APP-3 (`08` section 2, S1).
+ * The payload is decoded here, not signature-checked: the caller (function_app.ts)
+ * has already run the token through `trustedAccessToken` (D-19), which is where an
+ * unsigned, forged or expired token is turned away.
  */
 export function callerId(accessToken: string | null | undefined): CallerId {
   const decoded = decodeToken(accessToken);
