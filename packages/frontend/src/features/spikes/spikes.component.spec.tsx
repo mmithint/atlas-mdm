@@ -146,7 +146,7 @@ describe('Spikes page', () => {
     fireEvent.change(screen.getByLabelText('Comment (needed to reject or return)'), { target: { value: 'check the nameplate' } });
     fireEvent.click(screen.getByRole('button', { name: 'Decide request' }));
     expect(await screen.findByText(/not an active member/)).toBeInTheDocument();
-    expect(decideInvoke).toHaveBeenCalledWith({ requestId: 9, decision: 'RETURN', comment: 'check the nameplate', expectedStatus: '' });
+    expect(decideInvoke).toHaveBeenCalledWith({ requestId: 9, decision: 'RETURN', comment: 'check the nameplate', expectedStatus: '', returnTo: '' });
   });
 
   it('APP-3 scratch card: says so when the heater does not exist, without creating anything', async () => {

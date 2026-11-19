@@ -11,15 +11,22 @@
      50133 no such request                                                     50134 not waiting for a decision
      50135 @expected_status given and the request has moved on (the screen is out of date)
      50136 REJECT and RETURN need a comment
-     50141 not an active member of the group the request was routed to for this stage
-     50142 no role of the person has the stage's flag with a scope that covers the profit centre
-     50143 segregation: the same person approved the first stage and SAME_PERSON_BOTH_STAGES = 0
-           (only for APPROVE at the accountable stage)
+     50141 not an active member of the group the request was routed to for this stage (an admin is exempt)
+     50142 no role of the person has the stage's flag with a scope that covers the profit centre (an admin is
+           exempt)
+     (50143, "the same person may not approve both stages", is retired: client, 18 Nov 2026, answers Q-479.
+      Whoever is eligible at the second stage may approve it, also when they approved the first: an admin, or
+      a member of both routed groups. The event records how: decided_as ADMIN or GROUP_MEMBER, and
+      same_person_both_stages = true.)
      50144 APPROVE blocked by a FAILED approval check (app.fn_request_checks rows 1 to 5; NOT_CHECKED does
            not block; a stale request can still be REJECTED or RETURNED)
-     50137 RETURN to someone other than the allowed recipient: the submitter (field / manual requests) or
-           the rule's resolution group (rule requests); a request raised by system:... goes to its
-           responsible group (Q-465 working assumption, setting RETURN_RECIPIENT_RULE)
+     50137 RETURN to someone who is not allowed (client, 18 Nov 2026, answers Q-465). @return_recipient names
+           ONE person, who must be in app.fn_return_candidates for this request and this actor: the submitter,
+           an active member of either routed group (registered), or the actor themselves. Without
+           @return_recipient the request goes where it went before (the default): the submitter of a field or
+           manual request, the rule's resolution group for a rule request, the responsible group for another
+           request raised by system:... . @return_recipient_type, when given, must be USER with a person, or
+           GROUP with exactly that default group.
      50149 somebody else changed the request between the read and the write (row_version)
 
    What it writes, in ONE transaction: the new status, the event (type, stage, actor, group, comment,
@@ -27,7 +34,8 @@
      APPROVE at RESPONSIBLE   -> PENDING_ACCOUNTABLE, event RESPONSIBLE_APPROVED, group notified
      APPROVE at ACCOUNTABLE   -> APPROVED, event ACCOUNTABLE_APPROVED, requester notified; needs_merge = 1
      REJECT                   -> REJECTED, event REJECTED, requester notified with the comment
-     RETURN                   -> RETURNED, event RETURNED, the recipient notified with the comment
+     RETURN                   -> RETURNED, event RETURNED, the recipient notified with the comment (not when the
+                                 actor returned it to themselves)
    The merge into gold is NOT done here: it is a separate step after the approval commits (01 section 2.2).
    The function calls gold.usp_apply_approved_change when needs_merge = 1 and records the outcome with
    app.usp_request_record_merge.
@@ -89,25 +97,25 @@ BEGIN
         THROW 50136, N'A comment is required to reject or return a request.', 1;
 
     /* ---- who may decide ---------------------------------------------------------- */
-    DECLARE @is_member bit, @has_flag bit;
-    SELECT @is_member = e.is_group_member, @has_flag = e.has_flag_in_scope
+    DECLARE @is_member bit, @has_flag bit, @is_admin bit;
+    SELECT @is_member = e.is_group_member, @has_flag = e.has_flag_in_scope, @is_admin = e.is_admin
     FROM app.fn_stage_eligibility(@actor, @stage, @grp, @pc) AS e;
-    IF @is_member = 0
+    IF ISNULL(@is_admin, 0) = 0 AND @is_member = 0
     BEGIN
         SET @msg = N'You are not an active member of the group for this stage (' + ISNULL(@grp, N'none') + N').';
         THROW 50141, @msg, 1;
     END
-    IF @has_flag = 0
+    IF ISNULL(@is_admin, 0) = 0 AND @has_flag = 0
     BEGIN
         SET @msg = N'No role of yours allows the ' + @stage + N' stage for ' + ISNULL(@pc, N'this profit centre') + N'.';
         THROW 50142, @msg, 1;
     END
-
-    IF @dec = N'APPROVE' AND @stage = N'ACCOUNTABLE'
-       AND ISNULL((SELECT s.setting_value FROM app.app_setting AS s WHERE s.setting_key = N'SAME_PERSON_BOTH_STAGES'), N'0') = N'0'
-       AND EXISTS (SELECT 1 FROM app.change_request_event AS ev
-                   WHERE ev.request_id = @request_id AND ev.event_type = N'RESPONSIBLE_APPROVED' AND ev.actor = @actor)
-        THROW 50143, N'The same person may not approve both stages of one request.', 1;
+    -- how this person qualified, for the history: a group member with the flag, or an admin who is not
+    DECLARE @decided_as nvarchar(12) = CASE WHEN @is_member = 1 AND @has_flag = 1 THEN N'GROUP_MEMBER' ELSE N'ADMIN' END;
+    DECLARE @same_person bit = CASE WHEN @dec = N'APPROVE' AND @stage = N'ACCOUNTABLE'
+                                     AND EXISTS (SELECT 1 FROM app.change_request_event AS ev
+                                                 WHERE ev.request_id = @request_id AND ev.event_type = N'RESPONSIBLE_APPROVED' AND ev.actor = @actor)
+                                    THEN 1 ELSE 0 END;
 
     /* ---- approval checks (a stale or failing request may still be rejected or returned) -- */
     DECLARE @failed nvarchar(max);
@@ -149,12 +157,28 @@ BEGIN
             SET @rrec = @rg;
         END
 
-        IF (@return_recipient IS NOT NULL OR @return_recipient_type IS NOT NULL)
-           AND (UPPER(ISNULL(LTRIM(RTRIM(@return_recipient_type)), N'')) <> @rtype
-                OR LOWER(ISNULL(LTRIM(RTRIM(@return_recipient)), N'')) <> LOWER(@rrec))
+        -- a chosen recipient (client, 18 Nov 2026): one person from app.fn_return_candidates, or the default group
+        DECLARE @want_type nvarchar(10) = NULLIF(UPPER(LTRIM(RTRIM(@return_recipient_type))), N'');
+        DECLARE @want nvarchar(256) = NULLIF(LOWER(LTRIM(RTRIM(@return_recipient))), N'');
+        IF @want IS NOT NULL OR @want_type IS NOT NULL
         BEGIN
-            SET @msg = N'This request can only be returned to ' + @rrec + N' (' + @rtype + N').';
-            THROW 50137, @msg, 1;
+            IF @want_type = N'GROUP'
+            BEGIN
+                IF @rtype <> N'GROUP' OR @want IS NULL OR @want <> LOWER(@rrec)
+                BEGIN
+                    SET @msg = N'This request can only be returned to a person, or to ' + CASE WHEN @rtype = N'GROUP' THEN @rrec ELSE N'no group' END + N'.';
+                    THROW 50137, @msg, 1;
+                END
+            END
+            ELSE
+            BEGIN
+                IF (@want_type IS NOT NULL AND @want_type <> N'USER')
+                   OR @want IS NULL
+                   OR NOT EXISTS (SELECT 1 FROM app.fn_return_candidates(@request_id, @actor) AS c WHERE c.user_email = @want)
+                    THROW 50137, N'A request can only be returned to its submitter, to a registered member of one of its two approval groups, or to yourself.', 1;
+                SET @rtype = N'USER';
+                SET @rrec = @want;
+            END
         END
     END
 
@@ -168,11 +192,12 @@ BEGIN
                                             WHEN @stage = N'RESPONSIBLE' THEN N'RESPONSIBLE_APPROVED'
                                             ELSE N'ACCOUNTABLE_APPROVED' END;
     DECLARE @details nvarchar(max) =
-        (SELECT @stage AS stage, @dec AS decision, JSON_QUERY(@checks_json) AS checks,
+        (SELECT @stage AS stage, @dec AS decision, @decided_as AS decided_as,
+                CAST(@same_person AS bit) AS same_person_both_stages, JSON_QUERY(@checks_json) AS checks,
                 @rtype AS return_recipient_type, @rrec AS return_recipient
          FOR JSON PATH, WITHOUT_ARRAY_WRAPPER);
     DECLARE @req_mail nvarchar(256) = CASE WHEN @by = @actor THEN NULL ELSE @by END;
-    DECLARE @ret_mail nvarchar(256) = CASE WHEN @rtype = N'USER' THEN @rrec ELSE NULL END;
+    DECLARE @ret_mail nvarchar(256) = CASE WHEN @rtype = N'USER' AND @rrec <> @actor THEN @rrec ELSE NULL END;
     DECLARE @ret_group nvarchar(64) = CASE WHEN @rtype = N'GROUP' THEN @rrec ELSE NULL END;
     DECLARE @what nvarchar(400) = (SELECT TOP (1) ISNULL(fc.label, r.field_code) + N' of ' + ISNULL(r.equipment_number, r.functional_location)
                                    FROM app.change_request AS r

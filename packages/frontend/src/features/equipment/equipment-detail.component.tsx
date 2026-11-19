@@ -1,20 +1,25 @@
 import { ArrowLeft, Pencil } from 'lucide-react';
-import type { ReactNode } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 
+import { useProfile } from '@/app/profile.context';
 import { hrefFor } from '@/app/router';
 import { EmptyState, ErrorState, LoadingState } from '@/components/states';
 import { badge, button, card } from '@/components/ui';
 import { useLoad } from '@/hooks/use-load';
 import { BLANK, formatUtc, orBlank } from '@/lib/format';
 
+import { fetchFormOptions } from './change-request-api';
 import { buildFieldRows, flocLevels, type FieldRow } from './detail-model';
 import { fetchHeater, type HeaterDetail } from './equipment-api';
+import { EquipmentRequests } from './equipment-requests.component';
+import { RequestDialog } from './request-dialog.component';
+import { buildFieldChoices, submitBlockReason, type AccessInput } from './request-dialog-model';
 
 /**
- * S-5 Equipment detail (POC-APP-06), first half: the golden record of one heater, who
- * answers and who signs off for every field, and honest placeholders for what later phases
- * add (rule results, verification, history and requests, evidence). Nothing here changes
- * data; "Request change" is wired in APP-4.
+ * S-5 Equipment detail (POC-APP-06): the golden record of one heater, who answers and who
+ * signs off for every field, the change requests on it, and honest placeholders for what later
+ * phases add (rule results, verification, evidence). Reading changes nothing; "Request change"
+ * (APP-4) opens a dialog whose submit goes through the request function and procedure.
  */
 export function EquipmentDetail({ idText }: { idText: string }) {
   const valid = /^\d+$/.test(idText);
@@ -50,12 +55,48 @@ export function EquipmentDetail({ idText }: { idText: string }) {
   );
 }
 
+/** A stable empty list, so the memo below is not rebuilt on every render while the options load. */
+const NO_BLOCKED_FIELDS: never[] = [];
+
 function Heater({ detail }: { detail: HeaterDetail }) {
   const { heater, floc } = detail;
-  const fields = buildFieldRows(detail.catalog, detail.fieldValues, detail.ownership, heater);
+  const fields = useMemo(
+    () => buildFieldRows(detail.catalog, detail.fieldValues, detail.ownership, heater),
+    [detail.catalog, detail.fieldValues, detail.ownership, heater]
+  );
   const levels = flocLevels(floc);
   const title = heater.equipmentTagNumber || heater.equipmentNumber || `Heater ${heater.equipmentId}`;
   const facility = heater.superiorFunctionalLocation;
+
+  // What this person may request: the person (profile) and the form options, loaded once beside the page. A
+  // failure here only switches the buttons off with the reason; it never breaks the page.
+  const { state: profileState } = useProfile();
+  const options = useLoad('request-form-options', fetchFormOptions);
+  const blocked = options.status === 'ready' ? options.data.blockedFields : NO_BLOCKED_FIELDS;
+  const choices = useMemo(
+    () => buildFieldChoices(fields, detail.catalog, detail.fieldValues, blocked),
+    [fields, detail.catalog, detail.fieldValues, blocked]
+  );
+  const access: AccessInput = {
+    person:
+      profileState.status === 'loading'
+        ? 'loading'
+        : profileState.status === 'error'
+          ? 'unavailable'
+          : profileState.profile.status === 'OK'
+            ? 'registered'
+            : 'not-registered',
+    options:
+      options.status === 'ready'
+        ? { status: 'ready', canSubmit: options.data.canSubmit }
+        : options.status === 'error'
+          ? { status: 'error', message: options.message }
+          : { status: 'loading' },
+  };
+  const blockReason = submitBlockReason(access);
+  const choiceByCode = new Map(choices.map((c) => [c.fieldCode, c]));
+  const [dialog, setDialog] = useState<{ fieldCode: string | null } | null>(null);
+  const [requestsReload, setRequestsReload] = useState(0);
 
   return (
     <>
@@ -71,8 +112,9 @@ function Heater({ detail }: { detail: HeaterDetail }) {
         <button
           type="button"
           className={button.primary}
-          disabled
-          title="Change requests open in the approval phase (APP-4)"
+          disabled={blockReason !== null}
+          title={blockReason ?? 'Propose a change to one of the fields below'}
+          onClick={() => setDialog({ fieldCode: null })}
         >
           <Pencil aria-hidden="true" className="icon-size-200" />
           Request change
@@ -122,7 +164,11 @@ function Heater({ detail }: { detail: HeaterDetail }) {
         </SummaryCard>
       </div>
 
-      <FieldsTable fields={fields} />
+      <FieldsTable
+        fields={fields}
+        requestBlock={(code) => blockReason ?? choiceByCode.get(code)?.unavailableReason ?? null}
+        onRequest={(code) => setDialog({ fieldCode: code })}
+      />
 
       <p className="text-200 text-muted-foreground">
         Golden record version {orBlank(heater.goldenVersionId)}. Last approved change:{' '}
@@ -130,17 +176,29 @@ function Heater({ detail }: { detail: HeaterDetail }) {
         SAP baseline taken {formatUtc(heater.baselineAsOfUtc)}.
       </p>
 
+      <EquipmentRequests equipmentId={heater.equipmentId} reloadKey={requestsReload} />
+
       <section aria-labelledby="later-title" className="space-y-300">
         <h2 id="later-title" className="text-400 font-semibold">
           Still to come on this page
         </h2>
-        <div className="grid gap-300 md:grid-cols-2 xl:grid-cols-4">
+        <div className="grid gap-300 md:grid-cols-3">
           <Later title="Rule results" phase="APP-5" text="Valid or Invalid badges from the business rules, each with a Fix button." />
           <Later title="Verification" phase="APP-9" text="How many of the five key fields were verified, and when." />
-          <Later title="History and requests" phase="APP-4" text="Every change request on this heater or its FLOC, open and closed, and who approved what." />
           <Later title="Evidence" phase="APP-7" text="Photos from the field and the P&ID drawings for this site." />
         </div>
       </section>
+
+      {dialog !== null && options.status === 'ready' ? (
+        <RequestDialog
+          heater={{ equipmentId: heater.equipmentId, functionalLocation: heater.functionalLocation, title }}
+          choices={choices}
+          allowedValues={options.data.allowedValues}
+          initialFieldCode={dialog.fieldCode}
+          onClose={() => setDialog(null)}
+          onCreated={() => setRequestsReload((n) => n + 1)}
+        />
+      ) : null}
     </>
   );
 }
@@ -185,7 +243,16 @@ const SOURCE_BADGE: Record<string, { text: string; className: string }> = {
   CORRECTED: { text: 'corrected', className: badge.info },
 };
 
-function FieldsTable({ fields }: { fields: readonly FieldRow[] }) {
+function FieldsTable({
+  fields,
+  requestBlock,
+  onRequest,
+}: {
+  fields: readonly FieldRow[];
+  /** Why a change to this field cannot be requested right now (the button's title), or null when it can. */
+  requestBlock: (fieldCode: string) => string | null;
+  onRequest: (fieldCode: string) => void;
+}) {
   if (fields.length === 0) {
     return <EmptyState title="No fields to show" hint="The field catalogue is empty. Run the seed 0106 (field catalogue) in the database." />;
   }
@@ -227,7 +294,7 @@ function FieldsTable({ fields }: { fields: readonly FieldRow[] }) {
                   </th>
                 </tr>
                 {g.rows.map((f) => (
-                  <FieldLine key={f.fieldCode} field={f} />
+                  <FieldLine key={f.fieldCode} field={f} blockedBecause={requestBlock(f.fieldCode)} onRequest={() => onRequest(f.fieldCode)} />
                 ))}
               </tbody>
             ))}
@@ -237,7 +304,7 @@ function FieldsTable({ fields }: { fields: readonly FieldRow[] }) {
   );
 }
 
-function FieldLine({ field }: { field: FieldRow }) {
+function FieldLine({ field, blockedBecause, onRequest }: { field: FieldRow; blockedBecause: string | null; onRequest: () => void }) {
   const source = field.valueSource ? (SOURCE_BADGE[field.valueSource] ?? { text: field.valueSource.toLowerCase(), className: badge.neutral }) : null;
   const unit = field.unit && field.current ? ` ${field.unit}` : '';
   return (
@@ -270,9 +337,10 @@ function FieldLine({ field }: { field: FieldRow }) {
         <button
           type="button"
           className={button.small}
-          disabled
-          aria-label={`Request a change to ${field.label} (available in the approval phase)`}
-          title="Change requests open in the approval phase (APP-4)"
+          disabled={blockedBecause !== null}
+          aria-label={`Request a change to ${field.label}`}
+          title={blockedBecause ?? `Request a change to ${field.label}`}
+          onClick={onRequest}
         >
           <Pencil aria-hidden="true" className="icon-size-100" />
         </button>

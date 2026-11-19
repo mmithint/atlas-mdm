@@ -2,6 +2,7 @@ import { Flame, Menu, Moon, Sun, X } from 'lucide-react';
 import clsx from 'clsx';
 import { useEffect, useState } from 'react';
 
+import { NotificationBell } from '@/features/notifications/notification-bell.component';
 import { useAuth } from '@/hooks/auth.context';
 import { useHashRoute } from '@/hooks/use-hash-route';
 import { useTheme } from '@/hooks/theme.context';
@@ -114,6 +115,7 @@ export function AppShell() {
               {roleLine}
             </p>
           </div>
+          {profile ? <NotificationBell refreshKey={route.path} /> : null}
           <button
             type="button"
             onClick={toggleTheme}

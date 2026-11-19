@@ -5,11 +5,13 @@
    Needs: app.fn_value_check, app.usp_notification_enqueue.
 
    Sends a RETURNED request back to the first stage (PENDING_RESPONSIBLE), optionally with a corrected
-   proposed value. Only the return recipient may do it: the submitter when the return went to a USER, an
-   active member of the group when it went to a GROUP. A refusal is a THROW; nothing is written:
+   proposed value. Who may do it is app.fn_return_rights (client, 18 Nov 2026): the person it was returned to
+   (any of the people app.fn_return_candidates allowed, not only the submitter), an active member of the group
+   when it went to a GROUP; and, when that recipient can no longer act on it (orphaned), also the submitter, a
+   member of the responsible group or an admin. "Raised by" never changes. A refusal is a THROW; nothing is written:
 
      50161 no such request                       50162 the request is not RETURNED
-     50163 the person is not the return recipient (nor a member of the recipient group)
+     50163 the person may not resubmit it (app.fn_return_rights)
      50120 the corrected value equals the old value
      50121 the corrected value is not acceptable (app.fn_value_check)
      50164 another open request already proposes that change (same de-duplication key)
@@ -58,10 +60,8 @@ BEGIN
         THROW 50162, @msg, 1;
     END
 
-    IF NOT (   (@rtype = N'USER' AND LOWER(@rrec) = @actor)
-            OR (@rtype = N'GROUP' AND EXISTS (SELECT 1 FROM app.group_membership AS m
-                                              WHERE m.group_key = @rrec AND m.is_active = 1 AND m.user_email = @actor)))
-        THROW 50163, N'Only the person or group the request was returned to may resubmit it.', 1;
+    IF NOT EXISTS (SELECT 1 FROM app.fn_return_rights(@request_id, @actor) AS rr WHERE rr.can_resubmit = 1)
+        THROW 50163, N'Only the person or group the request was returned to may resubmit it (or, when that person can no longer act on it, the submitter, a member of the responsible group or an admin).', 1;
 
     /* ---- a corrected value ----------------------------------------------------------- */
     DECLARE @newv nvarchar(400) = @curv;

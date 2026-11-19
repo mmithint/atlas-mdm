@@ -1,3 +1,5 @@
+import { Approvals } from '@/features/approvals/approvals.component';
+import { RequestDetail } from '@/features/approvals/request-detail.component';
 import { EquipmentDetail } from '@/features/equipment/equipment-detail.component';
 import { EquipmentSearch } from '@/features/equipment/equipment-search.component';
 import { Spikes } from '@/features/spikes/spikes.component';
@@ -17,6 +19,10 @@ export function Screen({ route, canManageAdmin }: { route: CurrentRoute; canMana
   if (def.needsAdmin && !canManageAdmin) return <NoAccess route={def} />;
 
   switch (def.id) {
+    case 'approvals':
+      return <Approvals />;
+    case 'request':
+      return <RequestDetail key={params['id']} idText={params['id'] ?? ''} />;
     case 'equipment':
       return <EquipmentSearch />;
     case 'equipment-detail':

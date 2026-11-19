@@ -19,7 +19,8 @@
      S4  return -> cancel; the same change can be raised again afterwards
      S5  a person who is not in the routed group refused (several kinds); the checks say so
      S6  out of scope: a member of another region's group refused; a member whose roles lost the flag refused
-     S7  the same person may not approve both stages (setting SAME_PERSON_BOTH_STAGES = 0), and may when it is 1
+     S7  both stages (changed 18 Nov 2026, client; Q-479): a member of both groups may approve both and the event
+         records it; a member of the first group only is still refused at the second stage
      S8  a failing approval check blocks approval (gold moved on), but the request can still be rejected
      S9  a duplicate is suppressed (any requester); after a rejection a person can raise it again
      S10 an incompatible open request on the same field is blocked; another field is not
@@ -309,7 +310,7 @@ BEGIN TRY
     EXEC app.usp_request_create @source_type = N'MANUAL', @entity_type = N'EQUIPMENT', @field_code = N'MANUFACTURER', @new_value = N'T3 MFR 3',
         @reason = N'T3 lifecycle', @requested_by = @u_req, @equipment_id = @eid, @old_value = @cur, @emit_result = 0, @o_request_id = @id OUTPUT;
     SET @r3 = @id;
-    -- a return can only go to the submitter
+    -- a return cannot go to an outsider (not the submitter, not in either group; rule of 18 Nov 2026)
     SET @errno = NULL;
     BEGIN TRY
         EXEC app.usp_request_decide @request_id = @r3, @actor_email = @u_resp, @decision = N'RETURN', @comment = N'wrong spelling', @return_recipient_type = N'USER', @return_recipient = @u_none, @emit_result = 0;
@@ -317,7 +318,7 @@ BEGIN TRY
     BEGIN CATCH
         SET @errno = ERROR_NUMBER();
     END CATCH;
-    IF @errno IS NULL OR @errno <> 50137 SET @txt += N' a return to somebody else gave error ' + ISNULL(CAST(@errno AS nvarchar(12)), N'none') + N';';
+    IF @errno IS NULL OR @errno <> 50137 SET @txt += N' a return to an outsider gave error ' + ISNULL(CAST(@errno AS nvarchar(12)), N'none') + N';';
     EXEC app.usp_request_decide @request_id = @r3, @actor_email = @u_resp, @decision = N'RETURN', @comment = N'wrong spelling', @emit_result = 0, @o_new_status = @ns OUTPUT;
     IF @ns <> N'RETURNED' SET @txt += N' RETURN gave ' + ISNULL(@ns, N'NULL') + N';';
     IF NOT EXISTS (SELECT 1 FROM app.change_request WHERE request_id = @r3 AND return_recipient_type = N'USER' AND return_recipient = @u_req)
@@ -519,36 +520,37 @@ BEGIN TRY
     SET @r6 = @id;
     EXEC app.usp_request_decide @request_id = @r6, @actor_email = @u_both, @decision = N'APPROVE', @emit_result = 0, @o_new_status = @ns OUTPUT;
     IF @ns <> N'PENDING_ACCOUNTABLE' SET @txt += N' first stage gave ' + ISNULL(@ns, N'NULL') + N';';
-    SET @errno = NULL;
-    BEGIN TRY
-        EXEC app.usp_request_decide @request_id = @r6, @actor_email = @u_both, @decision = N'APPROVE', @emit_result = 0;
-    END TRY
-    BEGIN CATCH
-        SET @errno = ERROR_NUMBER();
-    END CATCH;
-    IF @errno IS NULL OR @errno <> 50143 SET @txt += N' the same person at the second stage gave error ' + ISNULL(CAST(@errno AS nvarchar(12)), N'none') + N';';
+    -- changed 18 Nov 2026 (client, Q-479): a member of BOTH groups may approve both stages; the check says so
     DELETE FROM @chk;
     INSERT INTO @chk EXEC app.usp_request_checks @request_id = @r6, @actor_email = @u_both;
     SELECT @s2 = check_status, @s3 = message FROM @chk WHERE check_code = N'USER_ELIGIBLE_FOR_STAGE';
-    IF @s2 <> N'FAIL' OR @s3 NOT LIKE N'%both stages%' SET @txt += N' the eligibility check said ' + ISNULL(@s2, N'NULL') + N': ' + ISNULL(@s3, N'NULL') + N';';
-    -- a second person finishes it
-    EXEC app.usp_request_decide @request_id = @r6, @actor_email = @u_acc, @decision = N'APPROVE', @emit_result = 0, @o_new_status = @ns OUTPUT;
-    IF @ns <> N'APPROVED' SET @txt += N' a second person gave ' + ISNULL(@ns, N'NULL') + N';';
-    -- with the setting switched to 1 (inside this test) one person may do both
-    UPDATE app.app_setting SET setting_value = N'1' WHERE setting_key = N'SAME_PERSON_BOTH_STAGES';
+    IF @s2 <> N'PASS' SET @txt += N' the eligibility check said ' + ISNULL(@s2, N'NULL') + N': ' + ISNULL(@s3, N'NULL') + N';';
+    EXEC app.usp_request_decide @request_id = @r6, @actor_email = @u_both, @decision = N'APPROVE', @emit_result = 0, @o_new_status = @ns OUTPUT;
+    IF @ns <> N'APPROVED' SET @txt += N' the same person (member of both groups) at the second stage gave ' + ISNULL(@ns, N'NULL') + N';';
+    IF NOT EXISTS (SELECT 1 FROM app.change_request_event WHERE request_id = @r6 AND event_type = N'ACCOUNTABLE_APPROVED' AND actor = @u_both
+                     AND JSON_VALUE(event_details_json, '$.decided_as') = N'GROUP_MEMBER'
+                     AND JSON_VALUE(event_details_json, '$.same_person_both_stages') = N'true')
+        SET @txt += N' the second approval does not record decided_as GROUP_MEMBER and same_person_both_stages;';
+    -- a person in only the first group still cannot approve the second stage (50141)
     SELECT @eid = equipment_id, @cur = mfr FROM @h WHERE n = 7;
     EXEC app.usp_request_create @source_type = N'MANUAL', @entity_type = N'EQUIPMENT', @field_code = N'MANUFACTURER', @new_value = N'T3 MFR 7',
         @reason = N'T3 lifecycle', @requested_by = @u_req, @equipment_id = @eid, @old_value = @cur, @emit_result = 0, @o_request_id = @id OUTPUT;
     SET @r7 = @id;
-    EXEC app.usp_request_decide @request_id = @r7, @actor_email = @u_both, @decision = N'APPROVE', @emit_result = 0;
-    EXEC app.usp_request_decide @request_id = @r7, @actor_email = @u_both, @decision = N'APPROVE', @emit_result = 0, @o_new_status = @ns OUTPUT;
-    UPDATE app.app_setting SET setting_value = N'0' WHERE setting_key = N'SAME_PERSON_BOTH_STAGES';
-    IF @ns <> N'APPROVED' SET @txt += N' with the setting at 1 the same person gave ' + ISNULL(@ns, N'NULL') + N';';
-    IF @txt = N'' PRINT 'OK  S7 segregation: the same person is refused at the second stage (50143, and the check says so); another person finishes it; with SAME_PERSON_BOTH_STAGES = 1 one person may do both';
+    EXEC app.usp_request_decide @request_id = @r7, @actor_email = @u_resp, @decision = N'APPROVE', @emit_result = 0;
+    SET @errno = NULL;
+    BEGIN TRY
+        EXEC app.usp_request_decide @request_id = @r7, @actor_email = @u_resp, @decision = N'APPROVE', @emit_result = 0;
+    END TRY
+    BEGIN CATCH
+        SET @errno = ERROR_NUMBER();
+    END CATCH;
+    IF @errno IS NULL OR @errno <> 50141 SET @txt += N' a first-group-only approver at the second stage gave error ' + ISNULL(CAST(@errno AS nvarchar(12)), N'none') + N' (expected 50141);';
+    EXEC app.usp_request_decide @request_id = @r7, @actor_email = @u_acc, @decision = N'APPROVE', @emit_result = 0, @o_new_status = @ns OUTPUT;
+    IF @ns <> N'APPROVED' SET @txt += N' a second person gave ' + ISNULL(@ns, N'NULL') + N';';
+    IF @txt = N'' PRINT 'OK  S7 both stages (rule of 18 Nov): a member of both groups approves both, the check says PASS and the event records GROUP_MEMBER and same person; a first-group-only approver is still refused at stage 2 (50141); another person finishes it';
     ELSE BEGIN SET @fails += 1; PRINT 'FAIL S7' + @txt; END
 END TRY
 BEGIN CATCH
-    UPDATE app.app_setting SET setting_value = N'0' WHERE setting_key = N'SAME_PERSON_BOTH_STAGES';
     SET @fails += 1;
     PRINT 'FAIL S7 error ' + CAST(ERROR_NUMBER() AS varchar(12)) + ' on line ' + CAST(ERROR_LINE() AS varchar(12)) + ': ' + ERROR_MESSAGE();
 END CATCH;

@@ -19,8 +19,8 @@
      5 NO_CONFLICTING_OPEN_REQUEST  no other open request proposes a different value for the same field
                                     of the same heater (or FLOC)
      6 USER_ELIGIBLE_FOR_STAGE      the person named in @actor_email may decide this stage: flag, scope
-                                    and group (app.fn_stage_eligibility), and, at the accountable stage
-                                    with SAME_PERSON_BOTH_STAGES = 0, did not approve the first stage
+                                    and group, or an admin (app.fn_stage_eligibility). Approving both
+                                    stages is allowed since 18 Nov 2026 (client; Q-479)
 
    A request that is not waiting for a decision (status other than PENDING_RESPONSIBLE or
    PENDING_ACCOUNTABLE) gets NOT_CHECKED on every row: the checks mean something only while a person
@@ -89,16 +89,7 @@ RETURN
                         OR (r.entity_type = N'FLOC' AND o.entity_type = N'FLOC' AND o.functional_location = r.functional_location))
                    AND ISNULL(o.new_value, N'') COLLATE Latin1_General_BIN2 <> t.newv COLLATE Latin1_General_BIN2
                  ORDER BY o.request_id) AS cf
-    OUTER APPLY (SELECT TOP (1) s.setting_value AS v
-                 FROM app.app_setting AS s
-                 WHERE s.setting_key = N'SAME_PERSON_BOTH_STAGES') AS sp
     OUTER APPLY app.fn_stage_eligibility(ac.a, st.stage, sg.grp, r.profit_center_name) AS el
-    CROSS APPLY (SELECT CASE WHEN st.stage = N'ACCOUNTABLE'
-                              AND ISNULL(sp.v, N'0') = N'0'
-                              AND EXISTS (SELECT 1 FROM app.change_request_event AS ev
-                                          WHERE ev.request_id = r.request_id
-                                            AND ev.event_type = N'RESPONSIBLE_APPROVED'
-                                            AND ev.actor = ac.a) THEN 1 ELSE 0 END AS blocked) AS sgr
     CROSS APPLY
     (
         SELECT
@@ -169,15 +160,14 @@ RETURN
             -- 6 USER_ELIGIBLE_FOR_STAGE
             CASE WHEN st.stage IS NULL THEN N'NOT_CHECKED'
                  WHEN ac.a IS NULL OR ac.a = N'' THEN N'NOT_CHECKED'
-                 WHEN el.is_group_member = 0 OR el.has_flag_in_scope = 0 THEN N'FAIL'
-                 WHEN sgr.blocked = 1 THEN N'FAIL'
-                 ELSE N'PASS' END AS c6s,
+                 WHEN el.is_eligible = 1 THEN N'PASS'
+                 ELSE N'FAIL' END AS c6s,
             CASE WHEN st.stage IS NULL THEN NULL
                  WHEN ac.a IS NULL OR ac.a = N'' THEN N'no approver was named, so eligibility was not checked'
+                 WHEN el.is_group_member = 1 AND el.has_flag_in_scope = 1 THEN N'allowed to decide the ' + st.stage + N' stage'
+                 WHEN el.is_admin = 1 THEN N'allowed to decide the ' + st.stage + N' stage as an admin (not a member of ' + ISNULL(sg.grp, N'the group') + N')'
                  WHEN el.is_group_member = 0 THEN N'not an active member of the group for this stage (' + ISNULL(sg.grp, N'none') + N')'
-                 WHEN el.has_flag_in_scope = 0 THEN N'no role of this person allows the ' + st.stage + N' stage for ' + LEFT(r.profit_center_name, 40)
-                 WHEN sgr.blocked = 1 THEN N'the same person may not approve both stages of one request (setting SAME_PERSON_BOTH_STAGES)'
-                 ELSE N'allowed to decide the ' + st.stage + N' stage' END AS c6m
+                 ELSE N'no role of this person allows the ' + st.stage + N' stage for ' + LEFT(r.profit_center_name, 40) END AS c6m
     ) AS x
     CROSS APPLY (VALUES
         (1, N'ASSOCIATION_MATCH',           x.c1s, ISNULL(x.c1m, x.notpending)),

@@ -145,7 +145,7 @@ describe('input checks (types, sizes, words; never business rules)', () => {
 describe('every function', () => {
   const callers = {
     createChangeRequest: (t: string | undefined) => runCreateRequest(create(), t, getSqlToken),
-    decideRequest: (t: string | undefined) => runDecideRequest({ requestId: 5, decision: 'APPROVE', comment: '', expectedStatus: '' }, t, getSqlToken),
+    decideRequest: (t: string | undefined) => runDecideRequest({ requestId: 5, decision: 'APPROVE', comment: '', expectedStatus: '', returnTo: '' }, t, getSqlToken),
     bulkApprove: (t: string | undefined) => runBulkApprove({ requestIds: '5,6', comment: '' }, t, getSqlToken),
     resubmitRequest: (t: string | undefined) => runResubmitRequest({ requestId: 5, newValue: '', comment: '' }, t, getSqlToken),
     cancelRequest: (t: string | undefined) => runCancelRequest({ requestId: 5, comment: '' }, t, getSqlToken),
@@ -182,8 +182,8 @@ describe('every function', () => {
     const r = await runCreateRequest(create({ source: 'BUSINESS_RULE' }), TOKEN, getSqlToken);
     expect(r).toMatchObject({ ok: false, status: 'INVALID', requestId: null });
     expect(r.error).toMatch(/source/i);
-    expect((await runDecideRequest({ requestId: 0, decision: 'APPROVE', comment: '', expectedStatus: '' }, TOKEN, getSqlToken)).status).toBe('INVALID');
-    expect((await runDecideRequest({ requestId: 5, decision: 'DELETE', comment: '', expectedStatus: '' }, TOKEN, getSqlToken)).status).toBe('INVALID');
+    expect((await runDecideRequest({ requestId: 0, decision: 'APPROVE', comment: '', expectedStatus: '', returnTo: '' }, TOKEN, getSqlToken)).status).toBe('INVALID');
+    expect((await runDecideRequest({ requestId: 5, decision: 'DELETE', comment: '', expectedStatus: '', returnTo: '' }, TOKEN, getSqlToken)).status).toBe('INVALID');
     expect((await runBulkApprove({ requestIds: '1,x', comment: '' }, TOKEN, getSqlToken)).status).toBe('INVALID');
     expect((await runRequestChecks(1.5, TOKEN, getSqlToken)).status).toBe('INVALID');
     expect(openPool).not.toHaveBeenCalled();
@@ -191,7 +191,7 @@ describe('every function', () => {
 
   it('returns a procedure\'s refusal as REFUSED with its own words and number (never thrown)', async () => {
     makePool({ 'app.usp_request_decide': refusal(50141, 'You are not an active member of the group for this stage (X).') });
-    const r = await runDecideRequest({ requestId: 5, decision: 'APPROVE', comment: '', expectedStatus: '' }, TOKEN, getSqlToken);
+    const r = await runDecideRequest({ requestId: 5, decision: 'APPROVE', comment: '', expectedStatus: '', returnTo: '' }, TOKEN, getSqlToken);
     expect(r).toMatchObject({ ok: false, status: 'REFUSED', errorCode: 50141, userId: ID, needsMerge: false, merge: null });
     expect(r.error).toBe('You are not an active member of the group for this stage (X).');
   });
@@ -274,7 +274,7 @@ describe('decideRequest and the merge', () => {
 
   it('a first-stage approval is only the decision: no merge is attempted', async () => {
     const { calls } = makePool({ 'app.usp_request_decide': decided({ new_status: 'PENDING_ACCOUNTABLE', stage: 'RESPONSIBLE', needs_merge: false }) });
-    const r = await runDecideRequest({ requestId: 5, decision: 'approve', comment: ' ok ', expectedStatus: 'PENDING_RESPONSIBLE' }, TOKEN, getSqlToken);
+    const r = await runDecideRequest({ requestId: 5, decision: 'approve', comment: ' ok ', expectedStatus: 'PENDING_RESPONSIBLE', returnTo: '' }, TOKEN, getSqlToken);
     expect(r).toMatchObject({ ok: true, newStatus: 'PENDING_ACCOUNTABLE', stage: 'RESPONSIBLE', needsMerge: false, merge: null });
     expect(calls.map((c) => c.proc)).toEqual(['app.usp_identity_resolve', 'app.usp_request_decide']);
     expect(calls[1]?.inputs).toEqual({
@@ -283,6 +283,8 @@ describe('decideRequest and the merge', () => {
       decision: 'APPROVE',
       comment: 'ok',
       expected_status: 'PENDING_RESPONSIBLE',
+      return_recipient_type: null,
+      return_recipient: null,
       emit_result: 1,
     });
   });
@@ -293,7 +295,7 @@ describe('decideRequest and the merge', () => {
       'gold.usp_apply_approved_change': { recordset: [{ outcome: 'applied', message: 'done', golden_version_id: 7 }] },
       'app.usp_request_record_merge': { recordset: [{ request_id: 5, request_ref: 'CR-000005', recorded: 'MERGED' }] },
     });
-    const r = await runDecideRequest({ requestId: 5, decision: 'APPROVE', comment: '', expectedStatus: '' }, TOKEN, getSqlToken);
+    const r = await runDecideRequest({ requestId: 5, decision: 'APPROVE', comment: '', expectedStatus: '', returnTo: '' }, TOKEN, getSqlToken);
     expect(r).toMatchObject({ ok: true, newStatus: 'APPROVED', needsMerge: true });
     expect(r.merge).toEqual({ outcome: 'APPLIED', message: 'done', goldenVersionId: 7, recorded: 'MERGED', error: null });
     expect(calls.map((c) => c.proc)).toEqual([
@@ -312,7 +314,7 @@ describe('decideRequest and the merge', () => {
       'gold.usp_apply_approved_change': { recordset: [{ outcome: 'ERROR', message: 'merge not yet implemented', golden_version_id: null }] },
       'app.usp_request_record_merge': { recordset: [{ recorded: 'COMMENTED' }] },
     });
-    const r = await runDecideRequest({ requestId: 5, decision: 'APPROVE', comment: '', expectedStatus: '' }, TOKEN, getSqlToken);
+    const r = await runDecideRequest({ requestId: 5, decision: 'APPROVE', comment: '', expectedStatus: '', returnTo: '' }, TOKEN, getSqlToken);
     expect(r.ok).toBe(true);
     expect(r.newStatus).toBe('APPROVED');
     expect(r.merge).toEqual({ outcome: 'ERROR', message: 'merge not yet implemented', goldenVersionId: null, recorded: 'COMMENTED', error: null });
@@ -325,7 +327,7 @@ describe('decideRequest and the merge', () => {
       'gold.usp_apply_approved_change': Object.assign(new Error('Could not find stored procedure'), { number: 2812 }),
       'app.usp_request_record_merge': { recordset: [{ recorded: 'COMMENTED' }] },
     });
-    const r = await runDecideRequest({ requestId: 5, decision: 'APPROVE', comment: '', expectedStatus: '' }, TOKEN, getSqlToken);
+    const r = await runDecideRequest({ requestId: 5, decision: 'APPROVE', comment: '', expectedStatus: '', returnTo: '' }, TOKEN, getSqlToken);
     expect(r.ok).toBe(true);
     expect(r.merge).toMatchObject({ outcome: 'ERROR', recorded: 'COMMENTED', error: null });
     expect(r.merge?.message).toContain('could not be called (2812)');
@@ -335,7 +337,7 @@ describe('decideRequest and the merge', () => {
       'gold.usp_apply_approved_change': { recordset: [{ outcome: 'MAYBE', message: null, golden_version_id: null }] },
       'app.usp_request_record_merge': { recordset: [{ recorded: 'COMMENTED' }] },
     });
-    const r2 = await runDecideRequest({ requestId: 5, decision: 'APPROVE', comment: '', expectedStatus: '' }, TOKEN, getSqlToken);
+    const r2 = await runDecideRequest({ requestId: 5, decision: 'APPROVE', comment: '', expectedStatus: '', returnTo: '' }, TOKEN, getSqlToken);
     expect(r2.merge).toMatchObject({ outcome: 'ERROR', message: 'The merge answered "MAYBE".' });
   });
 
@@ -345,7 +347,7 @@ describe('decideRequest and the merge', () => {
       'gold.usp_apply_approved_change': { recordset: [{ outcome: 'STALE', message: 'value moved', golden_version_id: null }] },
       'app.usp_request_record_merge': refusal(50182, 'Only an approved request has a merge to record.'),
     });
-    const r = await runDecideRequest({ requestId: 5, decision: 'APPROVE', comment: '', expectedStatus: '' }, TOKEN, getSqlToken);
+    const r = await runDecideRequest({ requestId: 5, decision: 'APPROVE', comment: '', expectedStatus: '', returnTo: '' }, TOKEN, getSqlToken);
     expect(r).toMatchObject({ ok: true, status: 'OK', newStatus: 'APPROVED' });
     expect(r.merge).toMatchObject({ outcome: 'STALE', recorded: null });
     expect(r.merge?.error).toContain('could not be recorded (50182)');
@@ -353,16 +355,36 @@ describe('decideRequest and the merge', () => {
 
   it('a refused approval never reaches the merge', async () => {
     const { calls } = makePool({ 'app.usp_request_decide': refusal(50144, 'Approval is blocked by failed checks: OLD_VALUE_CURRENT.') });
-    const r = await runDecideRequest({ requestId: 5, decision: 'APPROVE', comment: '', expectedStatus: '' }, TOKEN, getSqlToken);
+    const r = await runDecideRequest({ requestId: 5, decision: 'APPROVE', comment: '', expectedStatus: '', returnTo: '' }, TOKEN, getSqlToken);
     expect(r).toMatchObject({ ok: false, status: 'REFUSED', errorCode: 50144 });
     expect(calls.some((c) => c.proc.startsWith('gold.'))).toBe(false);
   });
 
   it('reject and return send their comment and never merge', async () => {
     const { calls } = makePool({ 'app.usp_request_decide': decided({ decision: 'RETURN', new_status: 'RETURNED', needs_merge: false }) });
-    const r = await runDecideRequest({ requestId: 5, decision: 'RETURN', comment: 'wrong spelling', expectedStatus: '' }, TOKEN, getSqlToken);
+    const r = await runDecideRequest({ requestId: 5, decision: 'RETURN', comment: 'wrong spelling', expectedStatus: '', returnTo: '' }, TOKEN, getSqlToken);
     expect(r).toMatchObject({ newStatus: 'RETURNED', needsMerge: false, merge: null });
-    expect(calls[1]?.inputs).toMatchObject({ decision: 'RETURN', comment: 'wrong spelling', expected_status: null });
+    expect(calls[1]?.inputs).toMatchObject({ decision: 'RETURN', comment: 'wrong spelling', expected_status: null, return_recipient_type: null, return_recipient: null });
+  });
+
+  it('sends a picked return recipient as a USER; the procedure checks who it may be', async () => {
+    const { calls } = makePool({ 'app.usp_request_decide': decided({ decision: 'RETURN', new_status: 'RETURNED', needs_merge: false }) });
+    const r = await runDecideRequest({ requestId: 5, decision: 'RETURN', comment: 'check it', expectedStatus: '', returnTo: ' someone@example.test ' }, TOKEN, getSqlToken);
+    expect(r).toMatchObject({ ok: true, newStatus: 'RETURNED' });
+    expect(calls[1]?.inputs).toMatchObject({ return_recipient_type: 'USER', return_recipient: 'someone@example.test' });
+  });
+
+  it('refuses a return recipient on APPROVE or one that is not an e-mail, before any database call', async () => {
+    const a = await runDecideRequest({ requestId: 5, decision: 'APPROVE', comment: '', expectedStatus: '', returnTo: 'someone@example.test' }, TOKEN, getSqlToken);
+    const b = await runDecideRequest({ requestId: 5, decision: 'RETURN', comment: 'x', expectedStatus: '', returnTo: 'not an address' }, TOKEN, getSqlToken);
+    expect(a).toMatchObject({ ok: false, status: 'INVALID' });
+    expect(b).toMatchObject({ ok: false, status: 'INVALID' });
+  });
+
+  it('passes the server refusal for a recipient who may not receive it (50137)', async () => {
+    makePool({ 'app.usp_request_decide': refusal(50137, 'A request can only be returned to its submitter, to a registered member of one of its two approval groups, or to yourself.') });
+    const r = await runDecideRequest({ requestId: 5, decision: 'RETURN', comment: 'x', expectedStatus: '', returnTo: 'outsider@example.test' }, TOKEN, getSqlToken);
+    expect(r).toMatchObject({ ok: false, status: 'REFUSED', errorCode: 50137 });
   });
 });
 

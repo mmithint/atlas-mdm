@@ -11,17 +11,23 @@
         a list that contains it), and
      3. the person is an active member of the group the request was routed to for that stage.
 
+   OR the person is an app admin (a registered person holding a role with can_manage_admin,
+   app.fn_requester_rights): an admin may decide ANY stage of ANY request, without being in the group
+   and without the stage's flag (client, 18 Nov 2026; answers Q-479).
+
    Input : the person's e-mail, the stage (RESPONSIBLE or ACCOUNTABLE), the routed group's key
            and the request's profit centre.
    Output: exactly one row
      is_group_member     3. (the group must also be active)
      has_flag_in_scope   1. and 2. together, on the same role assignment
-     is_eligible         both
+     is_admin            the admin override above (independent of the stage)
+     is_eligible         is_admin, or is_group_member and has_flag_in_scope (an unknown stage gives 0)
 
    A role is held when it is assigned to the person (USER) or to a group the person is an active
    member of (GROUP). An unknown stage, a missing group or a blank e-mail gives 0, never an error.
-   Segregation of duties (one person may not approve both stages) is a different rule and is
-   checked where it is used (app.usp_request_decide, setting SAME_PERSON_BOTH_STAGES).
+   One person approving both stages is NOT refused any more (client, 18 Nov 2026): whoever is eligible
+   at the second stage may approve it, also when they approved the first one. That is only possible for
+   an admin or for a member of both routed groups. The setting SAME_PERSON_BOTH_STAGES is no longer read.
    ===================================================================== */
 CREATE OR ALTER FUNCTION app.fn_stage_eligibility
 (
@@ -37,8 +43,13 @@ RETURN
     SELECT
         CAST(z.mem  AS bit) AS is_group_member,
         CAST(z.flag AS bit) AS has_flag_in_scope,
-        CAST(CASE WHEN z.mem = 1 AND z.flag = 1 THEN 1 ELSE 0 END AS bit) AS is_eligible
+        CAST(ISNULL(ad.can_manage_admin, 0) AS bit) AS is_admin,
+        CAST(CASE WHEN @stage NOT IN (N'RESPONSIBLE', N'ACCOUNTABLE') OR @stage IS NULL THEN 0
+                  WHEN ISNULL(ad.can_manage_admin, 0) = 1 THEN 1
+                  WHEN z.mem = 1 AND z.flag = 1 THEN 1
+                  ELSE 0 END AS bit) AS is_eligible
     FROM (SELECT LOWER(LTRIM(RTRIM(@user_email))) AS e) AS q
+    OUTER APPLY app.fn_requester_rights(q.e) AS ad
     CROSS APPLY
     (
         SELECT

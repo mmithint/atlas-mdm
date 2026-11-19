@@ -165,8 +165,8 @@ function WritePathCard() {
       <p className="mt-200 text-muted-foreground">
         Creates a real request on a synthetic heater as you, shows its live approval checks, and decides it. The server
         works out who you are from your sign-in; you are never asked for an e-mail. Press the three buttons in order.
-        A decision needs you to belong to the request's responsible (then accountable) group, and one person may not
-        approve both stages.
+        A decision needs you to belong to the request's responsible (then accountable) group, or to be an admin; since
+        18 Nov one person in both groups (or an admin) may approve both stages.
       </p>
 
       <div className="mt-300 grid gap-300 md:grid-cols-4">
@@ -215,7 +215,7 @@ function WritePathCard() {
           disabled={state.status === 'running' || !Number.isInteger(requestNumber) || requestNumber < 1}
           onClick={() =>
             void go(async () =>
-              (await getRayfinClient()).functions.decideRequest.invoke({ requestId: requestNumber, decision, comment, expectedStatus: '' })
+              (await getRayfinClient()).functions.decideRequest.invoke({ requestId: requestNumber, decision, comment, expectedStatus: '', returnTo: '' })
             )
           }
         >

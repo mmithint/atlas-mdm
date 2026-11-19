@@ -2,6 +2,7 @@
  * Synthetic rows for the equipment tests. Everything here is invented (SYN- identifiers,
  * "SYNTHETIC MFR" manufacturers); nothing comes from the client.
  */
+import type { FormOptions, RelatedRequestRow } from './change-request-api';
 import type { HeaterDetail, SearchRow } from './equipment-api';
 
 export function searchRow(n: number, over: Partial<Record<string, unknown>> = {}): SearchRow {
@@ -65,6 +66,38 @@ export function heaterDetail(over: Partial<HeaterDetail> = {}): HeaterDetail {
       { fieldOwnershipKey: 'EQUIPMENT|MANUFACTURER', fieldCode: 'MANUFACTURER', responsibleRole: 'Operations-IOC', accountableRole: 'SAPBusinessSupport' },
       { fieldOwnershipKey: 'EQUIPMENT|HEAT_DUTY', fieldCode: 'HEAT_DUTY', responsibleRole: 'Operations-IOC', accountableRole: 'SAPBusinessSupport' },
     ] as unknown as HeaterDetail['ownership'],
+    ...over,
+  };
+}
+
+/** What the request form gets for a person who may submit: one drop-down field and nothing blocked. */
+export function formOptions(over: Partial<FormOptions> = {}): FormOptions {
+  return {
+    canSubmit: true,
+    isAdmin: false,
+    allowedValues: [
+      { fieldCode: 'FIRED_UNFIRED', value: 'FIRED', order: 1 },
+      { fieldCode: 'FIRED_UNFIRED', value: 'UNFIRED', order: 2 },
+    ],
+    blockedFields: [],
+    ...over,
+  };
+}
+
+/** A request on a heater, as the list of requests shows it. Invented. */
+export function requestRow(n: number, over: Partial<RelatedRequestRow> = {}): RelatedRequestRow {
+  return {
+    requestId: n,
+    requestRef: `CR-${String(n).padStart(6, '0')}`,
+    requestStatus: 'PENDING_RESPONSIBLE',
+    isOpen: true,
+    equipmentId: 1,
+    functionalLocation: 'SYN-FL-0001',
+    fieldCode: 'MANUFACTURER',
+    fieldLabel: 'Manufacturer',
+    sourceLabel: 'Manual request',
+    requestedAtUtc: '2026-11-17T09:30:00.000Z',
+    otherOpenRequestsSameField: 0,
     ...over,
   };
 }

@@ -7,6 +7,8 @@
    Files, in run order:
      db/procs/fn_requester_rights.sql
      db/procs/fn_stage_eligibility.sql
+     db/procs/fn_return_candidates.sql
+     db/procs/fn_return_rights.sql
      db/procs/fn_value_check.sql
      db/procs/fn_request_checks.sql
      db/procs/usp_notification_enqueue.sql
@@ -25,7 +27,7 @@
      db/views/vw_request_detail.sql
    ===================================================================== */
 SET NOCOUNT ON;
-PRINT N'=== app3_1_request_objects: 18 file(s) ===';
+PRINT N'=== app3_1_request_objects: 20 file(s) ===';
 
 PRINT N'--- db/procs/fn_requester_rights.sql';
 EXEC (N'/* =====================================================================
@@ -96,17 +98,23 @@ EXEC (N'/* =====================================================================
         a list that contains it), and
      3. the person is an active member of the group the request was routed to for that stage.
 
+   OR the person is an app admin (a registered person holding a role with can_manage_admin,
+   app.fn_requester_rights): an admin may decide ANY stage of ANY request, without being in the group
+   and without the stage''s flag (client, 18 Nov 2026; answers Q-479).
+
    Input : the person''s e-mail, the stage (RESPONSIBLE or ACCOUNTABLE), the routed group''s key
            and the request''s profit centre.
    Output: exactly one row
      is_group_member     3. (the group must also be active)
      has_flag_in_scope   1. and 2. together, on the same role assignment
-     is_eligible         both
+     is_admin            the admin override above (independent of the stage)
+     is_eligible         is_admin, or is_group_member and has_flag_in_scope (an unknown stage gives 0)
 
    A role is held when it is assigned to the person (USER) or to a group the person is an active
    member of (GROUP). An unknown stage, a missing group or a blank e-mail gives 0, never an error.
-   Segregation of duties (one person may not approve both stages) is a different rule and is
-   checked where it is used (app.usp_request_decide, setting SAME_PERSON_BOTH_STAGES).
+   One person approving both stages is NOT refused any more (client, 18 Nov 2026): whoever is eligible
+   at the second stage may approve it, also when they approved the first one. That is only possible for
+   an admin or for a member of both routed groups. The setting SAME_PERSON_BOTH_STAGES is no longer read.
    ===================================================================== */
 CREATE OR ALTER FUNCTION app.fn_stage_eligibility
 (
@@ -122,8 +130,13 @@ RETURN
     SELECT
         CAST(z.mem  AS bit) AS is_group_member,
         CAST(z.flag AS bit) AS has_flag_in_scope,
-        CAST(CASE WHEN z.mem = 1 AND z.flag = 1 THEN 1 ELSE 0 END AS bit) AS is_eligible
+        CAST(ISNULL(ad.can_manage_admin, 0) AS bit) AS is_admin,
+        CAST(CASE WHEN @stage NOT IN (N''RESPONSIBLE'', N''ACCOUNTABLE'') OR @stage IS NULL THEN 0
+                  WHEN ISNULL(ad.can_manage_admin, 0) = 1 THEN 1
+                  WHEN z.mem = 1 AND z.flag = 1 THEN 1
+                  ELSE 0 END AS bit) AS is_eligible
     FROM (SELECT LOWER(LTRIM(RTRIM(@user_email))) AS e) AS q
+    OUTER APPLY app.fn_requester_rights(q.e) AS ad
     CROSS APPLY
     (
         SELECT
@@ -146,6 +159,155 @@ RETURN
                                      OR EXISTS (SELECT 1 FROM app.principal_role_assignment_scope AS s
                                                 WHERE s.assignment_id = a.assignment_id AND s.profit_center_name = @profit_center_name))) THEN 1 ELSE 0 END AS flag
     ) AS z
+);
+');
+
+PRINT N'--- db/procs/fn_return_candidates.sql';
+EXEC (N'/* =====================================================================
+   app.fn_return_candidates     APP-4 change (client, 18 Nov 2026; answers Q-465)
+                                (used by app.usp_request_decide to check a RETURN, app.fn_return_rights and
+                                app.usp_request_detail for the Return dialog''s picker, so the list lives in ONE place)
+   Single statement per file; CREATE OR ALTER, safe to run again.
+   Needs: app.principal_identity, app.group_membership, app.security_group. Reads only.
+   Test: db/tests/t_request_approval_rules.sql
+
+   Who may a request be returned to "for correction"? The client: "anyone, including themselves". Agreed
+   reading (18 Nov): the people who have something to do with the request:
+     SUBMITTER          the person who raised it (not for a request raised by system:...)
+     RESPONSIBLE_GROUP  an active member of the group the first stage is routed to
+     ACCOUNTABLE_GROUP  an active member of the group the second stage is routed to
+     YOU                @actor_email itself (the person returning it), whatever else is true
+   Everyone except YOU must be a REGISTERED person (an active row in app.principal_identity), so a request is
+   never returned to an address nobody signs in with. The groups must be active.
+
+   Input : @request_id, @actor_email (NULL = list without "you": used to ask "is this person still a valid
+           holder of a returned request?", app.fn_return_rights)
+   Output: one row per person (a person who fits several reasons appears once, with the first reason in the
+           order above, YOU last unless YOU is the only reason):
+     user_email, display_name, relation (SUBMITTER, RESPONSIBLE_GROUP, ACCOUNTABLE_GROUP or YOU), sort_order,
+     is_you (1 = this row is @actor_email, whatever its relation)
+   An unknown request gives no rows.
+   ===================================================================== */
+CREATE OR ALTER FUNCTION app.fn_return_candidates
+(
+    @request_id  bigint,
+    @actor_email nvarchar(256)
+)
+RETURNS TABLE
+AS
+RETURN
+(
+    SELECT
+        CAST(c.user_email AS nvarchar(256)) AS user_email,
+        CAST(ISNULL(pi.display_name, c.user_email) AS nvarchar(256)) AS display_name,
+        CAST(CASE MIN(c.prio) WHEN 1 THEN N''SUBMITTER'' WHEN 2 THEN N''RESPONSIBLE_GROUP''
+                              WHEN 3 THEN N''ACCOUNTABLE_GROUP'' ELSE N''YOU'' END AS nvarchar(20)) AS relation,
+        CAST(MIN(c.prio) AS int) AS sort_order,
+        CAST(CASE WHEN c.user_email = LOWER(LTRIM(RTRIM(@actor_email))) THEN 1 ELSE 0 END AS bit) AS is_you
+    FROM
+    (
+        SELECT LOWER(r.requested_by) AS user_email, 1 AS prio
+        FROM app.change_request AS r
+        WHERE r.request_id = @request_id
+          AND LEFT(r.requested_by, 7) <> N''system:''
+          AND EXISTS (SELECT 1 FROM app.principal_identity AS i WHERE i.user_email = LOWER(r.requested_by) AND i.is_active = 1)
+        UNION ALL
+        SELECT LOWER(m.user_email), CASE WHEN m.group_key = r.responsible_group THEN 2 ELSE 3 END
+        FROM app.change_request AS r
+        JOIN app.group_membership AS m ON m.is_active = 1 AND (m.group_key = r.responsible_group OR m.group_key = r.accountable_group)
+        JOIN app.security_group AS sg ON sg.group_key = m.group_key AND sg.is_active = 1
+        WHERE r.request_id = @request_id
+          AND EXISTS (SELECT 1 FROM app.principal_identity AS i WHERE i.user_email = LOWER(m.user_email) AND i.is_active = 1)
+        UNION ALL
+        SELECT LOWER(LTRIM(RTRIM(@actor_email))), 9
+        FROM app.change_request AS r
+        WHERE r.request_id = @request_id
+          AND @actor_email IS NOT NULL
+          AND CHARINDEX(N''@'', @actor_email) > 1
+          AND LEFT(LTRIM(@actor_email), 7) <> N''system:''
+    ) AS c
+    OUTER APPLY (SELECT TOP (1) p.display_name FROM app.principal_identity AS p
+                 WHERE p.user_email = c.user_email AND p.is_active = 1) AS pi
+    GROUP BY c.user_email, pi.display_name
+);
+');
+
+PRINT N'--- db/procs/fn_return_rights.sql';
+EXEC (N'/* =====================================================================
+   app.fn_return_rights         APP-4 change (client, 18 Nov 2026; answers Q-465, edge case "the recipient left")
+                                (used by app.usp_request_resubmit, app.fn_request_actions and app.usp_request_queue,
+                                so the screens'' Resubmit button, the "Returned to me" tab and the procedure agree)
+   Single statement per file; CREATE OR ALTER, safe to run again.
+   Needs: app.fn_return_candidates, app.fn_requester_rights. Reads only.
+   Test: db/tests/t_request_approval_rules.sql
+
+   Who may pick up (correct and resubmit) a RETURNED request?
+     1. the recipient: the person it was returned to (USER), or an active member of the group (GROUP: a request
+        the system raised, returned to the rule''s resolution group or the responsible group)
+     2. when the return is ORPHANED, also: the submitter, an active member of the responsible group, an admin.
+        Orphaned means nobody valid holds it any more:
+          USER   the recipient is no longer a valid recipient: not registered any more, or no longer the submitter,
+                 a member of either routed group or an admin (app.fn_return_candidates without "you")
+          GROUP  the group is inactive or has no active member left
+   "Raised by" never changes; the picking up is visible in the history (the RESUBMITTED event names who did it).
+
+   Input : @request_id, @actor_email.
+   Output: one row per existing request (none for an unknown id):
+     is_recipient   1 = rule 1
+     is_orphaned    1 = the return is orphaned (only meaningful while RETURNED; 0 otherwise)
+     can_resubmit   1 = the request is RETURNED, the actor is a person, and rule 1 or (orphaned and rule 2)
+   ===================================================================== */
+CREATE OR ALTER FUNCTION app.fn_return_rights
+(
+    @request_id  bigint,
+    @actor_email nvarchar(256)
+)
+RETURNS TABLE
+AS
+RETURN
+(
+    SELECT
+        r.request_id,
+        CAST(x.is_recipient AS bit) AS is_recipient,
+        CAST(x.is_orphaned  AS bit) AS is_orphaned,
+        CAST(CASE WHEN r.request_status = N''RETURNED'' AND a.is_person = 1
+                   AND (x.is_recipient = 1 OR (x.is_orphaned = 1 AND x.is_fallback = 1)) THEN 1 ELSE 0 END AS bit) AS can_resubmit
+    FROM app.change_request AS r
+    CROSS APPLY (SELECT LOWER(LTRIM(RTRIM(@actor_email))) AS e) AS a0
+    CROSS APPLY (SELECT a0.e,
+                        CASE WHEN a0.e IS NOT NULL AND CHARINDEX(N''@'', a0.e) > 1 AND LEFT(a0.e, 7) <> N''system:'' THEN 1 ELSE 0 END AS is_person) AS a
+    OUTER APPLY app.fn_requester_rights(a.e) AS me
+    OUTER APPLY app.fn_requester_rights(CASE WHEN r.return_recipient_type = N''USER'' THEN LOWER(r.return_recipient) END) AS rec
+    CROSS APPLY
+    (
+        SELECT
+            CASE WHEN a.is_person = 1
+                  AND (   (r.return_recipient_type = N''USER'' AND LOWER(r.return_recipient) = a.e)
+                       OR (r.return_recipient_type = N''GROUP''
+                           AND EXISTS (SELECT 1 FROM app.group_membership AS m
+                                       JOIN app.security_group AS sg ON sg.group_key = m.group_key AND sg.is_active = 1
+                                       WHERE m.group_key = r.return_recipient AND m.is_active = 1 AND m.user_email = a.e)))
+                 THEN 1 ELSE 0 END AS is_recipient,
+            CASE WHEN r.request_status <> N''RETURNED'' THEN 0
+                 WHEN r.return_recipient_type = N''USER''
+                      AND ISNULL(rec.can_manage_admin, 0) = 0
+                      AND NOT EXISTS (SELECT 1 FROM app.fn_return_candidates(r.request_id, NULL) AS c
+                                      WHERE c.user_email = LOWER(r.return_recipient)) THEN 1
+                 WHEN r.return_recipient_type = N''GROUP''
+                      AND NOT EXISTS (SELECT 1 FROM app.group_membership AS m
+                                      JOIN app.security_group AS sg ON sg.group_key = m.group_key AND sg.is_active = 1
+                                      WHERE m.group_key = r.return_recipient AND m.is_active = 1) THEN 1
+                 WHEN r.return_recipient_type IS NULL OR r.return_recipient IS NULL THEN 1
+                 ELSE 0 END AS is_orphaned,
+            CASE WHEN a.is_person = 0 THEN 0
+                 WHEN LOWER(r.requested_by) = a.e THEN 1
+                 WHEN ISNULL(me.can_manage_admin, 0) = 1 THEN 1
+                 WHEN EXISTS (SELECT 1 FROM app.group_membership AS m
+                              JOIN app.security_group AS sg ON sg.group_key = m.group_key AND sg.is_active = 1
+                              WHERE m.group_key = r.responsible_group AND m.is_active = 1 AND m.user_email = a.e) THEN 1
+                 ELSE 0 END AS is_fallback
+    ) AS x
+    WHERE r.request_id = @request_id
 );
 ');
 
@@ -244,8 +406,8 @@ EXEC (N'/* =====================================================================
      5 NO_CONFLICTING_OPEN_REQUEST  no other open request proposes a different value for the same field
                                     of the same heater (or FLOC)
      6 USER_ELIGIBLE_FOR_STAGE      the person named in @actor_email may decide this stage: flag, scope
-                                    and group (app.fn_stage_eligibility), and, at the accountable stage
-                                    with SAME_PERSON_BOTH_STAGES = 0, did not approve the first stage
+                                    and group, or an admin (app.fn_stage_eligibility). Approving both
+                                    stages is allowed since 18 Nov 2026 (client; Q-479)
 
    A request that is not waiting for a decision (status other than PENDING_RESPONSIBLE or
    PENDING_ACCOUNTABLE) gets NOT_CHECKED on every row: the checks mean something only while a person
@@ -314,16 +476,7 @@ RETURN
                         OR (r.entity_type = N''FLOC'' AND o.entity_type = N''FLOC'' AND o.functional_location = r.functional_location))
                    AND ISNULL(o.new_value, N'''') COLLATE Latin1_General_BIN2 <> t.newv COLLATE Latin1_General_BIN2
                  ORDER BY o.request_id) AS cf
-    OUTER APPLY (SELECT TOP (1) s.setting_value AS v
-                 FROM app.app_setting AS s
-                 WHERE s.setting_key = N''SAME_PERSON_BOTH_STAGES'') AS sp
     OUTER APPLY app.fn_stage_eligibility(ac.a, st.stage, sg.grp, r.profit_center_name) AS el
-    CROSS APPLY (SELECT CASE WHEN st.stage = N''ACCOUNTABLE''
-                              AND ISNULL(sp.v, N''0'') = N''0''
-                              AND EXISTS (SELECT 1 FROM app.change_request_event AS ev
-                                          WHERE ev.request_id = r.request_id
-                                            AND ev.event_type = N''RESPONSIBLE_APPROVED''
-                                            AND ev.actor = ac.a) THEN 1 ELSE 0 END AS blocked) AS sgr
     CROSS APPLY
     (
         SELECT
@@ -394,15 +547,14 @@ RETURN
             -- 6 USER_ELIGIBLE_FOR_STAGE
             CASE WHEN st.stage IS NULL THEN N''NOT_CHECKED''
                  WHEN ac.a IS NULL OR ac.a = N'''' THEN N''NOT_CHECKED''
-                 WHEN el.is_group_member = 0 OR el.has_flag_in_scope = 0 THEN N''FAIL''
-                 WHEN sgr.blocked = 1 THEN N''FAIL''
-                 ELSE N''PASS'' END AS c6s,
+                 WHEN el.is_eligible = 1 THEN N''PASS''
+                 ELSE N''FAIL'' END AS c6s,
             CASE WHEN st.stage IS NULL THEN NULL
                  WHEN ac.a IS NULL OR ac.a = N'''' THEN N''no approver was named, so eligibility was not checked''
+                 WHEN el.is_group_member = 1 AND el.has_flag_in_scope = 1 THEN N''allowed to decide the '' + st.stage + N'' stage''
+                 WHEN el.is_admin = 1 THEN N''allowed to decide the '' + st.stage + N'' stage as an admin (not a member of '' + ISNULL(sg.grp, N''the group'') + N'')''
                  WHEN el.is_group_member = 0 THEN N''not an active member of the group for this stage ('' + ISNULL(sg.grp, N''none'') + N'')''
-                 WHEN el.has_flag_in_scope = 0 THEN N''no role of this person allows the '' + st.stage + N'' stage for '' + LEFT(r.profit_center_name, 40)
-                 WHEN sgr.blocked = 1 THEN N''the same person may not approve both stages of one request (setting SAME_PERSON_BOTH_STAGES)''
-                 ELSE N''allowed to decide the '' + st.stage + N'' stage'' END AS c6m
+                 ELSE N''no role of this person allows the '' + st.stage + N'' stage for '' + LEFT(r.profit_center_name, 40) END AS c6m
     ) AS x
     CROSS APPLY (VALUES
         (1, N''ASSOCIATION_MATCH'',           x.c1s, ISNULL(x.c1m, x.notpending)),
@@ -820,15 +972,22 @@ EXEC (N'/* =====================================================================
      50133 no such request                                                     50134 not waiting for a decision
      50135 @expected_status given and the request has moved on (the screen is out of date)
      50136 REJECT and RETURN need a comment
-     50141 not an active member of the group the request was routed to for this stage
-     50142 no role of the person has the stage''s flag with a scope that covers the profit centre
-     50143 segregation: the same person approved the first stage and SAME_PERSON_BOTH_STAGES = 0
-           (only for APPROVE at the accountable stage)
+     50141 not an active member of the group the request was routed to for this stage (an admin is exempt)
+     50142 no role of the person has the stage''s flag with a scope that covers the profit centre (an admin is
+           exempt)
+     (50143, "the same person may not approve both stages", is retired: client, 18 Nov 2026, answers Q-479.
+      Whoever is eligible at the second stage may approve it, also when they approved the first: an admin, or
+      a member of both routed groups. The event records how: decided_as ADMIN or GROUP_MEMBER, and
+      same_person_both_stages = true.)
      50144 APPROVE blocked by a FAILED approval check (app.fn_request_checks rows 1 to 5; NOT_CHECKED does
            not block; a stale request can still be REJECTED or RETURNED)
-     50137 RETURN to someone other than the allowed recipient: the submitter (field / manual requests) or
-           the rule''s resolution group (rule requests); a request raised by system:... goes to its
-           responsible group (Q-465 working assumption, setting RETURN_RECIPIENT_RULE)
+     50137 RETURN to someone who is not allowed (client, 18 Nov 2026, answers Q-465). @return_recipient names
+           ONE person, who must be in app.fn_return_candidates for this request and this actor: the submitter,
+           an active member of either routed group (registered), or the actor themselves. Without
+           @return_recipient the request goes where it went before (the default): the submitter of a field or
+           manual request, the rule''s resolution group for a rule request, the responsible group for another
+           request raised by system:... . @return_recipient_type, when given, must be USER with a person, or
+           GROUP with exactly that default group.
      50149 somebody else changed the request between the read and the write (row_version)
 
    What it writes, in ONE transaction: the new status, the event (type, stage, actor, group, comment,
@@ -836,7 +995,8 @@ EXEC (N'/* =====================================================================
      APPROVE at RESPONSIBLE   -> PENDING_ACCOUNTABLE, event RESPONSIBLE_APPROVED, group notified
      APPROVE at ACCOUNTABLE   -> APPROVED, event ACCOUNTABLE_APPROVED, requester notified; needs_merge = 1
      REJECT                   -> REJECTED, event REJECTED, requester notified with the comment
-     RETURN                   -> RETURNED, event RETURNED, the recipient notified with the comment
+     RETURN                   -> RETURNED, event RETURNED, the recipient notified with the comment (not when the
+                                 actor returned it to themselves)
    The merge into gold is NOT done here: it is a separate step after the approval commits (01 section 2.2).
    The function calls gold.usp_apply_approved_change when needs_merge = 1 and records the outcome with
    app.usp_request_record_merge.
@@ -898,25 +1058,25 @@ BEGIN
         THROW 50136, N''A comment is required to reject or return a request.'', 1;
 
     /* ---- who may decide ---------------------------------------------------------- */
-    DECLARE @is_member bit, @has_flag bit;
-    SELECT @is_member = e.is_group_member, @has_flag = e.has_flag_in_scope
+    DECLARE @is_member bit, @has_flag bit, @is_admin bit;
+    SELECT @is_member = e.is_group_member, @has_flag = e.has_flag_in_scope, @is_admin = e.is_admin
     FROM app.fn_stage_eligibility(@actor, @stage, @grp, @pc) AS e;
-    IF @is_member = 0
+    IF ISNULL(@is_admin, 0) = 0 AND @is_member = 0
     BEGIN
         SET @msg = N''You are not an active member of the group for this stage ('' + ISNULL(@grp, N''none'') + N'').'';
         THROW 50141, @msg, 1;
     END
-    IF @has_flag = 0
+    IF ISNULL(@is_admin, 0) = 0 AND @has_flag = 0
     BEGIN
         SET @msg = N''No role of yours allows the '' + @stage + N'' stage for '' + ISNULL(@pc, N''this profit centre'') + N''.'';
         THROW 50142, @msg, 1;
     END
-
-    IF @dec = N''APPROVE'' AND @stage = N''ACCOUNTABLE''
-       AND ISNULL((SELECT s.setting_value FROM app.app_setting AS s WHERE s.setting_key = N''SAME_PERSON_BOTH_STAGES''), N''0'') = N''0''
-       AND EXISTS (SELECT 1 FROM app.change_request_event AS ev
-                   WHERE ev.request_id = @request_id AND ev.event_type = N''RESPONSIBLE_APPROVED'' AND ev.actor = @actor)
-        THROW 50143, N''The same person may not approve both stages of one request.'', 1;
+    -- how this person qualified, for the history: a group member with the flag, or an admin who is not
+    DECLARE @decided_as nvarchar(12) = CASE WHEN @is_member = 1 AND @has_flag = 1 THEN N''GROUP_MEMBER'' ELSE N''ADMIN'' END;
+    DECLARE @same_person bit = CASE WHEN @dec = N''APPROVE'' AND @stage = N''ACCOUNTABLE''
+                                     AND EXISTS (SELECT 1 FROM app.change_request_event AS ev
+                                                 WHERE ev.request_id = @request_id AND ev.event_type = N''RESPONSIBLE_APPROVED'' AND ev.actor = @actor)
+                                    THEN 1 ELSE 0 END;
 
     /* ---- approval checks (a stale or failing request may still be rejected or returned) -- */
     DECLARE @failed nvarchar(max);
@@ -958,12 +1118,28 @@ BEGIN
             SET @rrec = @rg;
         END
 
-        IF (@return_recipient IS NOT NULL OR @return_recipient_type IS NOT NULL)
-           AND (UPPER(ISNULL(LTRIM(RTRIM(@return_recipient_type)), N'''')) <> @rtype
-                OR LOWER(ISNULL(LTRIM(RTRIM(@return_recipient)), N'''')) <> LOWER(@rrec))
+        -- a chosen recipient (client, 18 Nov 2026): one person from app.fn_return_candidates, or the default group
+        DECLARE @want_type nvarchar(10) = NULLIF(UPPER(LTRIM(RTRIM(@return_recipient_type))), N'''');
+        DECLARE @want nvarchar(256) = NULLIF(LOWER(LTRIM(RTRIM(@return_recipient))), N'''');
+        IF @want IS NOT NULL OR @want_type IS NOT NULL
         BEGIN
-            SET @msg = N''This request can only be returned to '' + @rrec + N'' ('' + @rtype + N'').'';
-            THROW 50137, @msg, 1;
+            IF @want_type = N''GROUP''
+            BEGIN
+                IF @rtype <> N''GROUP'' OR @want IS NULL OR @want <> LOWER(@rrec)
+                BEGIN
+                    SET @msg = N''This request can only be returned to a person, or to '' + CASE WHEN @rtype = N''GROUP'' THEN @rrec ELSE N''no group'' END + N''.'';
+                    THROW 50137, @msg, 1;
+                END
+            END
+            ELSE
+            BEGIN
+                IF (@want_type IS NOT NULL AND @want_type <> N''USER'')
+                   OR @want IS NULL
+                   OR NOT EXISTS (SELECT 1 FROM app.fn_return_candidates(@request_id, @actor) AS c WHERE c.user_email = @want)
+                    THROW 50137, N''A request can only be returned to its submitter, to a registered member of one of its two approval groups, or to yourself.'', 1;
+                SET @rtype = N''USER'';
+                SET @rrec = @want;
+            END
         END
     END
 
@@ -977,11 +1153,12 @@ BEGIN
                                             WHEN @stage = N''RESPONSIBLE'' THEN N''RESPONSIBLE_APPROVED''
                                             ELSE N''ACCOUNTABLE_APPROVED'' END;
     DECLARE @details nvarchar(max) =
-        (SELECT @stage AS stage, @dec AS decision, JSON_QUERY(@checks_json) AS checks,
+        (SELECT @stage AS stage, @dec AS decision, @decided_as AS decided_as,
+                CAST(@same_person AS bit) AS same_person_both_stages, JSON_QUERY(@checks_json) AS checks,
                 @rtype AS return_recipient_type, @rrec AS return_recipient
          FOR JSON PATH, WITHOUT_ARRAY_WRAPPER);
     DECLARE @req_mail nvarchar(256) = CASE WHEN @by = @actor THEN NULL ELSE @by END;
-    DECLARE @ret_mail nvarchar(256) = CASE WHEN @rtype = N''USER'' THEN @rrec ELSE NULL END;
+    DECLARE @ret_mail nvarchar(256) = CASE WHEN @rtype = N''USER'' AND @rrec <> @actor THEN @rrec ELSE NULL END;
     DECLARE @ret_group nvarchar(64) = CASE WHEN @rtype = N''GROUP'' THEN @rrec ELSE NULL END;
     DECLARE @what nvarchar(400) = (SELECT TOP (1) ISNULL(fc.label, r.field_code) + N'' of '' + ISNULL(r.equipment_number, r.functional_location)
                                    FROM app.change_request AS r
@@ -1145,11 +1322,13 @@ EXEC (N'/* =====================================================================
    Needs: app.fn_value_check, app.usp_notification_enqueue.
 
    Sends a RETURNED request back to the first stage (PENDING_RESPONSIBLE), optionally with a corrected
-   proposed value. Only the return recipient may do it: the submitter when the return went to a USER, an
-   active member of the group when it went to a GROUP. A refusal is a THROW; nothing is written:
+   proposed value. Who may do it is app.fn_return_rights (client, 18 Nov 2026): the person it was returned to
+   (any of the people app.fn_return_candidates allowed, not only the submitter), an active member of the group
+   when it went to a GROUP; and, when that recipient can no longer act on it (orphaned), also the submitter, a
+   member of the responsible group or an admin. "Raised by" never changes. A refusal is a THROW; nothing is written:
 
      50161 no such request                       50162 the request is not RETURNED
-     50163 the person is not the return recipient (nor a member of the recipient group)
+     50163 the person may not resubmit it (app.fn_return_rights)
      50120 the corrected value equals the old value
      50121 the corrected value is not acceptable (app.fn_value_check)
      50164 another open request already proposes that change (same de-duplication key)
@@ -1198,10 +1377,8 @@ BEGIN
         THROW 50162, @msg, 1;
     END
 
-    IF NOT (   (@rtype = N''USER'' AND LOWER(@rrec) = @actor)
-            OR (@rtype = N''GROUP'' AND EXISTS (SELECT 1 FROM app.group_membership AS m
-                                              WHERE m.group_key = @rrec AND m.is_active = 1 AND m.user_email = @actor)))
-        THROW 50163, N''Only the person or group the request was returned to may resubmit it.'', 1;
+    IF NOT EXISTS (SELECT 1 FROM app.fn_return_rights(@request_id, @actor) AS rr WHERE rr.can_resubmit = 1)
+        THROW 50163, N''Only the person or group the request was returned to may resubmit it (or, when that person can no longer act on it, the submitter, a member of the responsible group or an admin).'', 1;
 
     /* ---- a corrected value ----------------------------------------------------------- */
     DECLARE @newv nvarchar(400) = @curv;
@@ -1302,11 +1479,16 @@ EXEC (N'/* =====================================================================
    de-duplication key, so the same change can be raised again by a person; a RULE source stays
    suppressed after a cancellation (app.usp_request_create, REF-52 [L0187]).
 
-   Who may: the person who raised it (requested_by); and, while it is RETURNED, the person or group
-   member it was returned to ("the recipient ... withdraws (CANCELLED)", POC_Final/04). A refusal is a
-   THROW; nothing is written:
+   Who may (changed 18 Nov 2026: a request can now be returned to people other than its submitter, and the
+   agreed rule is "the recipient fixes it, the submitter keeps it"):
+     - the person who raised it (requested_by), in any open status;
+     - an admin (can_manage_admin, app.fn_requester_rights), in any open status;
+     - while it is RETURNED to a GROUP (a request the system raised, which has no person as submitter), an
+       active member of that group, who stands in for the submitter [INFERRED].
+   A person it was returned to personally may correct and resubmit it but NOT withdraw it.
+   A refusal is a THROW; nothing is written:
      50171 no such request        50172 the request is already closed (APPROVED, REJECTED or CANCELLED)
-     50173 not the requester and not the return recipient
+     50173 not the requester, not an admin, and not a member of the group a system request was returned to
      50149 somebody else changed the request at the same moment
    No notification is queued (the notification topics of 09 section 7.1 have none for a withdrawal).
 
@@ -1342,11 +1524,11 @@ BEGIN
 
     IF @actor IS NULL OR @actor = N'''' OR LEFT(@actor, 7) = N''system:''
        OR NOT (   LOWER(@by) = @actor
-               OR (@status = N''RETURNED'' AND @rtype = N''USER'' AND LOWER(@rrec) = @actor)
+               OR EXISTS (SELECT 1 FROM app.fn_requester_rights(@actor) AS ad WHERE ad.can_manage_admin = 1)
                OR (@status = N''RETURNED'' AND @rtype = N''GROUP''
                    AND EXISTS (SELECT 1 FROM app.group_membership AS m
                                WHERE m.group_key = @rrec AND m.is_active = 1 AND m.user_email = @actor)))
-        THROW 50173, N''Only the person who raised the request, or the person it was returned to, may withdraw it.'', 1;
+        THROW 50173, N''Only the person who raised the request, or an admin, may withdraw it.'', 1;
 
     DECLARE @own bit = CASE WHEN @@TRANCOUNT = 0 THEN 1 ELSE 0 END;
     BEGIN TRY

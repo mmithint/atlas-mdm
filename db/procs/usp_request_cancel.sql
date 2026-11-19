@@ -7,11 +7,16 @@
    de-duplication key, so the same change can be raised again by a person; a RULE source stays
    suppressed after a cancellation (app.usp_request_create, REF-52 [L0187]).
 
-   Who may: the person who raised it (requested_by); and, while it is RETURNED, the person or group
-   member it was returned to ("the recipient ... withdraws (CANCELLED)", POC_Final/04). A refusal is a
-   THROW; nothing is written:
+   Who may (changed 18 Nov 2026: a request can now be returned to people other than its submitter, and the
+   agreed rule is "the recipient fixes it, the submitter keeps it"):
+     - the person who raised it (requested_by), in any open status;
+     - an admin (can_manage_admin, app.fn_requester_rights), in any open status;
+     - while it is RETURNED to a GROUP (a request the system raised, which has no person as submitter), an
+       active member of that group, who stands in for the submitter [INFERRED].
+   A person it was returned to personally may correct and resubmit it but NOT withdraw it.
+   A refusal is a THROW; nothing is written:
      50171 no such request        50172 the request is already closed (APPROVED, REJECTED or CANCELLED)
-     50173 not the requester and not the return recipient
+     50173 not the requester, not an admin, and not a member of the group a system request was returned to
      50149 somebody else changed the request at the same moment
    No notification is queued (the notification topics of 09 section 7.1 have none for a withdrawal).
 
@@ -47,11 +52,11 @@ BEGIN
 
     IF @actor IS NULL OR @actor = N'' OR LEFT(@actor, 7) = N'system:'
        OR NOT (   LOWER(@by) = @actor
-               OR (@status = N'RETURNED' AND @rtype = N'USER' AND LOWER(@rrec) = @actor)
+               OR EXISTS (SELECT 1 FROM app.fn_requester_rights(@actor) AS ad WHERE ad.can_manage_admin = 1)
                OR (@status = N'RETURNED' AND @rtype = N'GROUP'
                    AND EXISTS (SELECT 1 FROM app.group_membership AS m
                                WHERE m.group_key = @rrec AND m.is_active = 1 AND m.user_email = @actor)))
-        THROW 50173, N'Only the person who raised the request, or the person it was returned to, may withdraw it.', 1;
+        THROW 50173, N'Only the person who raised the request, or an admin, may withdraw it.', 1;
 
     DECLARE @own bit = CASE WHEN @@TRANCOUNT = 0 THEN 1 ELSE 0 END;
     BEGIN TRY

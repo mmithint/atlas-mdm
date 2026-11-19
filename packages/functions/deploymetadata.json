@@ -308,13 +308,18 @@
             "hasDefaultValue": false
           },
           {
+            "name": "returnTo",
+            "dataType": "string",
+            "hasDefaultValue": false
+          },
+          {
             "name": "ctx",
             "dataType": "RayfinContext<Record<string, any>, AudienceType.Sql>",
             "hasDefaultValue": false
           }
         ]
       },
-      "functionCode": "udf.func(\n  'decideRequest',\n  async (\n    requestId: number,\n    decision: string,\n    comment: string,\n    expectedStatus: string,\n    ctx: RayfinContext<Record<string, any>, AudienceType.Sql>\n  ): Promise<DecideRequestResult> =>\n    runDecideRequest({ requestId, decision, comment, expectedStatus }, await trustedAccessToken(ctx), () => ctx.Tokens.Sql),\n  []\n)"
+      "functionCode": "udf.func(\n  'decideRequest',\n  async (\n    requestId: number,\n    decision: string,\n    comment: string,\n    expectedStatus: string,\n    returnTo: string,\n    ctx: RayfinContext<Record<string, any>, AudienceType.Sql>\n  ): Promise<DecideRequestResult> =>\n    runDecideRequest({ requestId, decision, comment, expectedStatus, returnTo }, await trustedAccessToken(ctx), () => ctx.Tokens.Sql),\n  []\n)"
     },
     {
       "name": "bulkApprove",
@@ -560,6 +565,261 @@
         ]
       },
       "functionCode": "udf.func(\n  'getRequestEvidence',\n  async (\n    requestId: number,\n    ctx: RayfinContext<Record<string, any>, AudienceType.Sql>\n  ): Promise<RequestEvidenceResult> => runRequestEvidence(requestId, await trustedAccessToken(ctx), () => ctx.Tokens.Sql),\n  []\n)"
+    },
+    {
+      "name": "getRequestQueue",
+      "scriptFile": "src\\function_app.ts",
+      "bindings": [
+        {
+          "name": "req",
+          "type": "httpTrigger",
+          "direction": "in",
+          "authLevel": "anonymous",
+          "methods": [
+            "post"
+          ],
+          "route": "getRequestQueue"
+        },
+        {
+          "name": "$return",
+          "type": "http",
+          "direction": "out"
+        },
+        {
+          "name": "__generic_Sql",
+          "direction": "in",
+          "type": "FabricItem",
+          "alias": "",
+          "audienceType": "Sql"
+        }
+      ],
+      "fabricProperties": {
+        "fabricMetadataSchemaVersion": "1.0",
+        "fabricFunctionReturnType": "Promise<RequestQueueResult>",
+        "fabricFunctionParameters": [
+          {
+            "name": "tab",
+            "dataType": "string",
+            "hasDefaultValue": false
+          },
+          {
+            "name": "profitCenter",
+            "dataType": "string",
+            "hasDefaultValue": false
+          },
+          {
+            "name": "fieldCode",
+            "dataType": "string",
+            "hasDefaultValue": false
+          },
+          {
+            "name": "ruleId",
+            "dataType": "string",
+            "hasDefaultValue": false
+          },
+          {
+            "name": "minAgeHours",
+            "dataType": "number",
+            "hasDefaultValue": false
+          },
+          {
+            "name": "noteOnly",
+            "dataType": "number",
+            "hasDefaultValue": false
+          },
+          {
+            "name": "offset",
+            "dataType": "number",
+            "hasDefaultValue": false
+          },
+          {
+            "name": "pageSize",
+            "dataType": "number",
+            "hasDefaultValue": false
+          },
+          {
+            "name": "ctx",
+            "dataType": "RayfinContext<Record<string, any>, AudienceType.Sql>",
+            "hasDefaultValue": false
+          }
+        ]
+      },
+      "functionCode": "udf.func(\n  'getRequestQueue',\n  async (\n    tab: string,\n    profitCenter: string,\n    fieldCode: string,\n    ruleId: string,\n    minAgeHours: number,\n    noteOnly: number,\n    offset: number,\n    pageSize: number,\n    ctx: RayfinContext<Record<string, any>, AudienceType.Sql>\n  ): Promise<RequestQueueResult> =>\n    runRequestQueue(\n      { tab, profitCenter, fieldCode, ruleId, minAgeHours, noteOnly, offset, pageSize },\n      await trustedAccessToken(ctx),\n      () => ctx.Tokens.Sql\n    ),\n  []\n)"
+    },
+    {
+      "name": "getRequestDetail",
+      "scriptFile": "src\\function_app.ts",
+      "bindings": [
+        {
+          "name": "req",
+          "type": "httpTrigger",
+          "direction": "in",
+          "authLevel": "anonymous",
+          "methods": [
+            "post"
+          ],
+          "route": "getRequestDetail"
+        },
+        {
+          "name": "$return",
+          "type": "http",
+          "direction": "out"
+        },
+        {
+          "name": "__generic_Sql",
+          "direction": "in",
+          "type": "FabricItem",
+          "alias": "",
+          "audienceType": "Sql"
+        }
+      ],
+      "fabricProperties": {
+        "fabricMetadataSchemaVersion": "1.0",
+        "fabricFunctionReturnType": "Promise<RequestDetailResult>",
+        "fabricFunctionParameters": [
+          {
+            "name": "requestId",
+            "dataType": "number",
+            "hasDefaultValue": false
+          },
+          {
+            "name": "ctx",
+            "dataType": "RayfinContext<Record<string, any>, AudienceType.Sql>",
+            "hasDefaultValue": false
+          }
+        ]
+      },
+      "functionCode": "udf.func(\n  'getRequestDetail',\n  async (\n    requestId: number,\n    ctx: RayfinContext<Record<string, any>, AudienceType.Sql>\n  ): Promise<RequestDetailResult> => runRequestDetail(requestId, await trustedAccessToken(ctx), () => ctx.Tokens.Sql),\n  []\n)"
+    },
+    {
+      "name": "getMyNotifications",
+      "scriptFile": "src\\function_app.ts",
+      "bindings": [
+        {
+          "name": "req",
+          "type": "httpTrigger",
+          "direction": "in",
+          "authLevel": "anonymous",
+          "methods": [
+            "post"
+          ],
+          "route": "getMyNotifications"
+        },
+        {
+          "name": "$return",
+          "type": "http",
+          "direction": "out"
+        },
+        {
+          "name": "__generic_Sql",
+          "direction": "in",
+          "type": "FabricItem",
+          "alias": "",
+          "audienceType": "Sql"
+        }
+      ],
+      "fabricProperties": {
+        "fabricMetadataSchemaVersion": "1.0",
+        "fabricFunctionReturnType": "Promise<MyNotificationsResult>",
+        "fabricFunctionParameters": [
+          {
+            "name": "limit",
+            "dataType": "number",
+            "hasDefaultValue": false
+          },
+          {
+            "name": "ctx",
+            "dataType": "RayfinContext<Record<string, any>, AudienceType.Sql>",
+            "hasDefaultValue": false
+          }
+        ]
+      },
+      "functionCode": "udf.func(\n  'getMyNotifications',\n  async (\n    limit: number,\n    ctx: RayfinContext<Record<string, any>, AudienceType.Sql>\n  ): Promise<MyNotificationsResult> => runMyNotifications(limit, await trustedAccessToken(ctx), () => ctx.Tokens.Sql),\n  []\n)"
+    },
+    {
+      "name": "getRequestFormOptions",
+      "scriptFile": "src\\function_app.ts",
+      "bindings": [
+        {
+          "name": "req",
+          "type": "httpTrigger",
+          "direction": "in",
+          "authLevel": "anonymous",
+          "methods": [
+            "post"
+          ],
+          "route": "getRequestFormOptions"
+        },
+        {
+          "name": "$return",
+          "type": "http",
+          "direction": "out"
+        },
+        {
+          "name": "__generic_Sql",
+          "direction": "in",
+          "type": "FabricItem",
+          "alias": "",
+          "audienceType": "Sql"
+        }
+      ],
+      "fabricProperties": {
+        "fabricMetadataSchemaVersion": "1.0",
+        "fabricFunctionReturnType": "Promise<RequestFormOptionsResult>",
+        "fabricFunctionParameters": [
+          {
+            "name": "ctx",
+            "dataType": "RayfinContext<Record<string, any>, AudienceType.Sql>",
+            "hasDefaultValue": false
+          }
+        ]
+      },
+      "functionCode": "udf.func(\n  'getRequestFormOptions',\n  async (\n    ctx: RayfinContext<Record<string, any>, AudienceType.Sql>\n  ): Promise<RequestFormOptionsResult> => runRequestFormOptions(await trustedAccessToken(ctx), () => ctx.Tokens.Sql),\n  []\n)"
+    },
+    {
+      "name": "getEquipmentRequests",
+      "scriptFile": "src\\function_app.ts",
+      "bindings": [
+        {
+          "name": "req",
+          "type": "httpTrigger",
+          "direction": "in",
+          "authLevel": "anonymous",
+          "methods": [
+            "post"
+          ],
+          "route": "getEquipmentRequests"
+        },
+        {
+          "name": "$return",
+          "type": "http",
+          "direction": "out"
+        },
+        {
+          "name": "__generic_Sql",
+          "direction": "in",
+          "type": "FabricItem",
+          "alias": "",
+          "audienceType": "Sql"
+        }
+      ],
+      "fabricProperties": {
+        "fabricMetadataSchemaVersion": "1.0",
+        "fabricFunctionReturnType": "Promise<EquipmentRequestsResult>",
+        "fabricFunctionParameters": [
+          {
+            "name": "equipmentId",
+            "dataType": "number",
+            "hasDefaultValue": false
+          },
+          {
+            "name": "ctx",
+            "dataType": "RayfinContext<Record<string, any>, AudienceType.Sql>",
+            "hasDefaultValue": false
+          }
+        ]
+      },
+      "functionCode": "udf.func(\n  'getEquipmentRequests',\n  async (\n    equipmentId: number,\n    ctx: RayfinContext<Record<string, any>, AudienceType.Sql>\n  ): Promise<EquipmentRequestsResult> => runEquipmentRequests(equipmentId, await trustedAccessToken(ctx), () => ctx.Tokens.Sql),\n  []\n)"
     },
     {
       "name": "whoAmI",

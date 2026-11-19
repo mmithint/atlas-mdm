@@ -104,6 +104,9 @@ STAGES: dict[str, tuple[str, list[str]]] = {
         [
             "db/procs/fn_requester_rights.sql",
             "db/procs/fn_stage_eligibility.sql",
+            # added 18 Nov (client's approval rules, app4_0): the resubmit procedure needs them
+            "db/procs/fn_return_candidates.sql",
+            "db/procs/fn_return_rights.sql",
             "db/procs/fn_value_check.sql",
             "db/procs/fn_request_checks.sql",
             "db/procs/usp_notification_enqueue.sql",
@@ -132,6 +135,48 @@ STAGES: dict[str, tuple[str, list[str]]] = {
     "app3_3_request_lifecycle_test": (
         "APP-3 stage 3: request lifecycle test (16 scenarios and 2 extras)",
         ["db/tests/t_request_lifecycle.sql"],
+    ),
+    # APP-4 stage 0 (18 Nov, the client's call): the approval rules changed before APP-4 was run. An admin may decide any
+    # stage, one person may approve both stages, a request may be returned to the submitter, a member of either group or
+    # yourself, an orphaned return can be picked up, and only the submitter or an admin withdraws. These are APP-3 objects
+    # (CREATE OR ALTER), so app3_1 above lists the same files and regenerates too; this stage is what you run on a database
+    # that already has APP-3. Dependency order: the helpers first, then the procedures that use them.
+    "app4_0_approval_rules": (
+        "APP-4 stage 0: approval rule changes of 18 Nov (admin, both stages, return to a chosen person)",
+        [
+            "db/procs/fn_stage_eligibility.sql",
+            "db/procs/fn_return_candidates.sql",
+            "db/procs/fn_return_rights.sql",
+            "db/procs/fn_request_checks.sql",
+            "db/procs/usp_request_decide.sql",
+            "db/procs/usp_request_resubmit.sql",
+            "db/procs/usp_request_cancel.sql",
+        ],
+    ),
+    # APP-4 stage 1 (read path C, D-17): the read procedures behind the approval screens, the notification bell and the
+    # request dialog. The helper function first (the queue and the detail procedure use it). Needs the whole APP-3 stage
+    # (the four request views, fn_request_checks, fn_stage_eligibility, fn_requester_rights), the gold views and the seeds.
+    "app4_1_read_objects": (
+        "APP-4 stage 1: read function and procedures for the approval screens",
+        [
+            "db/procs/fn_request_actions.sql",
+            "db/procs/usp_request_queue.sql",
+            "db/procs/usp_request_detail.sql",
+            "db/procs/usp_notification_list.sql",
+            "db/procs/usp_request_form_options.sql",
+            "db/procs/usp_equipment_requests.sql",
+        ],
+    ),
+    # APP-4 stage 2: the test, apart from the objects so that a compile error in it never hides whether they compiled.
+    "app4_2_request_reads_test": (
+        "APP-4 stage 2: request reads test (queue, detail, notifications, dialog options, heater requests)",
+        ["db/tests/t_request_reads.sql"],
+    ),
+    # APP-4 stage 3 (18 Nov): the test of the changed approval rules (admin, both stages, return to a chosen person,
+    # orphaned returns, who may withdraw).
+    "app4_3_approval_rules_test": (
+        "APP-4 stage 3: approval rules test (admin, both stages, return recipients, orphaned returns, withdraw)",
+        ["db/tests/t_request_approval_rules.sql"],
     ),
 }
 

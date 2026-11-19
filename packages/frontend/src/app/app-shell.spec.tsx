@@ -2,6 +2,10 @@ import { fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('@/lib/rayfin-client', () => ({ getRayfinClient: async () => ({}) }));
+// The bell in the header reads the person's notifications; the shell tests do not need real ones.
+vi.mock('@/features/notifications/notifications-api', () => ({
+  fetchNotifications: async () => ({ unreadCount: 0, items: [] }),
+}));
 
 import { AuthContext, type AuthContextValue } from '@/hooks/auth.context';
 
@@ -44,7 +48,8 @@ const menu = () => screen.getByRole('navigation', { name: 'Main' });
 
 describe('App shell', () => {
   beforeEach(() => {
-    window.location.hash = '#/approvals';
+    // A screen that is not built yet, so the shell is tested without a screen's own reads.
+    window.location.hash = '#/rules';
   });
   afterEach(() => {
     window.location.hash = '';
@@ -68,15 +73,16 @@ describe('App shell', () => {
   it('marks the current page, and marks screens that are not built yet', async () => {
     renderShell(async () => PROFILE);
     await screen.findByLabelText('Signed in as');
-    expect(within(menu()).getByRole('link', { name: /Approvals/ })).toHaveAttribute('aria-current', 'page');
-    expect(within(menu()).getByRole('link', { name: /Approvals/ })).toHaveAttribute('title', 'Built in APP-4');
+    expect(within(menu()).getByRole('link', { name: /Rules/ })).toHaveAttribute('aria-current', 'page');
+    expect(within(menu()).getByRole('link', { name: /Rules/ })).toHaveAttribute('title', 'Built in APP-5');
     expect(within(menu()).getByRole('link', { name: /Equipment/ })).not.toHaveAttribute('title');
+    expect(within(menu()).getByRole('link', { name: /Approvals/ })).not.toHaveAttribute('title');
   });
 
   it('shows a placeholder, with the phase, for a screen that is not built yet', async () => {
     renderShell(async () => PROFILE);
-    expect(await screen.findByRole('heading', { level: 1, name: 'Approvals' })).toBeInTheDocument();
-    expect(screen.getByText(/It arrives in/)).toHaveTextContent('APP-4');
+    expect(await screen.findByRole('heading', { level: 1, name: 'Rules' })).toBeInTheDocument();
+    expect(screen.getByText(/It arrives in/)).toHaveTextContent('APP-5');
   });
 
   it('keeps a person without the admin right out of the admin screen', async () => {
@@ -90,6 +96,15 @@ describe('App shell', () => {
     renderShell(async () => ({ ...PROFILE, roles: ['Admin'], canManageAdmin: true }));
     expect(await screen.findByText(/This screen is not built yet/)).toBeInTheDocument();
     expect(screen.queryByText('You do not have access to this screen.')).toBeNull();
+  });
+
+  it('shows the notification bell to a registered person, and not to one who is not registered yet', async () => {
+    const first = renderShell(async () => PROFILE);
+    expect(await screen.findByRole('button', { name: /Notifications/ })).toBeInTheDocument();
+    first.unmount();
+    renderShell(async () => ({ ...PROFILE, status: 'NOT_REGISTERED', email: null, displayName: null, roles: [] }));
+    await screen.findByLabelText('Your roles');
+    expect(screen.queryByRole('button', { name: /Notifications/ })).toBeNull();
   });
 
   it('says so for an address that is no screen', async () => {
@@ -143,6 +158,6 @@ describe('App shell', () => {
   it('puts the screen name in the page title', async () => {
     renderShell(async () => PROFILE);
     await screen.findByLabelText('Signed in as');
-    expect(document.title).toBe('Approvals · ATLAS');
+    expect(document.title).toBe('Rules · ATLAS');
   });
 });

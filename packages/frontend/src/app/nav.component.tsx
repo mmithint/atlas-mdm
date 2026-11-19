@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 
 import { hrefFor } from './router';
-import { menuRoutes, type ScreenId } from './routes';
+import { isBuilt, menuRoutes, type ScreenId } from './routes';
 
 const ICONS: Partial<Record<ScreenId, LucideIcon>> = {
   home: House,
@@ -56,7 +56,7 @@ export function Nav({
         {menuRoutes(canManageAdmin).map((route) => {
           const Icon = ICONS[route.id];
           const isCurrent = route.id === active;
-          const built = route.builtIn === 'APP-2';
+          const built = isBuilt(route);
           return (
             <li key={route.id}>
               <a

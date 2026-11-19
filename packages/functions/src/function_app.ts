@@ -12,6 +12,18 @@ import {
 } from './equipment.js';
 import { loadMyProfile, type MyProfile } from './profile.js';
 import {
+  runEquipmentRequests,
+  runMyNotifications,
+  runRequestDetail,
+  runRequestFormOptions,
+  runRequestQueue,
+  type EquipmentRequestsResult,
+  type MyNotificationsResult,
+  type RequestDetailResult,
+  type RequestFormOptionsResult,
+  type RequestQueueResult,
+} from './request-reads.js';
+import {
   runBulkApprove,
   runCancelRequest,
   runCreateRequest,
@@ -126,9 +138,10 @@ udf.func(
     decision: string,
     comment: string,
     expectedStatus: string,
+    returnTo: string,
     ctx: RayfinContext<Record<string, any>, AudienceType.Sql>
   ): Promise<DecideRequestResult> =>
-    runDecideRequest({ requestId, decision, comment, expectedStatus }, await trustedAccessToken(ctx), () => ctx.Tokens.Sql),
+    runDecideRequest({ requestId, decision, comment, expectedStatus, returnTo }, await trustedAccessToken(ctx), () => ctx.Tokens.Sql),
   []
 );
 
@@ -181,6 +194,65 @@ udf.func(
     requestId: number,
     ctx: RayfinContext<Record<string, any>, AudienceType.Sql>
   ): Promise<RequestEvidenceResult> => runRequestEvidence(requestId, await trustedAccessToken(ctx), () => ctx.Tokens.Sql),
+  []
+);
+
+// APP-4, the request screens' reads (read path C, D-17; request-reads.ts). Reads only. They take the caller from the
+// verified token like the writes do, because "my queue", "what may I decide" and "my notifications" depend on who is
+// asking; the procedures behind them hold every rule (which request is in which tab, who may decide).
+udf.func(
+  'getRequestQueue',
+  async (
+    tab: string,
+    profitCenter: string,
+    fieldCode: string,
+    ruleId: string,
+    minAgeHours: number,
+    noteOnly: number,
+    offset: number,
+    pageSize: number,
+    ctx: RayfinContext<Record<string, any>, AudienceType.Sql>
+  ): Promise<RequestQueueResult> =>
+    runRequestQueue(
+      { tab, profitCenter, fieldCode, ruleId, minAgeHours, noteOnly, offset, pageSize },
+      await trustedAccessToken(ctx),
+      () => ctx.Tokens.Sql
+    ),
+  []
+);
+
+udf.func(
+  'getRequestDetail',
+  async (
+    requestId: number,
+    ctx: RayfinContext<Record<string, any>, AudienceType.Sql>
+  ): Promise<RequestDetailResult> => runRequestDetail(requestId, await trustedAccessToken(ctx), () => ctx.Tokens.Sql),
+  []
+);
+
+udf.func(
+  'getMyNotifications',
+  async (
+    limit: number,
+    ctx: RayfinContext<Record<string, any>, AudienceType.Sql>
+  ): Promise<MyNotificationsResult> => runMyNotifications(limit, await trustedAccessToken(ctx), () => ctx.Tokens.Sql),
+  []
+);
+
+udf.func(
+  'getRequestFormOptions',
+  async (
+    ctx: RayfinContext<Record<string, any>, AudienceType.Sql>
+  ): Promise<RequestFormOptionsResult> => runRequestFormOptions(await trustedAccessToken(ctx), () => ctx.Tokens.Sql),
+  []
+);
+
+udf.func(
+  'getEquipmentRequests',
+  async (
+    equipmentId: number,
+    ctx: RayfinContext<Record<string, any>, AudienceType.Sql>
+  ): Promise<EquipmentRequestsResult> => runEquipmentRequests(equipmentId, await trustedAccessToken(ctx), () => ctx.Tokens.Sql),
   []
 );
 

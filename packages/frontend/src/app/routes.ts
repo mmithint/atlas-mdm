@@ -38,9 +38,14 @@ export interface RouteDef {
   inMenu: boolean;
   /** Only people with the admin right see it in the menu and may open it. */
   needsAdmin: boolean;
-  /** The phase that builds the screen (`APP-2` = built now). */
+  /** The phase that builds the screen. */
   builtIn: string;
 }
+
+/** Phases whose screens exist; every other route shows a placeholder (and a "soon" mark in the menu). */
+export const BUILT_PHASES: readonly string[] = ['APP-2', 'APP-4'];
+
+export const isBuilt = (route: RouteDef): boolean => BUILT_PHASES.includes(route.builtIn);
 
 export const ROUTES: readonly RouteDef[] = [
   {

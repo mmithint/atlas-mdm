@@ -63,6 +63,17 @@ Run order and how to run a file: `FINAL PLAN/04_Your_Runbook.md` RB-02. No clien
 | Seed (stage 0, decided 16 Nov, D-18) | `0108_equipment_status_values` (EQUIPMENT_USER_STATUS becomes a list: AVFS, NOPE, OPER, DECM, the codes the EVOLVE equipment header accepts; re-runnable, never overwrites an admin's change) |
 | Bundle | `dist/app3_0_seed_status.sql` (run after `app1_2`, before the APP-3 procedures and tests). `app1_2` now lists 0101 to 0107 explicitly, so later seeds never change a finished phase's bundle |
 
+## APP-4 files
+
+| Kind | Files |
+|---|---|
+| Function | `fn_request_actions` (what one person may do with one request, and why not; used by the queue and the detail procedure) |
+| Read procedures (read path C, D-17) | `usp_request_queue` (refusals 50311 to 50315), `usp_request_detail` (50301), `usp_notification_list` (50321, 50322), `usp_request_form_options` (50331), `usp_equipment_requests`. Each has an optional `@only_set` (testing aid) |
+| Test | `t_request_reads` (13 checks; makes its own people and eight requests inside a transaction and rolls them back) |
+| Bundles | `dist/app4_1_read_objects.sql` (function and procedures; run after the APP-3 bundles), `dist/app4_2_request_reads_test.sql` |
+| Approval rules of 18 Nov (client: Q-479, Q-465) | New functions `fn_return_candidates` (who a request may be returned to) and `fn_return_rights` (who may resubmit, including orphaned returns); changed APP-3 objects `fn_stage_eligibility` (admin override), `fn_request_checks`, `usp_request_decide` (picked recipient, `decided_as`; 50143 retired), `usp_request_resubmit`, `usp_request_cancel` (submitter or admin). Bundle `dist/app4_0_approval_rules.sql` (run first on a database that has APP-3); test `t_request_approval_rules` (7 checks, bundle `dist/app4_3_approval_rules_test.sql`) |
+| Helper (not bundled) | `dev/app4_make_test_requests.sql` (makes up to 50 test requests as you on synthetic heaters; you type your own e-mail in the editor window only) |
+
 ## APP-0 spike scripts (`dev/`)
 
 | File | Spike | Run when |
