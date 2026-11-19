@@ -933,6 +933,56 @@
         ]
       },
       "functionCode": "udf.func(\n  'storageProbe',\n  async (\n    ctx: RayfinContext<Record<string, any>, AudienceType.Storage>\n  ): Promise<StorageProbeResult> => storageProbe(() => ctx.Tokens.Storage),\n  []\n)"
+    },
+    {
+      "name": "oxygptProbe",
+      "scriptFile": "src\\function_app.ts",
+      "bindings": [
+        {
+          "name": "req",
+          "type": "httpTrigger",
+          "direction": "in",
+          "authLevel": "anonymous",
+          "methods": [
+            "post"
+          ],
+          "route": "oxygptProbe"
+        },
+        {
+          "name": "$return",
+          "type": "http",
+          "direction": "out"
+        },
+        {
+          "name": "__generic_Sql",
+          "direction": "in",
+          "type": "FabricItem",
+          "alias": "",
+          "audienceType": "Sql"
+        }
+      ],
+      "fabricProperties": {
+        "fabricMetadataSchemaVersion": "1.0",
+        "fabricFunctionReturnType": "Promise<OxygptProbeResult>",
+        "fabricFunctionParameters": [
+          {
+            "name": "mode",
+            "dataType": "string",
+            "hasDefaultValue": false
+          },
+          {
+            "name": "prompt",
+            "dataType": "string",
+            "hasDefaultValue": false
+          },
+          {
+            "name": "ctx",
+            "dataType": "RayfinContext<Record<string, any>, AudienceType.Sql>",
+            "hasDefaultValue": false
+          }
+        ]
+      },
+      "functionCode": "udf.func(\n  'oxygptProbe',\n  async (\n    mode: string,\n    prompt: string,\n    ctx: RayfinContext<Record<string, any>, AudienceType.Sql>\n  ): Promise<OxygptProbeResult> =>\n    runOxygptProbe(\n      { mode, prompt },\n      await trustedAccessToken(ctx),\n      () => ctx.Tokens.Sql,\n      () => (ctx.Secrets as Readonly<Record<string, string>>)[SECRET_API_KEY] ?? '',\n      () => (ctx.Secrets as Readonly<Record<string, string>>)[SECRET_MODEL_ID] ?? ''\n    ),\n  []\n)"
     }
   ]
 }

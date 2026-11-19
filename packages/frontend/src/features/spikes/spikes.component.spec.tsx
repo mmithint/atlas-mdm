@@ -1,7 +1,8 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { whoAmIInvoke, sqlPingInvoke, storageProbeInvoke, searchInvoke, detailInvoke, createInvoke, checksInvoke, decideInvoke } = vi.hoisted(() => ({
+const { whoAmIInvoke, sqlPingInvoke, storageProbeInvoke, searchInvoke, detailInvoke, createInvoke, checksInvoke, decideInvoke, oxygptInvoke } = vi.hoisted(() => ({
+  oxygptInvoke: vi.fn(),
   whoAmIInvoke: vi.fn(),
   sqlPingInvoke: vi.fn(),
   storageProbeInvoke: vi.fn(),
@@ -18,6 +19,7 @@ vi.mock('@/lib/rayfin-client', () => ({
       whoAmI: { invoke: whoAmIInvoke },
       sqlPing: { invoke: sqlPingInvoke },
       storageProbe: { invoke: storageProbeInvoke },
+      oxygptProbe: { invoke: oxygptInvoke },
       searchEquipment: { invoke: searchInvoke },
       getEquipmentDetail: { invoke: detailInvoke },
       createChangeRequest: { invoke: createInvoke },
@@ -36,6 +38,7 @@ describe('Spikes page', () => {
     whoAmIInvoke.mockReset();
     sqlPingInvoke.mockReset();
     storageProbeInvoke.mockReset();
+    oxygptInvoke.mockReset();
     searchInvoke.mockReset();
     detailInvoke.mockReset();
     createInvoke.mockReset();
@@ -45,7 +48,7 @@ describe('Spikes page', () => {
 
   it('shows every spike button and calls nothing until clicked', () => {
     render(<Spikes />);
-    for (const name of ['Who am I', 'SQL ping', 'Run timing test', 'Run OneLake test', 'Create test request']) {
+    for (const name of ['Who am I', 'SQL ping', 'Run timing test', 'Run OneLake test', 'Create test request', 'Name lookup', 'List models', 'Ask OxyGPT']) {
       expect(screen.getByRole('button', { name })).toBeEnabled();
     }
     // no request number yet: nothing to check or decide
@@ -57,8 +60,42 @@ describe('Spikes page', () => {
     expect(whoAmIInvoke).not.toHaveBeenCalled();
     expect(sqlPingInvoke).not.toHaveBeenCalled();
     expect(storageProbeInvoke).not.toHaveBeenCalled();
+    expect(oxygptInvoke).not.toHaveBeenCalled();
     expect(searchInvoke).not.toHaveBeenCalled();
     expect(detailInvoke).not.toHaveBeenCalled();
+  });
+
+  it('S5: sends only the mode and the typed question to the OxyGPT probe, once per press, and shows the answer', async () => {
+    oxygptInvoke.mockResolvedValue({ ok: true, mode: 'text', category: null, host: 'h', httpStatus: 200, route: '/api/chat/completions', totalMs: 900, dns: null, models: null, reply: { text: 'pong', truncated: false, model: null, promptTokens: 5, completionTokens: 1 }, errorCode: null, error: null });
+    render(<Spikes />);
+    fireEvent.change(screen.getByLabelText(/Question/), { target: { value: 'Say pong' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Ask OxyGPT' }));
+    const result = await screen.findByRole('status');
+    expect(result).toHaveTextContent('"text": "pong"');
+    expect(oxygptInvoke).toHaveBeenCalledTimes(1);
+    expect(oxygptInvoke).toHaveBeenCalledWith({ mode: 'text', prompt: 'Say pong' });
+    expect(whoAmIInvoke).not.toHaveBeenCalled();
+  });
+
+  it('S5: the lookup and list buttons send their own mode', async () => {
+    oxygptInvoke.mockResolvedValue({ ok: true, mode: 'dns', category: null, host: 'h', httpStatus: null, route: null, totalMs: 5, dns: { addressCount: 1, scope: 'PUBLIC' }, models: null, reply: null, errorCode: null, error: null });
+    render(<Spikes />);
+    fireEvent.click(screen.getByRole('button', { name: 'Name lookup' }));
+    await screen.findByRole('status');
+    fireEvent.click(screen.getByRole('button', { name: 'List models' }));
+    await vi.waitFor(() => expect(oxygptInvoke).toHaveBeenCalledTimes(2));
+    expect(oxygptInvoke.mock.calls.map((c) => (c[0] as { mode: string }).mode)).toEqual(['dns', 'models']);
+  });
+
+  it('S5: shows a refusal from the function as data and a failed call as an alert', async () => {
+    oxygptInvoke.mockResolvedValueOnce({ ok: false, mode: 'models', category: 'NOT_ADMIN', host: 'h', httpStatus: null, route: null, totalMs: 3, dns: null, models: null, reply: null, errorCode: null, error: 'Only an Admin may run the OxyGPT test.' });
+    render(<Spikes />);
+    fireEvent.click(screen.getByRole('button', { name: 'List models' }));
+    expect(await screen.findByRole('status')).toHaveTextContent('NOT_ADMIN');
+
+    oxygptInvoke.mockRejectedValueOnce(new Error('InternalError: platform said no'));
+    fireEvent.click(screen.getByRole('button', { name: 'Ask OxyGPT' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('platform said no');
   });
 
   it('times the read functions (the latency gate) page by page and shows counts and timings only', async () => {

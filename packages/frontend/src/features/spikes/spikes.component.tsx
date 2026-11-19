@@ -254,6 +254,100 @@ function WritePathCard() {
   );
 }
 
+// ---- S5 card: can a deployed function reach OxyGPT? ---------------------------------------------------------
+// Removed with the rest of this page in APP-10. Only an Admin gets an answer (the function checks, not this page).
+// The page sends the mode and the question; the address, the model and the key live on the server.
+
+/** The longest question the function accepts (`OXYGPT.maxPromptChars` in packages/functions/src/config.ts). */
+const OXYGPT_MAX_QUESTION = 500;
+
+function OxygptCard() {
+  const [question, setQuestion] = useState('');
+  const [state, setState] = useState<SpikeState>({ status: 'idle' });
+  const [copied, setCopied] = useState(false);
+
+  const go = async (mode: 'dns' | 'models' | 'text') => {
+    setCopied(false);
+    setState({ status: 'running' });
+    try {
+      const result = await (await getRayfinClient()).functions.oxygptProbe.invoke({ mode, prompt: question });
+      setState({ status: 'done', text: JSON.stringify(result, null, 2) });
+    } catch (e) {
+      setState({ status: 'failed', text: describe(e) });
+    }
+  };
+
+  const button = 'rounded-md bg-primary px-400 py-200 font-medium text-primary-foreground disabled:opacity-50';
+  const busy = state.status === 'running';
+
+  return (
+    <section aria-labelledby="s5-title" className="rounded-xl border border-border bg-card p-500 md:col-span-2">
+      <h2 id="s5-title" className="font-semibold">
+        S5 · OxyGPT connection (Admin only)
+      </h2>
+      <p className="mt-200 text-muted-foreground">
+        Can the deployed server reach the client's AI service? Press the three buttons in order. Name lookup: does the
+        host name resolve from Fabric, and is it a private address? List models: can it connect, sign in with the key
+        and see the models (copy the agent's ID from here)? Ask OxyGPT: sends the question below and shows the answer.
+        Leave the question empty to ask for "pong". Do not type client row data. Nothing here is saved.
+      </p>
+
+      <label className="mt-300 block text-sm">
+        Question (up to {OXYGPT_MAX_QUESTION} characters)
+        <textarea
+          className="mt-100 w-full rounded-md border border-border bg-background px-300 py-100"
+          rows={2}
+          maxLength={OXYGPT_MAX_QUESTION}
+          value={question}
+          onChange={(e) => setQuestion(e.target.value)}
+        />
+      </label>
+
+      <div className="mt-300 flex flex-wrap gap-300">
+        <button type="button" className={button} disabled={busy} onClick={() => void go('dns')}>
+          Name lookup
+        </button>
+        <button type="button" className={button} disabled={busy} onClick={() => void go('models')}>
+          List models
+        </button>
+        <button type="button" className={button} disabled={busy} onClick={() => void go('text')}>
+          Ask OxyGPT
+        </button>
+      </div>
+
+      {busy ? <p className="mt-300 text-muted-foreground">Running… a slow agent can take a few minutes.</p> : null}
+
+      {state.status === 'done' ? (
+        <div className="mt-300">
+          <pre
+            role="status"
+            className="max-h-96 overflow-auto whitespace-pre-wrap break-words rounded-md border border-border bg-background p-300 text-sm"
+          >
+            {state.text}
+          </pre>
+          <button
+            type="button"
+            onClick={() => {
+              void navigator.clipboard.writeText(state.text).then(
+                () => setCopied(true),
+                () => setCopied(false)
+              );
+            }}
+            className="mt-200 rounded-md border border-border px-300 py-100 text-sm"
+          >
+            {copied ? 'Copied' : 'Copy result'}
+          </button>
+        </div>
+      ) : null}
+      {state.status === 'failed' ? (
+        <p role="alert" className="mt-300 break-words text-destructive">
+          The call failed: {state.text}
+        </p>
+      ) : null}
+    </section>
+  );
+}
+
 function SpikeCard({
   id,
   title,
@@ -369,6 +463,7 @@ export function Spikes() {
         run={runStorageProbe}
       />
       <WritePathCard />
+      <OxygptCard />
     </div>
   );
 }

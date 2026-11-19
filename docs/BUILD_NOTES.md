@@ -149,3 +149,14 @@ The approval screens and the request dialog, on read path C (D-17): composed rea
 | Tests | frontend 429, functions 244 (`npm test`) |
 
 Behaviour worth knowing: the queue's tab, filters and page size live in the address (`#/approvals?tab=ACCOUNTABLE&pc=...`), the row offset does not; the age filter applies to open requests only (the server ignores it on Approved and Rejected); a person who approved the first stage can still reject or return at the second but not approve (`can_decide` versus `can_approve`); Return has no recipient picker because the procedure accepts exactly one recipient; the bell shows an unread count that cannot be cleared until APP-8; after a final approval the screens say the golden-record update is pending while the merge is still the stub. Specs that mock a rejecting function must use a block body in `beforeEach` (`mockReset()` returns the mock, which vitest then calls as teardown).
+
+## 13. Added for spike S5, OxyGPT reachability (18 Nov; not yet run in Fabric)
+
+| What | Where |
+|---|---|
+| Function `oxygptProbe` (19 functions in all): three modes, `dns` (does the host resolve from Fabric, private or public), `models` (TLS, key, model IDs) and `text` (a free-text question, empty = "pong"). Admin only (verified token, registered person, `canManageAdmin`); failures come back as a `category` plus words, never thrown; the key, the question and the answer are not logged | `packages/functions/src/oxygpt.ts` (+ `oxygpt.spec.ts`), registered in `function_app.ts`, entry in `types.ts` |
+| Settings: base URL `https://ai-dev.oxy.com`, timeouts and length limits, and a fallback for the agent's model ID (empty). The key and the agent's ID are the secrets `OXY_GPT_API_KEY` and `OXYGPT_AGENT_MODEL_ID` (the names the team gave them in Fabric), read by name: `ctx.Secrets` is typed only for names `rayfin secret set` has written into `secrets.generated.ts` (never hand-edit it; it lists none yet), and it reads the delivered secret bag first and the environment second | `packages/functions/src/config.ts` (`OXYGPT`), names in `oxygpt.ts` (`SECRET_API_KEY`, `SECRET_MODEL_ID`) |
+| Spikes card with three buttons and a question box | `packages/frontend/src/features/spikes/spikes.component.tsx` (`OxygptCard`) |
+| Tests | frontend 436, functions 319 (`npm test`) |
+
+Behaviour worth knowing: the `types.ts` entry for a function with a union-typed output must list the union members in TypeScript's own internal order, which is not the source order; `node scripts/validate-functions.mjs` fails with "stale" until it matches, and `npx rayfin dev functions apply` rewrites it correctly. The unit tests mock `fetch` and the DNS lookup, so nothing here proves the cloud can reach the service: that is the point of running the spike. Removed in APP-10 with the other spikes.

@@ -10,6 +10,7 @@ import {
   type EquipmentDetailResult,
   type EquipmentSearchResult,
 } from './equipment.js';
+import { runOxygptProbe, SECRET_API_KEY, SECRET_MODEL_ID, type OxygptProbeResult } from './oxygpt.js';
 import { loadMyProfile, type MyProfile } from './profile.js';
 import {
   runEquipmentRequests,
@@ -283,5 +284,28 @@ udf.func(
   async (
     ctx: RayfinContext<Record<string, any>, AudienceType.Storage>
   ): Promise<StorageProbeResult> => storageProbe(() => ctx.Tokens.Storage),
+  []
+);
+
+// S5: can a deployed function reach OxyGPT (the client's AI service) and get an answer? Admin only: it spends a shared
+// key and, in `text` mode, forwards free text (oxygpt.ts). The key is the secret OXY_GPT_API_KEY and the agent's ID is
+// OXYGPT_AGENT_MODEL_ID, the names the project team gave them in Fabric. They are read by name: `ctx.Secrets` is typed
+// only for names that `npx rayfin secret set` has put in secrets.generated.ts (nothing there yet), and it resolves a
+// name from the delivered secret bag first and from the environment second, so both ways of setting a value work.
+// A missing value is reported as NO_SECRET or NOT_CONFIGURED, not thrown.
+udf.func(
+  'oxygptProbe',
+  async (
+    mode: string,
+    prompt: string,
+    ctx: RayfinContext<Record<string, any>, AudienceType.Sql>
+  ): Promise<OxygptProbeResult> =>
+    runOxygptProbe(
+      { mode, prompt },
+      await trustedAccessToken(ctx),
+      () => ctx.Tokens.Sql,
+      () => (ctx.Secrets as Readonly<Record<string, string>>)[SECRET_API_KEY] ?? '',
+      () => (ctx.Secrets as Readonly<Record<string, string>>)[SECRET_MODEL_ID] ?? ''
+    ),
   []
 );

@@ -28,6 +28,31 @@ export const ONELAKE_WORKSPACE = 'ATLAS';
 export const ONELAKE_LAKEHOUSE_ITEM = 'ATLAS_LH.Lakehouse';
 
 /**
+ * OxyGPT, the client's internal AI service (spike S5, `oxygpt.ts`). Identifiers and limits only: the API key is NOT
+ * here, it is the secret `OXY_GPT_API_KEY`, which the project team set in Fabric (RB-06).
+ *
+ * `baseUrl`   the documented development address (Getting Started guide; the client gave the same one). Confirm the
+ *             production address with Ops AI before the app goes live. Fixed here on purpose: no browser input can
+ *             change where the key is sent.
+ * `modelId`   only a FALLBACK for the agent's ID. The ID is normally read from the secret `OXYGPT_AGENT_MODEL_ID`
+ *             (the exact ID OxyGPT prints; Secure guide 4.5: never guess one from a display name), which wins when
+ *             it is set. Not a secret either way. With neither set, the text test answers NOT_CONFIGURED.
+ * Timeouts are per request. A Fabric function is stopped at 250 s (Rayfin guide `invoking-from-frontend.md`), so the
+ * longest wait stays well below it and a slow agent shows up as TIMEOUT instead of as a platform error.
+ */
+export const OXYGPT = {
+  // baseUrl: 'https://ai-dev.oxy.com',
+  baseUrl: 'https://chat.oxy.com',
+  modelId: '',
+  listTimeoutMs: 20_000,
+  textTimeoutMs: 150_000,
+  /** Longest question the test accepts (characters). */
+  maxPromptChars: 500,
+  /** Longest answer returned to the page (characters); the rest is cut and the result says so. */
+  maxReplyChars: 4_000,
+} as const;
+
+/**
  * Verifying the invocation token's signature (spike S8, decision D-19, `FINAL PLAN/01` section 6.8; code in
  * `tokenverify.ts`). Identifiers only, no secrets.
  *

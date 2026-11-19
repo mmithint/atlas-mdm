@@ -89,4 +89,8 @@ export type AppFunctionsSchema = {
     input: Record<string, never>;
     output: { ok: boolean; step: 'token' | 'done' | 'create' | 'append' | 'flush' | 'read' | 'delete'; path: string; httpStatus: null | number; readBackMatches: null | false | true; totalMs: number; error: null | string };
   };
+  oxygptProbe: {
+    input: { mode: string; prompt: string };
+    output: { ok: boolean; mode: null | 'dns' | 'models' | 'text'; category: null | 'NOT_REGISTERED' | 'NOT_AUTHENTICATED' | 'NOT_ADMIN' | 'BAD_INPUT' | 'NOT_CONFIGURED' | 'NO_SECRET' | 'IDENTITY_ERROR' | 'DNS' | 'NETWORK' | 'TIMEOUT' | 'TLS' | 'REDIRECT' | 'HTTP_401' | 'HTTP_403' | 'HTTP_429' | 'HTTP_OTHER' | 'BAD_RESPONSE'; host: string; httpStatus: null | number; route: null | string; totalMs: number; dns: null | { addressCount: number; scope: 'PRIVATE' | 'PUBLIC' | 'MIXED' }; models: null | { count: number; ids: string[]; configuredListed: null | false | true }; reply: null | { text: string; truncated: boolean; model: null | string; promptTokens: null | number; completionTokens: null | number }; errorCode: null | string; error: null | string };
+  };
 };
