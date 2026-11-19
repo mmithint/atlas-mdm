@@ -30,6 +30,11 @@ const SETTINGS: OxygptSettings = {
   textTimeoutMs: 1_000,
   maxPromptChars: 50,
   maxReplyChars: 20,
+  agentStepTimeoutMs: 1_000,
+  agentStartTimeoutMs: 1_000,
+  agentTotalMs: 10_000,
+  agentCleanupMs: 1_000,
+  agentPollMs: 10,
 };
 
 const admin: MyProfile = { ...emptyProfile('OK', 'id', 'tester@example.test', 'Tester'), canManageAdmin: true };
@@ -371,7 +376,7 @@ describe('the key, the question and the answer stay out of what is returned and 
   it('a result built from a real OXYGPT configuration carries only the documented fields', async () => {
     const result = await run({ mode: 'dns' }).promise;
     expect(Object.keys(result).sort()).toEqual(
-      ['category', 'dns', 'error', 'errorCode', 'host', 'httpStatus', 'mode', 'models', 'ok', 'reply', 'route', 'totalMs'].sort()
+      ['agent', 'category', 'dns', 'error', 'errorCode', 'host', 'httpStatus', 'mode', 'models', 'ok', 'reply', 'route', 'totalMs'].sort()
     );
   });
 });
@@ -426,6 +431,8 @@ describe('the shipped configuration and the source', () => {
   it('keeps the wait below the 250 s limit Fabric puts on a function', () => {
     expect(OXYGPT.textTimeoutMs).toBeLessThan(250_000);
     expect(OXYGPT.listTimeoutMs).toBeLessThan(OXYGPT.textTimeoutMs);
+    // the agent flow (oxygpt-agent.spec.ts checks it against the shipped numbers too)
+    expect(OXYGPT.agentTotalMs).toBeLessThan(250_000);
   });
 
   it('holds no secret and does not switch TLS verification off', () => {

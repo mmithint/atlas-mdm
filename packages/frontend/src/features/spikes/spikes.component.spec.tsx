@@ -48,7 +48,7 @@ describe('Spikes page', () => {
 
   it('shows every spike button and calls nothing until clicked', () => {
     render(<Spikes />);
-    for (const name of ['Who am I', 'SQL ping', 'Run timing test', 'Run OneLake test', 'Create test request', 'Name lookup', 'List models', 'Ask OxyGPT']) {
+    for (const name of ['Who am I', 'SQL ping', 'Run timing test', 'Run OneLake test', 'Create test request', 'Name lookup', 'List models', 'Ask OxyGPT', 'Ask the agent']) {
       expect(screen.getByRole('button', { name })).toBeEnabled();
     }
     // no request number yet: nothing to check or decide
@@ -85,6 +85,23 @@ describe('Spikes page', () => {
     fireEvent.click(screen.getByRole('button', { name: 'List models' }));
     await vi.waitFor(() => expect(oxygptInvoke).toHaveBeenCalledTimes(2));
     expect(oxygptInvoke.mock.calls.map((c) => (c[0] as { mode: string }).mode)).toEqual(['dns', 'models']);
+  });
+
+  it('S5: the agent button sends the agent mode with the typed question and shows the steps and the tools that ran', async () => {
+    oxygptInvoke.mockResolvedValue({
+      ok: true, mode: 'agent', category: null, host: 'h', httpStatus: 200, route: null, totalMs: 4200, dns: null, models: null,
+      reply: { text: 'pong', truncated: false, model: null, promptTokens: null, completionTokens: null },
+      agent: { steps: [{ step: 'models', ok: true, httpStatus: 200, ms: 40, count: 1 }, { step: 'poll', ok: true, httpStatus: 200, ms: 900, count: 5 }], polls: 5, config: null, toolCalls: { count: 1, names: ['sap_search'] }, chatDeleted: true, chatId: null },
+      errorCode: null, error: null,
+    });
+    render(<Spikes />);
+    fireEvent.change(screen.getByLabelText(/Question/), { target: { value: 'Say pong' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Ask the agent' }));
+    const result = await screen.findByRole('status');
+    expect(result).toHaveTextContent('"names"');
+    expect(result).toHaveTextContent('sap_search');
+    expect(oxygptInvoke).toHaveBeenCalledTimes(1);
+    expect(oxygptInvoke).toHaveBeenCalledWith({ mode: 'agent', prompt: 'Say pong' });
   });
 
   it('S5: shows a refusal from the function as data and a failed call as an alert', async () => {

@@ -5,7 +5,7 @@
       "type": "node",
       "request": "attach",
       "name": "Functions: Attach",
-      "port": 9229,
+      "port": 9230,
       "restart": true,
       "skipFiles": [
         "<node_internals>/**"

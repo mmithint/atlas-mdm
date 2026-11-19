@@ -11,6 +11,9 @@
  *   models   Can it open a TLS connection, authenticate with the key, and list the models? Returns the model IDs,
  *            so the exact agent ID can be copied from the deployed app when the laptop has no VPN yet.
  *   text     Can it send a question and read an answer? The question is typed on the spikes page.
+ *   agent    Can it run the whole saved-chat flow of the client's reference script (`oxy_agent.py`: create a chat,
+ *            start the agent, poll until it is done, read the saved answer, delete the chat) and did the agent's
+ *            tools run? Added 19 Nov; the flow itself is in `oxygpt-agent.ts`. Needs everything `text` needs.
  *
  * Rules kept from the client's Secure guide (4.4, 4.7, 4.8) and from D-19:
  *   - The caller is a verified Admin. The probe spends one shared key and, in `text` mode, forwards free text,
@@ -27,9 +30,18 @@ import { lookup } from 'node:dns/promises';
 import { isIPv4 } from 'node:net';
 
 import { OXYGPT } from './config.js';
+import {
+  AgentFailure,
+  agentReport,
+  realEnv,
+  runAgentTurn,
+  type AgentEnv,
+  type AgentHttp,
+  type AgentReport,
+} from './oxygpt-agent.js';
 import { loadMyProfile, type MyProfile } from './profile.js';
 
-export type OxygptMode = 'dns' | 'models' | 'text';
+export type OxygptMode = 'dns' | 'models' | 'text' | 'agent';
 
 export type OxygptCategory =
   | 'NOT_AUTHENTICATED' // the token did not verify (D-19)
@@ -48,7 +60,11 @@ export type OxygptCategory =
   | 'HTTP_403' // the key may not do this (model or agent not allowed)
   | 'HTTP_429' // rate limited
   | 'HTTP_OTHER' // any other error status
-  | 'BAD_RESPONSE'; // 200, but not the JSON shape the guide documents
+  | 'BAD_RESPONSE' // 200, but not the JSON shape the guide documents
+  | 'AGENT_NOT_LISTED' // `agent` mode: the agent's ID is not among the models this key can use
+  | 'AGENT_NO_TASK' // `agent` mode: the turn was accepted but no background task came back
+  | 'AGENT_WAITING' // `agent` mode: a tool is waiting for a person to approve it (the chat is kept)
+  | 'AGENT_FAILED'; // `agent` mode: the saved message holds an error, is not done, or is missing
 
 export interface OxygptProbeResult {
   /** True only when the requested layer worked end to end. */
@@ -67,8 +83,10 @@ export interface OxygptProbeResult {
   dns: { addressCount: number; scope: 'PRIVATE' | 'PUBLIC' | 'MIXED' } | null;
   /** `models` mode: how many models, the first IDs as printed, and whether the configured one is among them. */
   models: { count: number; ids: string[]; configuredListed: boolean | null } | null;
-  /** `text` mode: the answer (capped) and the token counts the service reports. */
+  /** `text` and `agent` mode: the answer (capped) and the token counts the service reports (`agent`: none reported). */
   reply: { text: string; truncated: boolean; model: string | null; promptTokens: number | null; completionTokens: number | null } | null;
+  /** `agent` mode: the steps of the saved-chat flow with their statuses and times, which tools ran, and whether the chat was removed. */
+  agent: AgentReport | null;
   /** The low-level error code (ENOTFOUND, ETIMEDOUT, CERT_HAS_EXPIRED, …) when there was one. */
   errorCode: string | null;
   /** What went wrong, in words, with the key removed; null when ok. */
@@ -83,6 +101,16 @@ export interface OxygptSettings {
   textTimeoutMs: number;
   maxPromptChars: number;
   maxReplyChars: number;
+  /** `agent` mode: each short request of the flow. */
+  agentStepTimeoutMs: number;
+  /** `agent` mode: the request that starts the turn. */
+  agentStartTimeoutMs: number;
+  /** `agent` mode: the whole call, counted from the first line of the function. Must stay under Fabric's 250 s. */
+  agentTotalMs: number;
+  /** `agent` mode: the part of the total kept back for deleting the chat. */
+  agentCleanupMs: number;
+  /** `agent` mode: the pause between two polls. */
+  agentPollMs: number;
 }
 
 export interface OxygptDeps {
@@ -90,6 +118,8 @@ export interface OxygptDeps {
   lookupFn: (host: string) => Promise<{ address: string }[]>;
   profile: (accessToken: string | null | undefined, getSqlToken: () => string) => Promise<MyProfile>;
   settings: OxygptSettings;
+  /** The clock, the pause and the id source of `agent` mode (the tests replace them). */
+  env: AgentEnv;
 }
 
 export interface OxygptProbeInput {
@@ -176,6 +206,7 @@ function blank(mode: OxygptMode | null, host: string): OxygptProbeResult {
     dns: null,
     models: null,
     reply: null,
+    agent: null,
     errorCode: null,
     error: null,
   };
@@ -292,12 +323,13 @@ export async function runOxygptProbe(
     lookupFn: overrides.lookupFn ?? ((host) => lookup(host, { all: true })),
     profile: overrides.profile ?? loadMyProfile,
     settings: overrides.settings ?? OXYGPT,
+    env: overrides.env ?? realEnv,
   };
   const { settings } = deps;
   const base = settings.baseUrl.replace(/\/+$/, '');
   const host = hostOf(base);
-  const started = performance.now();
-  const modeIsKnown = input.mode === 'dns' || input.mode === 'models' || input.mode === 'text';
+  const started = deps.env.now();
+  const modeIsKnown = input.mode === 'dns' || input.mode === 'models' || input.mode === 'text' || input.mode === 'agent';
   const result = blank(modeIsKnown ? (input.mode as OxygptMode) : null, host);
   let key = '';
 
@@ -320,12 +352,12 @@ export async function runOxygptProbe(
     if (!profile.canManageAdmin) return fail('NOT_ADMIN', 'Only an Admin may run the OxyGPT test.');
 
     // 2. What was asked, and is the probe set up for it?
-    if (!modeIsKnown) return fail('BAD_INPUT', 'The mode must be dns, models or text.');
+    if (!modeIsKnown) return fail('BAD_INPUT', 'The mode must be dns, models, text or agent.');
     const mode = input.mode as OxygptMode;
     if (!host || !base.startsWith('https://')) return fail('NOT_CONFIGURED', 'OXYGPT.baseUrl in config.ts must be an https address.');
 
     const prompt = input.prompt.trim() === '' ? DEFAULT_PROMPT : input.prompt.trim();
-    if (mode === 'text' && prompt.length > settings.maxPromptChars) {
+    if ((mode === 'text' || mode === 'agent') && prompt.length > settings.maxPromptChars) {
       return fail('BAD_INPUT', `The question is ${prompt.length} characters; the limit is ${settings.maxPromptChars}.`);
     }
 
@@ -353,14 +385,14 @@ export async function runOxygptProbe(
       }
     }
 
-    // 4. models and text need the key. A missing secret is reported, never worked around.
+    // 4. models, text and agent need the key. A missing secret is reported, never worked around.
     key = readOrEmpty(getKey);
     if (!key) {
       return fail('NO_SECRET', `The secret ${SECRET_API_KEY} was not delivered to the function. Check the name with npx rayfin secret list (or where the value was set in Fabric), then npx rayfin up.`);
     }
     // The agent's ID comes from the secret `OXYGPT_AGENT_MODEL_ID`; `config.ts` is only a fallback. It is not a secret.
     const modelId = readOrEmpty(getModelId) || settings.modelId;
-    if (mode === 'text' && !modelId) {
+    if ((mode === 'text' || mode === 'agent') && !modelId) {
       return fail('NOT_CONFIGURED', `No agent ID: the secret ${SECRET_MODEL_ID} is empty or missing, and OXYGPT.modelId in config.ts is empty. Run "List models" and copy the ID exactly as printed.`);
     }
 
@@ -385,7 +417,83 @@ export async function runOxygptProbe(
       }
     };
 
-    // 5. models: list what this key may use.
+    // 5a. agent: the saved-chat flow of the client's reference script (oxygpt-agent.ts). Every request goes through
+    // this one transport, so the key, the no-redirect rule, the time limit and the failure categories are the same as above.
+    if (mode === 'agent') {
+      const agentHttp: AgentHttp = async (method, path, body, timeoutMs) => {
+        let status: number;
+        let type: string;
+        let raw: string;
+        try {
+          const res = await deps.fetchFn(`${base}${path}`, {
+            method,
+            redirect: 'manual',
+            headers: {
+              Authorization: `Bearer ${key}`,
+              Accept: 'application/json',
+              ...(body === undefined ? {} : { 'Content-Type': 'application/json' }),
+            },
+            body: body === undefined ? undefined : JSON.stringify(body),
+            signal: AbortSignal.timeout(timeoutMs),
+          });
+          status = res.status;
+          type = res.headers.get('content-type') ?? '';
+          raw = await res.text();
+        } catch (err) {
+          const { category, code } = classifyFailure(err);
+          const message = category === 'TIMEOUT' ? `No answer within ${Math.round(timeoutMs / 1000)} s.` : `The connection failed${code ? ` (${code})` : ''}.`;
+          throw new AgentFailure(category, scrub(message, key), { errorCode: code });
+        }
+        result.httpStatus = status;
+        if (status < 200 || status >= 300) {
+          const detail = errorDetailOf(raw);
+          throw new AgentFailure(categoryForStatus(status), scrub(`${hintForStatus(status)}${detail ? ` ${detail}` : ''}`, key), { httpStatus: status });
+        }
+        // The script insists on application/json: anything else is a sign-in page or a gateway, not the API.
+        if ((type.split(';')[0] ?? '').trim().toLowerCase() !== 'application/json') {
+          throw new AgentFailure('BAD_RESPONSE', `Status ${status} but the content type was "${type.slice(0, 60)}", not JSON. A sign-in page instead of the API would look like this.`, { httpStatus: status });
+        }
+        const json = parseJson(raw);
+        if (json === undefined) throw new AgentFailure('BAD_RESPONSE', `Status ${status} with a JSON content type but a body that is not valid JSON.`, { httpStatus: status });
+        return { status, json };
+      };
+
+      const run = await runAgentTurn(agentHttp, deps.env, {
+        agentId: modelId,
+        prompt,
+        title: 'ATLAS connection test',
+        limits: {
+          stepTimeoutMs: settings.agentStepTimeoutMs,
+          startTimeoutMs: settings.agentStartTimeoutMs,
+          // The wait ends early enough to leave `agentCleanupMs` for deleting the chat before Fabric's own 250 s limit.
+          deadline: started + settings.agentTotalMs - settings.agentCleanupMs,
+          cleanupTimeoutMs: settings.agentCleanupMs,
+          pollMs: settings.agentPollMs,
+        },
+      });
+      result.agent = agentReport(run);
+      if (run.failure) {
+        result.errorCode = run.failure.errorCode;
+        if (run.failure.httpStatus !== null) result.httpStatus = run.failure.httpStatus;
+        const where = run.failure.step ? `Step "${run.failure.step}": ` : '';
+        return fail(run.failure.category, `${where}${run.failure.message}`);
+      }
+      const answer = run.answer;
+      if (answer === null || answer.text.trim() === '') {
+        return fail('BAD_RESPONSE', 'The agent finished but returned no answer text.');
+      }
+      result.reply = {
+        text: answer.text.slice(0, settings.maxReplyChars),
+        truncated: answer.text.length > settings.maxReplyChars,
+        model: answer.model,
+        promptTokens: null,
+        completionTokens: null,
+      };
+      result.ok = true;
+      return result;
+    }
+
+    // 5b. models: list what this key may use.
     if (mode === 'models') {
       let answer: { status: number; raw: string; type: string } | null = null;
       for (const route of MODEL_ROUTES) {
@@ -448,7 +556,7 @@ export async function runOxygptProbe(
     // Anything not foreseen above: say so in words, without the key.
     return fail('NETWORK', err instanceof Error ? err.message : String(err));
   } finally {
-    result.totalMs = Math.round(performance.now() - started);
+    result.totalMs = Math.round(deps.env.now() - started);
     // Names and numbers only: never the key, the question or the answer.
     console.log(
       `oxygptProbe: mode=${result.mode ?? 'none'} ok=${result.ok} category=${result.category ?? 'none'} status=${result.httpStatus ?? 'none'} totalMs=${result.totalMs}`

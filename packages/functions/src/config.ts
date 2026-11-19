@@ -39,13 +39,24 @@ export const ONELAKE_LAKEHOUSE_ITEM = 'ATLAS_LH.Lakehouse';
  *             it is set. Not a secret either way. With neither set, the text test answers NOT_CONFIGURED.
  * Timeouts are per request. A Fabric function is stopped at 250 s (Rayfin guide `invoking-from-frontend.md`), so the
  * longest wait stays well below it and a slow agent shows up as TIMEOUT instead of as a platform error.
+ *
+ * The `agent` values are for the saved-chat flow (`oxygpt-agent.ts`): many short requests instead of one long one.
+ * `agentTotalMs` is the whole call, from the first line of the function; the wait for the agent ends
+ * `agentCleanupMs` earlier, so there is still time to delete the chat before Fabric's 250 s limit.
  */
 export const OXYGPT = {
-  // baseUrl: 'https://ai-dev.oxy.com',
-  baseUrl: 'https://chat.oxy.com',
+  // The documented API address: the client's script (`oxy_agent.py` line 176), the Getting Started examples and the
+  // Secure guide (4.3, 4.4) all use it. `https://chat.oxy.com` was tried on 18 Nov only as a diagnostic (it resolves
+  // from Fabric but answers 404 on every path, so it is not the API address).
+  baseUrl: 'https://ai-dev.oxy.com',
   modelId: '',
   listTimeoutMs: 20_000,
   textTimeoutMs: 150_000,
+  agentStepTimeoutMs: 20_000,
+  agentStartTimeoutMs: 30_000,
+  agentTotalMs: 220_000,
+  agentCleanupMs: 15_000,
+  agentPollMs: 1_000,
   /** Longest question the test accepts (characters). */
   maxPromptChars: 500,
   /** Longest answer returned to the page (characters); the rest is cut and the result says so. */

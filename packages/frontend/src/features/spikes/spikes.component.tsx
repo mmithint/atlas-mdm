@@ -266,7 +266,7 @@ function OxygptCard() {
   const [state, setState] = useState<SpikeState>({ status: 'idle' });
   const [copied, setCopied] = useState(false);
 
-  const go = async (mode: 'dns' | 'models' | 'text') => {
+  const go = async (mode: 'dns' | 'models' | 'text' | 'agent') => {
     setCopied(false);
     setState({ status: 'running' });
     try {
@@ -286,10 +286,12 @@ function OxygptCard() {
         S5 · OxyGPT connection (Admin only)
       </h2>
       <p className="mt-200 text-muted-foreground">
-        Can the deployed server reach the client's AI service? Press the three buttons in order. Name lookup: does the
-        host name resolve from Fabric, and is it a private address? List models: can it connect, sign in with the key
-        and see the models (copy the agent's ID from here)? Ask OxyGPT: sends the question below and shows the answer.
-        Leave the question empty to ask for "pong". Do not type client row data. Nothing here is saved.
+        Can the deployed server reach the client's AI service? Press the buttons in order. Name lookup: does the host
+        name resolve from Fabric, and is it a private address? List models: can it connect, sign in with the key and
+        see the models (copy the agent's ID from here)? Ask OxyGPT: sends the question below to the model and shows the
+        answer. Ask the agent: runs the client's saved-chat flow (create a chat, start the agent, wait for it, read the
+        answer, delete the chat) and shows each step and which tools the agent ran; it can take a few minutes. Leave the
+        question empty to ask for "pong". Do not type client row data. Nothing here is saved by this app.
       </p>
 
       <label className="mt-300 block text-sm">
@@ -312,6 +314,9 @@ function OxygptCard() {
         </button>
         <button type="button" className={button} disabled={busy} onClick={() => void go('text')}>
           Ask OxyGPT
+        </button>
+        <button type="button" className={button} disabled={busy} onClick={() => void go('agent')}>
+          Ask the agent
         </button>
       </div>
 
