@@ -42,6 +42,13 @@ export class MissingRayfinConfigError extends Error {
  * `client.connectors.atlas_sql_db` and `client.functions.<name>` are typed.
  */
 export async function getRayfinClient(): Promise<AppClient> {
+  // `npm run dev:mock` only: answers come from invented data, with no server (dev-mock/). The condition is
+  // written out here so the production build drops the branch and the whole dev-mock folder with it.
+  if (import.meta.env.DEV && import.meta.env.MODE === 'mock') {
+    if (!_client) _client = import('@/dev-mock/mock-client').then((m) => m.createMockClient());
+    return _client;
+  }
+
   if (!_client) {
     _client = createClient().catch((error) => {
       _client = undefined;

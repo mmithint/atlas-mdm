@@ -681,7 +681,10 @@ if (ts !== undefined && frontendPackage !== undefined) {
       /\.[cm]?tsx?$/u.test(file) &&
       !/\.d\.ts$/u.test(file) &&
       !/\.(?:spec|test)\.[cm]?tsx?$/u.test(file) &&
-      !/[\\/]test[\\/]/u.test(file)
+      !/[\\/]test[\\/]/u.test(file) &&
+      // `npm run dev:mock` test double (src/dev-mock): it must cast once to stand in for the client, and every
+      // answer it gives is typed against AppFunctionsSchema, so a stale schema still fails to compile there.
+      !/[\\/]dev-mock[\\/]/u.test(file)
   );
   const frontendProgram = createTypeScriptProgram(
     ts,

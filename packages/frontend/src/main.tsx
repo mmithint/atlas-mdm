@@ -12,7 +12,12 @@ import { bootstrapAuth } from './services/rayfin-auth.service';
 
 import './global.css';
 
-const rayfinAuthService = await bootstrapAuth();
+// `npm run dev:mock` (Vite mode "mock"): sign in as an invented user and answer from invented data. The check is
+// written out so the production build drops the branch; see src/dev-mock/.
+const rayfinAuthService =
+  import.meta.env.DEV && import.meta.env.MODE === 'mock'
+    ? (await import('./dev-mock/mock-client')).createMockAuthService()
+    : await bootstrapAuth();
 
 createRoot(document.getElementById('root')!).render(
   <Root rayfinAuthService={rayfinAuthService} />
