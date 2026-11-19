@@ -1,18 +1,28 @@
 import { Flame, Menu, Moon, Sun, X } from 'lucide-react';
 import clsx from 'clsx';
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
 
+import { badge } from '@/components/ui';
 import { NotificationBell } from '@/features/notifications/notification-bell.component';
 import { useAuth } from '@/hooks/auth.context';
 import { useHashRoute } from '@/hooks/use-hash-route';
 import { useTheme } from '@/hooks/theme.context';
 
 import { Nav } from './nav.component';
+import { PREVIEW_MODE } from './preview';
 import { ProfileNotice } from './profile-notice.component';
 import { useProfile } from './profile.context';
+import { isBuilt } from './routes';
 import { Screen } from './screens';
 
 const MAX_ROLES_SHOWN = 3;
+
+/**
+ * The presenter's persona switch and Reset demo (FINAL PLAN/11 §3), `npm run dev:mock` only. The condition is
+ * written out so the production build drops the import and the whole dev-mock folder with it.
+ */
+const DemoControls =
+  import.meta.env.DEV && import.meta.env.MODE === 'mock' ? lazy(() => import('@/dev-mock/demo-controls.component')) : null;
 
 /**
  * The frame around every screen: the navigation rail (dark, like an instrument panel),
@@ -21,10 +31,16 @@ const MAX_ROLES_SHOWN = 3;
  */
 export function AppShell() {
   const route = useHashRoute();
-  const { state } = useProfile();
+  const { state, reload } = useProfile();
   const { session } = useAuth();
   const { isDark, toggleTheme } = useTheme();
   const [menuOpen, setMenuOpen] = useState(false);
+  // Demo build only: a persona switch or Reset demo bumps this, so the profile, the page and the bell reload.
+  const [demoEpoch, setDemoEpoch] = useState(0);
+  const onDemoChange = useCallback(() => {
+    reload();
+    setDemoEpoch((n) => n + 1);
+  }, [reload]);
 
   const profile = state.status === 'ready' && state.profile.status === 'OK' ? state.profile : null;
   const canManageAdmin = profile?.canManageAdmin === true;
@@ -88,7 +104,7 @@ export function AppShell() {
             <X aria-hidden="true" className="icon-size-300" />
           </button>
         </div>
-        <Nav current={current?.id ?? null} canManageAdmin={canManageAdmin} onNavigate={() => setMenuOpen(false)} />
+        <Nav current={current?.id ?? null} canManageAdmin={canManageAdmin} onNavigate={() => setMenuOpen(false)} preview={PREVIEW_MODE} />
         <p className="border-t border-sidebar-border px-400 py-300 text-100 text-sidebar-muted">Proof of value build</p>
       </aside>
 
@@ -106,7 +122,17 @@ export function AppShell() {
           <p className="min-w-0 flex-1 truncate text-300 text-muted-foreground">
             {current?.screen ? <span className="id-plate mr-200">{current.screen}</span> : null}
             {title}
+            {PREVIEW_MODE && current && !isBuilt(current) ? (
+              <span className={`${badge.info} ml-200`} title={`Shown on sample data. Built for real in ${current.builtIn}.`}>
+                Preview · {current.builtIn} · sample data
+              </span>
+            ) : null}
           </p>
+          {DemoControls ? (
+            <Suspense fallback={null}>
+              <DemoControls onChange={onDemoChange} />
+            </Suspense>
+          ) : null}
           <div className="min-w-0 text-right">
             <p className="truncate text-300 font-medium" aria-label="Signed in as">
               {name}
@@ -115,7 +141,7 @@ export function AppShell() {
               {roleLine}
             </p>
           </div>
-          {profile ? <NotificationBell refreshKey={route.path} /> : null}
+          {profile ? <NotificationBell refreshKey={`${route.path}#${demoEpoch}`} /> : null}
           <button
             type="button"
             onClick={toggleTheme}
@@ -129,7 +155,7 @@ export function AppShell() {
         <ProfileNotice />
 
         <main className="mx-auto w-full max-w-7xl flex-1 p-400 md:p-600">
-          <Screen route={route} canManageAdmin={canManageAdmin} />
+          <Screen key={demoEpoch} route={route} canManageAdmin={canManageAdmin} />
         </main>
       </div>
     </div>

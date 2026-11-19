@@ -1,10 +1,13 @@
 /**
- * Stand-ins for the Rayfin functions, used ONLY by `npm run dev:mock` (see mock-client.ts).
+ * Stand-ins for the Rayfin functions that exist, used ONLY by `npm run dev:mock` (see mock-client.ts).
  *
  * Why this exists: under `rayfin dev` the functions run on the developer's own Microsoft account, which Fabric
- * SQL refuses, so UI work had no data. These handlers answer from invented rows (SYN- identifiers, addresses
- * ending @example.test, reused from the test fixtures) and keep a little state in memory, so approving, returning
- * or withdrawing a request moves it between the Approvals tabs until the page is reloaded.
+ * SQL refuses, so UI work had no data; and the client demo (FINAL PLAN/11, APP-D) runs on sample data from a
+ * laptop. The handlers answer from the demo store (`demo-store.ts`) for the persona chosen in the header
+ * (`personas.ts`), so approving, returning or withdrawing a request moves it between the Approvals tabs, adds to
+ * its history and tells the next people, until Reset demo or a page reload.
+ *
+ * Functions that are not built yet answer from `preview-handlers.ts` instead.
  *
  * Nothing here is real, nothing here talks to a server, and none of it is part of a production build: the
  * only importers are dynamic imports behind `import.meta.env.DEV` checks.
@@ -15,179 +18,83 @@
 import type { AppFunctionsSchema as S } from '@rayfin-app/functions/types';
 
 import { queueRow } from '../features/approvals/queue-fixtures';
+import type { QueueRow } from '../features/approvals/queue-api';
 import type { DetailRow } from '../features/approvals/request-api';
-import { checkRows, detailRow, eventRow, goldRow, relatedRow, returnCandidates, routeRow, viewer } from '../features/approvals/request-fixtures';
-import { formOptions, searchRow } from '../features/equipment/test-fixtures';
+import { checkRows, detailRow, goldRow, relatedRow, routeRow, viewer } from '../features/approvals/request-fixtures';
 
-export const MOCK_USER = 'dev.user@example.test';
-export const MOCK_USER_NAME = 'Dev User (mock)';
+import { ALLOWED_VALUES, CATALOG, fieldOf, fieldValueOf, labelOf, setFieldValue } from './catalog';
+import {
+  ACCOUNTABLE_GROUP,
+  addEvent,
+  demo,
+  displayNameOf,
+  eligibility,
+  eventsOf,
+  inboxOf,
+  isOpen,
+  isReadBy,
+  me,
+  membersOf,
+  notify,
+  nowIso,
+  refOf,
+  resetDemoAndPersona,
+  responsibleGroupFor,
+} from './demo-store';
+import { currentPersona, profileOf } from './personas';
+
+/** Shown by the mock sign-in until the profile answers; the header then shows the persona. */
+export const MOCK_USER = 'alex.kim@example.test';
+export const MOCK_USER_NAME = 'Alex Kim (sample)';
 
 type Handlers = { [K in keyof S]?: (input: S[K]['input']) => S[K]['output'] };
-type QueueRowT = S['getRequestQueue']['output']['rows'][number];
-type SearchRowT = S['searchEquipment']['output']['rows'][number];
 
 const TIMING = { connectMs: 0, queryMs: 1, totalMs: 1 };
-const OK = { ok: true, status: 'OK', error: null, errorCode: null, userId: 'mock-user', timing: TIMING } as const;
+const ok = () => ({ ok: true, status: 'OK', error: null, errorCode: null, userId: `sample-${currentPersona().id}`, timing: TIMING }) as const;
 
 /** A procedure's refusal, as the real functions report it inside the answer. */
 function refused(error: string, errorCode: number): never {
-  return { ...OK, ok: false, status: 'REFUSED', error, errorCode } as never;
+  return { ...ok(), ok: false, status: 'REFUSED', error, errorCode } as never;
 }
-
-// ---------------------------------------------------------------- heaters
-
-const PROFIT_CENTRES = ['SYN PROFIT CENTRE A', 'SYN PROFIT CENTRE B', 'SYN PROFIT CENTRE C'];
-const MAKERS = ['SYNTHETIC MFR A', 'SYNTHETIC MFR B', 'SYNTHETIC MFR C'];
-const HEATER_COUNT = 60;
-
-function buildHeaters(): SearchRowT[] {
-  return Array.from({ length: HEATER_COUNT }, (_, i) => {
-    const n = i + 1;
-    return searchRow(n, {
-      manufacturer: MAKERS[n % MAKERS.length],
-      modelNumber: `SYN-MODEL-${(n % 4) + 1}`,
-      profitCenterName: PROFIT_CENTRES[n % PROFIT_CENTRES.length],
-      firedUnfired: n % 5 === 0 ? 'UNFIRED' : 'FIRED',
-      heatDutyMmbtuHr: 1 + (n % 9) * 0.75,
-      verificationPct: 20 + ((n * 7) % 80),
-      invalidRuleCount: n % 4 === 0 ? 2 : 0,
-    });
-  });
-}
-
-const CATALOG = [
-  ['MANUFACTURER', 'Manufacturer', 'EQUIPMENT', 'TEXT', null, 'KEY', true],
-  ['MODEL_NUMBER', 'Model number', 'EQUIPMENT', 'TEXT', null, 'KEY', true],
-  ['MANUFACTURER_SERIAL_NUMBER', 'Serial number', 'EQUIPMENT', 'TEXT', null, 'KEY', true],
-  ['FIRED_UNFIRED', 'Fired / unfired', 'EQUIPMENT', 'LIST', null, 'KEY', true],
-  ['HEAT_DUTY', 'Heat duty (MMBTU/hr)', 'EQUIPMENT', 'DECIMAL', 'MMBTU/hr', 'KEY', true],
-  ['EQUIPMENT_TAG_NUMBER', 'Engineering tag', 'EQUIPMENT', 'TEXT', null, 'ADDITIONAL', true],
-  ['FLOC_CLASS', 'FLOC class', 'FLOC', 'CODE', null, 'ADDITIONAL', true],
-  ['PLANNER_GROUP', 'Planner group', 'EQUIPMENT', 'CODE', null, 'ADDITIONAL', false],
-] as const;
 
 /** The field catalogue, as the read-only connector returns it (table `app.field_catalog`). */
 export function catalogRows(): Record<string, unknown>[] {
-  return CATALOG.map(([fieldCode, label, entityType, dataType, unit, displayGroup, isEditable], i) => ({
-    fieldCode,
-    label,
-    entityType,
-    dataType,
-    maxLength: 100,
-    unit,
-    allowedValuesSource: dataType === 'LIST' ? 'FIRED_UNFIRED' : null,
-    isKeyVerificationField: displayGroup === 'KEY',
-    isEditable,
-    displayGroup,
+  return CATALOG.map((c, i) => ({
+    fieldCode: c.fieldCode,
+    label: c.label,
+    entityType: c.entityType,
+    dataType: c.dataType,
+    maxLength: c.maxLength,
+    unit: c.unit,
+    allowedValuesSource: c.allowedValuesSource,
+    isKeyVerificationField: c.isKey,
+    isEditable: true,
+    displayGroup: c.displayGroup,
     displayOrder: i + 1,
     isMandatoryForSubmission: false,
     isActive: true,
   }));
 }
 
-const FIELD_LABEL = new Map<string, string>(CATALOG.map((c) => [c[0], c[1]]));
-
-function fieldValueOf(h: SearchRowT, code: string): string | null {
-  const map: Record<string, unknown> = {
-    MANUFACTURER: h.manufacturer,
-    MODEL_NUMBER: h.modelNumber,
-    MANUFACTURER_SERIAL_NUMBER: h.manufacturerSerialNumber,
-    FIRED_UNFIRED: h.firedUnfired,
-    HEAT_DUTY: h.heatDutyMmbtuHr === null ? null : h.heatDutyMmbtuHr.toFixed(4),
-    EQUIPMENT_TAG_NUMBER: h.equipmentTagNumber,
-    FLOC_CLASS: h.flocClass,
-    PLANNER_GROUP: h.plannerGroup,
-  };
-  const v = map[code];
-  return v === undefined || v === null ? null : String(v);
-}
-
-// ---------------------------------------------------------------- requests (in memory)
-
-const ME = MOCK_USER;
-const FIELDS = [
-  ['MANUFACTURER', 'HERST', 'SYNTHETIC MFR A', 'SYNTHETIC MFR B'],
-  ['MODEL_NUMBER', 'TYPBZ', 'SYN-MODEL-1', 'SYN-MODEL-2'],
-  ['HEAT_DUTY', 'HEAT_DUTY', '2.5000', '3.1000'],
-  ['FIRED_UNFIRED', 'FIRED_UNFIRED', 'FIRED', 'UNFIRED'],
-] as const;
-
-function hoursAgo(h: number): string {
-  return new Date(Date.now() - h * 3_600_000).toISOString();
-}
-
-function buildRequests(heaters: SearchRowT[]): QueueRowT[] {
-  // 1-8 waiting for the responsible group, 9-12 for the accountable group, 13-14 returned,
-  // 15-20 approved, 21-22 rejected. Every third one was raised by the mock user.
-  const status = (n: number): [string, string | null] =>
-    n <= 8 ? ['PENDING_RESPONSIBLE', 'RESPONSIBLE']
-    : n <= 12 ? ['PENDING_ACCOUNTABLE', 'ACCOUNTABLE']
-    : n <= 14 ? ['RETURNED', null]
-    : n <= 20 ? ['APPROVED', null]
-    : ['REJECTED', null];
-
-  return Array.from({ length: 22 }, (_, i) => {
-    const n = i + 1;
-    const h = heaters[(n * 3) % heaters.length];
-    const [fieldCode, sapField, oldValue, newValue] = FIELDS[n % FIELDS.length];
-    const [requestStatus, approvalStage] = status(n);
-    const fromRule = n % 4 === 0;
-    const age = 2 + n * 9;
-    return queueRow(n, {
-      requestStatus,
-      approvalStage,
-      equipmentId: h.equipmentId,
-      equipmentNumber: h.equipmentNumber,
-      functionalLocation: h.functionalLocation,
-      equipmentTagNumber: h.equipmentTagNumber,
-      profitCenterName: h.profitCenterName,
-      fieldCode,
-      fieldLabel: FIELD_LABEL.get(fieldCode) ?? fieldCode,
-      sapField,
-      oldValue,
-      newValue,
-      reason: fromRule ? null : 'Nameplate photo shows a different value (SYNTHETIC)',
-      note: n % 5 === 0 ? 'Please double-check (SYNTHETIC note)' : null,
-      sourceType: fromRule ? 'RULE' : 'MANUAL',
-      sourceRuleId: fromRule ? 'HR-07' : null,
-      sourceRuleVersion: fromRule ? 1 : null,
-      sourceLabel: fromRule ? 'Rule HR-07 (synthetic)' : 'Manual request',
-      requestedBy: n % 3 === 0 ? ME : `requester${n}@example.test`,
-      requestedAtUtc: hoursAgo(age),
-      detectedAtUtc: fromRule ? hoursAgo(age + 1) : null,
-      returnRecipientType: requestStatus === 'RETURNED' ? 'USER' : null,
-      returnRecipient: requestStatus === 'RETURNED' ? ME : null,
-      ageHours: age,
-      photoCount: n % 3,
-      updatedAtUtc: hoursAgo(age / 2),
-      canApprove: requestStatus.startsWith('PENDING'),
-    });
-  });
-}
-
-const HEATERS = buildHeaters();
-let requests: QueueRowT[] = buildRequests(HEATERS);
-let nextRequestId = 100;
-
-/** Back to the starting data (the page reload does this too; tests call it). */
+/** Back to the starting data and the default persona (tests call it; the header's Reset demo keeps the persona). */
 export function resetMock(): void {
-  requests = buildRequests(HEATERS);
-  nextRequestId = 100;
+  resetDemoAndPersona();
 }
 
-const isOpen = (r: QueueRowT) => r.requestStatus.startsWith('PENDING') || r.requestStatus === 'RETURNED';
-const refOf = (n: number) => `CR-${String(n).padStart(6, '0')}`;
+const findRequest = (id: number): QueueRow | undefined => demo().requests.find((x) => x.requestId === id);
+const findHeater = (id: number | null) => demo().heaters.find((x) => x.equipmentId === id);
 
-const TAB_TEST: Record<string, (r: QueueRowT) => boolean> = {
-  RESPONSIBLE: (r) => r.requestStatus === 'PENDING_RESPONSIBLE',
-  ACCOUNTABLE: (r) => r.requestStatus === 'PENDING_ACCOUNTABLE',
-  RETURNED: (r) => r.requestStatus === 'RETURNED' && r.returnRecipient === ME,
+/** The six queue tabs, for the current persona (`app.fn_request_actions`, simplified). */
+const TAB_TEST: Record<string, (r: QueueRow) => boolean> = {
+  RESPONSIBLE: (r) => r.requestStatus === 'PENDING_RESPONSIBLE' && eligibility(r).ok,
+  ACCOUNTABLE: (r) => r.requestStatus === 'PENDING_ACCOUNTABLE' && eligibility(r).ok,
+  RETURNED: (r) => r.requestStatus === 'RETURNED' && r.returnRecipient === me(),
   APPROVED: (r) => r.requestStatus === 'APPROVED',
   REJECTED: (r) => r.requestStatus === 'REJECTED',
-  MY_REQUESTS: (r) => r.requestedBy === ME,
+  MY_REQUESTS: (r) => r.requestedBy === me(),
 };
 
-function tally(rows: QueueRowT[], kind: string, pick: (r: QueueRowT) => [string, string] | null) {
+function tally(rows: QueueRow[], kind: string, pick: (r: QueueRow) => [string, string] | null) {
   const counts = new Map<string, { label: string; n: number }>();
   for (const r of rows) {
     const p = pick(r);
@@ -199,77 +106,93 @@ function tally(rows: QueueRowT[], kind: string, pick: (r: QueueRowT) => [string,
   return [...counts].map(([value, e]) => ({ kind, value, label: e.label, n: e.n }));
 }
 
-// ---------------------------------------------------------------- handlers
+const MERGED = { outcome: 'MERGED', message: 'Merged into the golden record (sample data).', goldenVersionId: 5, recorded: 'MERGED', error: null };
 
-function applyDecision(row: QueueRowT, decision: string, returnTo: string): { previous: string; stage: string | null } {
-  const previous = row.requestStatus;
-  const stage = row.approvalStage;
-  if (decision === 'APPROVE') {
-    if (previous === 'PENDING_RESPONSIBLE') {
-      row.requestStatus = 'PENDING_ACCOUNTABLE';
-      row.approvalStage = 'ACCOUNTABLE';
-    } else {
-      row.requestStatus = 'APPROVED';
-      row.approvalStage = null;
-    }
+/**
+ * Applies a decision the persona is allowed to make: status, history, notifications and, on final approval,
+ * the heater's new value (the merge). Mirrors `app.usp_request_decide` in outline.
+ */
+function applyDecision(r: QueueRow, decision: string, comment: string, returnTo: string): { previous: string; stage: string | null } {
+  const previous = r.requestStatus;
+  const stage = r.approvalStage;
+  const who = eligibility(r);
+  const stageGroup = previous === 'PENDING_RESPONSIBLE' ? r.responsibleGroup : r.accountableGroup;
+  const base = { approvalStage: stage, actor: me(), actorGroup: who.decidedAs === 'GROUP_MEMBER' ? stageGroup : null, decidedAs: who.decidedAs, statusFrom: previous, comments: comment || null };
+
+  if (decision === 'APPROVE' && previous === 'PENDING_RESPONSIBLE') {
+    r.requestStatus = 'PENDING_ACCOUNTABLE';
+    r.approvalStage = 'ACCOUNTABLE';
+    addEvent(r.requestId, { ...base, eventType: 'RESPONSIBLE_APPROVED', statusTo: r.requestStatus });
+    notify(r, `group:${r.accountableGroup}`, 'REQUEST_PENDING_ACCOUNTABLE', 'A request is waiting for your final approval');
+  } else if (decision === 'APPROVE') {
+    const stage1 = eventsOf(r.requestId).filter((e) => e.eventType === 'RESPONSIBLE_APPROVED').at(-1);
+    r.requestStatus = 'APPROVED';
+    r.approvalStage = null;
+    addEvent(r.requestId, { ...base, eventType: 'ACCOUNTABLE_APPROVED', statusTo: 'APPROVED', samePersonBothStages: stage1?.actor === me() });
+    const h = findHeater(r.equipmentId);
+    if (h && r.fieldCode) setFieldValue(h, r.fieldCode, r.newValue);
+    addEvent(r.requestId, { eventType: 'MERGED', actor: 'system:merge', comments: 'The golden record was updated.', statusFrom: 'APPROVED', statusTo: 'APPROVED' });
+    notify(r, r.requestedBy, 'REQUEST_APPROVED', 'Your request was approved');
   } else if (decision === 'REJECT') {
-    row.requestStatus = 'REJECTED';
-    row.approvalStage = null;
+    r.requestStatus = 'REJECTED';
+    r.approvalStage = null;
+    addEvent(r.requestId, { ...base, eventType: 'REJECTED', statusTo: 'REJECTED' });
+    notify(r, r.requestedBy, 'REQUEST_REJECTED', 'Your request was rejected');
   } else {
-    row.requestStatus = 'RETURNED';
-    row.approvalStage = null;
-    row.returnRecipientType = 'USER';
-    row.returnRecipient = returnTo || row.requestedBy;
+    r.requestStatus = 'RETURNED';
+    r.approvalStage = null;
+    r.returnRecipientType = 'USER';
+    r.returnRecipient = returnTo || (r.requestedBy.startsWith('system:') ? me() : r.requestedBy);
+    addEvent(r.requestId, { ...base, eventType: 'RETURNED', statusTo: 'RETURNED', returnedTo: r.returnRecipient });
+    notify(r, r.returnRecipient, 'REQUEST_RETURNED', 'A request was returned to you');
   }
-  row.canApprove = row.requestStatus.startsWith('PENDING');
-  row.updatedAtUtc = new Date().toISOString();
+  r.canApprove = r.requestStatus.startsWith('PENDING');
+  r.updatedAtUtc = nowIso();
   return { previous, stage };
 }
 
-const MERGED = { outcome: 'MERGED', message: 'Merged into the golden record (mock).', goldenVersionId: 5, recorded: null, error: null };
+/** Who the Return dialog offers (`app.fn_return_candidates`): the submitter, members of both groups, you. */
+function returnCandidatesFor(r: QueueRow) {
+  const seen = new Set<string>();
+  const out: { email: string; displayName: string; relation: string; isYou: boolean }[] = [];
+  const add = (email: string, relation: string) => {
+    if (seen.has(email) || email.startsWith('system:')) return;
+    seen.add(email);
+    out.push({ email, displayName: displayNameOf(email), relation, isYou: email === me() });
+  };
+  add(r.requestedBy, 'SUBMITTER');
+  for (const p of membersOf(r.responsibleGroup)) add(p.email, 'RESPONSIBLE_GROUP');
+  for (const p of membersOf(r.accountableGroup)) add(p.email, 'ACCOUNTABLE_GROUP');
+  add(me(), 'APPROVER');
+  return out;
+}
 
 export const mockHandlers: Handlers = {
-  getMyProfile: () => ({
-    status: 'OK',
-    userId: 'mock-user',
-    email: MOCK_USER,
-    displayName: MOCK_USER_NAME,
-    roles: ['Mock-Everything'],
-    groups: ['SYN-GROUP-R', 'SYN-GROUP-A'],
-    canView: true,
-    canSubmitRequests: true,
-    canEditRules: true,
-    canPublishRules: true,
-    canResponsibleApprove: true,
-    canAccountableApprove: true,
-    canManageAdmin: true,
-    responsibleScope: { allOrcm: true, profitCenters: [] },
-    accountableScope: { allOrcm: true, profitCenters: [] },
-  }),
+  getMyProfile: () => profileOf(currentPersona()),
 
   searchEquipment: (input) => {
     const text = (input.searchText ?? '').trim().toLowerCase();
-    let rows = HEATERS.filter((h) => !input.facility || h.profitCenterName === input.facility);
+    let rows = demo().heaters.filter((h) => !input.facility || h.profitCenterName === input.facility);
     if (input.mode === 'match' && text) {
       rows = rows.filter((h) =>
         [h.equipmentNumber, h.equipmentDescription, h.functionalLocation, h.equipmentTagNumber, h.manufacturer, h.modelNumber, h.manufacturerSerialNumber]
           .some((v) => (v ?? '').toLowerCase().includes(text))
       );
     }
-    const key = input.sortColumn as keyof SearchRowT;
+    const key = input.sortColumn as keyof (typeof rows)[number];
     if (key && rows.length > 0 && key in rows[0]) {
       const dir = input.sortDirection === 'desc' ? -1 : 1;
       rows = [...rows].sort((a, b) => String(a[key] ?? '').localeCompare(String(b[key] ?? ''), undefined, { numeric: true }) * dir);
     }
     const page = rows.slice(input.offset, input.offset + input.pageSize).map((h) => ({
       ...h,
-      openRequestCount: requests.filter((r) => r.equipmentId === h.equipmentId && isOpen(r)).length,
+      openRequestCount: demo().requests.filter((r) => r.equipmentId === h.equipmentId && isOpen(r)).length,
     }));
     return { rows: page, totalMatches: rows.length, hasMore: input.offset + page.length < rows.length, truncated: false, timing: TIMING, error: null };
   },
 
   getEquipmentDetail: ({ equipmentId }) => {
-    const h = HEATERS.find((x) => x.equipmentId === equipmentId);
+    const h = findHeater(equipmentId);
     if (!h) return { found: false, heater: null, floc: null, fieldValues: [], ownership: [], timing: TIMING, error: null };
     return {
       found: true,
@@ -288,27 +211,27 @@ export const mockHandlers: Handlers = {
         level4Id: null,
         level5Id: null,
         level6Id: null,
-        goldenVersionId: 1,
-        lastChangedAtUtc: null,
+        goldenVersionId: h.goldenVersionId,
+        lastChangedAtUtc: h.lastChangedAtUtc,
       },
-      fieldValues: CATALOG.map(([fieldCode, , , , unit]) => ({
-        equipmentFieldKey: `${equipmentId}|${fieldCode}`,
+      fieldValues: CATALOG.map((c) => ({
+        equipmentFieldKey: `${equipmentId}|${c.fieldCode}`,
         equipmentId,
-        fieldCode,
-        currentValue: fieldValueOf(h, fieldCode),
-        baselineValue: fieldValueOf(h, fieldCode),
-        unit,
+        fieldCode: c.fieldCode,
+        currentValue: fieldValueOf(h, c.fieldCode),
+        baselineValue: fieldValueOf(h, c.fieldCode),
+        unit: c.unit,
         valueSource: 'STATED',
         lastRequestId: null,
         lastChangedAtUtc: null,
       })),
-      ownership: CATALOG.map(([fieldCode, label, entityType]) => ({
-        fieldOwnershipKey: `${entityType}|${fieldCode}`,
-        entityType,
-        fieldCode,
-        label,
+      ownership: CATALOG.map((c) => ({
+        fieldOwnershipKey: `${c.entityType}|${c.fieldCode}`,
+        entityType: c.entityType,
+        fieldCode: c.fieldCode,
+        label: c.label,
         responsibleRole: 'Operations-IOC',
-        accountableRole: 'SAPBusinessSupport',
+        accountableRole: ACCOUNTABLE_GROUP,
         routeId: 3,
       })),
       timing: TIMING,
@@ -316,11 +239,22 @@ export const mockHandlers: Handlers = {
     };
   },
 
-  getRequestFormOptions: () => ({ ...OK, ...formOptions({ isAdmin: true }) }),
+  getRequestFormOptions: () => {
+    const p = currentPersona();
+    return {
+      ...ok(),
+      canSubmit: p.canSubmitRequests,
+      isAdmin: p.canManageAdmin,
+      allowedValues: [...ALLOWED_VALUES],
+      blockedFields: p.canManageAdmin
+        ? []
+        : CATALOG.filter((c) => c.adminOnly).map((c) => ({ fieldCode: c.fieldCode, reason: 'Only an admin or a business rule may change this field.' })),
+    };
+  },
 
   getEquipmentRequests: ({ equipmentId }) => {
-    const rows = requests
-      .filter((r) => r.equipmentId === equipmentId)
+    const rows = demo()
+      .requests.filter((r) => r.equipmentId === equipmentId)
       .map((r) => ({
         requestId: r.requestId,
         requestRef: r.requestRef,
@@ -334,39 +268,52 @@ export const mockHandlers: Handlers = {
         requestedAtUtc: r.requestedAtUtc,
         otherOpenRequestsSameField: 0,
       }));
-    return { ...OK, totalCount: rows.length, rows };
+    return { ...ok(), totalCount: rows.length, rows };
   },
 
   createChangeRequest: (input) => {
-    const h = HEATERS.find((x) => x.equipmentId === input.equipmentId);
-    if (!h) return refused('There is no such heater (mock).', 50201);
-    const n = nextRequestId++;
-    requests.unshift(
-      queueRow(n, {
-        requestStatus: 'PENDING_RESPONSIBLE',
-        approvalStage: 'RESPONSIBLE',
-        equipmentId: h.equipmentId,
-        equipmentNumber: h.equipmentNumber,
-        functionalLocation: h.functionalLocation,
-        equipmentTagNumber: h.equipmentTagNumber,
-        profitCenterName: h.profitCenterName,
-        fieldCode: input.fieldCode,
-        fieldLabel: FIELD_LABEL.get(input.fieldCode) ?? input.fieldCode,
-        oldValue: input.oldValue,
-        newValue: input.newValue,
-        reason: input.reason || null,
-        requestedBy: ME,
-        requestedAtUtc: new Date().toISOString(),
-        ageHours: 0,
-        updatedAtUtc: new Date().toISOString(),
-        canApprove: true,
-      })
-    );
-    return { ...OK, requestId: n, requestRef: refOf(n), outcome: 'CREATED', responsibleGroup: 'SYN-GROUP-R', accountableGroup: 'SYN-GROUP-A' };
+    const h = findHeater(input.equipmentId);
+    if (!h) return refused('There is no such heater (sample data).', 50201);
+    const open = demo().requests.find((r) => r.equipmentId === h.equipmentId && r.fieldCode === input.fieldCode && isOpen(r));
+    const groups = { responsibleGroup: responsibleGroupFor(h.profitCenterName), accountableGroup: ACCOUNTABLE_GROUP };
+    if (open) {
+      const outcome = open.newValue === input.newValue ? 'DUPLICATE_SUPPRESSED' : 'BLOCKED_INCOMPATIBLE';
+      return { ...ok(), requestId: open.requestId, requestRef: open.requestRef, outcome, ...groups };
+    }
+    const n = demo().nextRequestId++;
+    const fromField = input.source === 'FIELD';
+    const row = queueRow(n, {
+      requestStatus: 'PENDING_RESPONSIBLE',
+      approvalStage: 'RESPONSIBLE',
+      equipmentId: h.equipmentId,
+      equipmentNumber: h.equipmentNumber,
+      functionalLocation: h.functionalLocation,
+      equipmentTagNumber: h.equipmentTagNumber,
+      profitCenterName: h.profitCenterName,
+      fieldCode: input.fieldCode,
+      fieldLabel: labelOf(input.fieldCode),
+      sapField: fieldOf(input.fieldCode)?.sapField ?? null,
+      oldValue: input.oldValue,
+      newValue: input.newValue,
+      reason: input.reason || null,
+      sourceType: fromField ? 'FIELD' : 'MANUAL',
+      sourceLabel: fromField ? 'Field submission' : 'Manual request',
+      requestedBy: me(),
+      requestedAtUtc: nowIso(),
+      ...groups,
+      ageHours: 0,
+      updatedAtUtc: nowIso(),
+      canApprove: true,
+    });
+    demo().requests.unshift(row);
+    addEvent(n, { eventType: 'CREATED', actor: me(), comments: input.reason || null, statusTo: 'PENDING_RESPONSIBLE' });
+    notify(row, `group:${groups.responsibleGroup}`, 'REQUEST_PENDING_RESPONSIBLE', 'A request is waiting for you');
+    return { ...ok(), requestId: n, requestRef: refOf(n), outcome: 'CREATED', ...groups };
   },
 
   getRequestQueue: (input) => {
-    const inTab = requests.filter(TAB_TEST[input.tab] ?? (() => false));
+    const all = demo().requests;
+    const inTab = all.filter(TAB_TEST[input.tab] ?? (() => false));
     const facets = [
       ...tally(inTab, 'PROFIT_CENTER', (r) => (r.profitCenterName ? [r.profitCenterName, r.profitCenterName] : null)),
       ...tally(inTab, 'FIELD', (r) => (r.fieldCode ? [r.fieldCode, r.fieldLabel ?? r.fieldCode] : null)),
@@ -380,16 +327,17 @@ export const mockHandlers: Handlers = {
         (r.ageHours ?? 0) >= input.minAgeHours &&
         (!input.noteOnly || r.note !== null)
     );
-    const page = rows.slice(input.offset, input.offset + input.pageSize);
+    const page = rows.slice(input.offset, input.offset + input.pageSize).map((r) => ({ ...r, canApprove: eligibility(r).ok }));
+    const count = (tab: string) => all.filter(TAB_TEST[tab]).length;
     return {
-      ...OK,
+      ...ok(),
       counts: {
-        responsible: requests.filter(TAB_TEST.RESPONSIBLE).length,
-        accountable: requests.filter(TAB_TEST.ACCOUNTABLE).length,
-        returned: requests.filter(TAB_TEST.RETURNED).length,
-        approved: requests.filter(TAB_TEST.APPROVED).length,
-        rejected: requests.filter(TAB_TEST.REJECTED).length,
-        mine: requests.filter(TAB_TEST.MY_REQUESTS).length,
+        responsible: count('RESPONSIBLE'),
+        accountable: count('ACCOUNTABLE'),
+        returned: count('RETURNED'),
+        approved: count('APPROVED'),
+        rejected: count('REJECTED'),
+        mine: count('MY_REQUESTS'),
       },
       totalMatches: rows.length,
       hasMore: input.offset + page.length < rows.length,
@@ -399,121 +347,178 @@ export const mockHandlers: Handlers = {
   },
 
   getRequestDetail: ({ requestId }) => {
-    const r = requests.find((x) => x.requestId === requestId);
-    if (!r) return refused('There is no such request (mock).', 50301);
-    const open = r.requestStatus.startsWith('PENDING');
-    const h = HEATERS.find((x) => x.equipmentId === r.equipmentId);
-    const events = [eventRow(1, { actor: r.requestedBy, occurredAtUtc: r.requestedAtUtc, comments: r.reason, statusTo: 'PENDING_RESPONSIBLE' })];
-    if (r.requestStatus !== 'PENDING_RESPONSIBLE') {
-      events.push(
-        eventRow(2, {
-          eventType: r.requestStatus === 'PENDING_ACCOUNTABLE' ? 'APPROVED' : r.requestStatus,
-          approvalStage: 'RESPONSIBLE',
-          actor: 't3.responsible@example.test',
-          occurredAtUtc: r.updatedAtUtc,
-          comments: 'Looks right (mock)',
-          statusFrom: 'PENDING_RESPONSIBLE',
-          statusTo: r.requestStatus,
-        })
-      );
-    }
+    const r = findRequest(requestId);
+    if (!r) return refused('There is no such request (sample data).', 50301);
+    const h = findHeater(r.equipmentId);
+    const p = currentPersona();
+    const who = eligibility(r);
+    const events = eventsOf(r.requestId);
+    const lastDecision = [...events].reverse().find((e) => e.decidedAs !== null);
+    const merged = events.find((e) => e.eventType === 'MERGED');
+    const isSubmitter = r.requestedBy === me();
+    const isRecipient = r.requestStatus === 'RETURNED' && r.returnRecipient === me();
+    const defaultReturn = r.requestedBy.startsWith('system:') ? me() : r.requestedBy;
     return {
-      ...OK,
-      request: detailRow({ ...(r as unknown as Partial<DetailRow>), classCode: 'HEATER', routeId: 3, creationComment: r.reason }),
+      ...ok(),
+      request: detailRow({
+        ...(r as unknown as Partial<DetailRow>),
+        classCode: 'HEATER',
+        routeId: 3,
+        creationComment: r.reason,
+        lastDecisionBy: lastDecision?.actor ?? null,
+        lastDecisionAtUtc: lastDecision?.occurredAtUtc ?? null,
+        mergeOutcome: merged ? 'MERGED' : null,
+        mergedAtUtc: merged?.occurredAtUtc ?? null,
+        goldenVersionId: merged ? (h?.goldenVersionId ?? 1) + 1 : null,
+      }),
       events,
-      related: requests
-        .filter((x) => x.equipmentId === r.equipmentId && x.requestId !== r.requestId)
-        .map((x) => relatedRow(x.requestId, { requestStatus: x.requestStatus, isOpen: isOpen(x), fieldCode: x.fieldCode, fieldLabel: x.fieldLabel, equipmentId: x.equipmentId, functionalLocation: x.functionalLocation })),
+      related: demo()
+        .requests.filter((x) => x.equipmentId === r.equipmentId && x.requestId !== r.requestId)
+        .map((x) =>
+          relatedRow(x.requestId, {
+            requestStatus: x.requestStatus,
+            isOpen: isOpen(x),
+            fieldCode: x.fieldCode,
+            fieldLabel: x.fieldLabel,
+            equipmentId: x.equipmentId,
+            functionalLocation: x.functionalLocation,
+            sourceLabel: x.sourceLabel,
+            requestedAtUtc: x.requestedAtUtc,
+          })
+        ),
       route: routeRow(),
       gold: goldRow({
         equipmentNumber: r.equipmentNumber,
+        equipmentDescription: h?.equipmentDescription ?? null,
         equipmentTagNumber: r.equipmentTagNumber,
         functionalLocation: r.functionalLocation,
         profitCenterName: r.profitCenterName,
         manufacturer: h?.manufacturer ?? null,
-        fieldCurrentValue: r.oldValue,
+        modelNumber: h?.modelNumber ?? null,
+        manufacturerSerialNumber: h?.manufacturerSerialNumber ?? null,
+        fieldCurrentValue: h && r.fieldCode ? fieldValueOf(h, r.fieldCode) : r.oldValue,
+        fieldUnit: r.fieldCode ? (fieldOf(r.fieldCode)?.unit ?? null) : null,
       }),
-      checks: checkRows(),
-      viewer: open
-        ? viewer({ stage: r.approvalStage, returnTo: r.requestedBy, returnToLabel: r.requestedBy })
-        : viewer({
-            canDecide: false,
-            decideBlockedReason: 'This request is no longer waiting for a decision (mock).',
-            canApprove: false,
-            approveBlockedReason: 'This request is no longer waiting for a decision (mock).',
-            canResubmit: r.requestStatus === 'RETURNED' && r.requestedBy === ME,
-            canCancel: r.requestStatus === 'RETURNED' && r.requestedBy === ME,
-            stage: null,
-            decidedAs: null,
-          }),
-      returnCandidates: returnCandidates(),
+      checks: checkRows(
+        who.ok ? {} : { USER_ELIGIBLE_FOR_STAGE: { checkStatus: 'FAIL', message: who.reason ?? 'you may not decide this stage' } }
+      ),
+      viewer: viewer({
+        canDecide: who.ok,
+        decideBlockedReason: who.reason,
+        canApprove: who.ok,
+        approveBlockedReason: who.reason,
+        canResubmit: isRecipient || (r.requestStatus === 'RETURNED' && p.canManageAdmin),
+        canCancel: isOpen(r) && (isSubmitter || p.canManageAdmin),
+        returnToType: 'USER',
+        returnTo: defaultReturn,
+        returnToLabel: displayNameOf(defaultReturn),
+        stage: r.approvalStage,
+        decidedAs: who.decidedAs,
+      }),
+      returnCandidates: returnCandidatesFor(r),
     };
   },
 
-  getRequestChecks: () => ({ ...OK, requestStatus: 'PENDING_RESPONSIBLE', checks: checkRows() }),
+  getRequestChecks: ({ requestId }) => {
+    const r = findRequest(requestId);
+    return { ...ok(), requestStatus: r?.requestStatus ?? 'PENDING_RESPONSIBLE', checks: checkRows() };
+  },
 
   getRequestEvidence: ({ requestId }) => {
-    const r = requests.find((x) => x.requestId === requestId);
+    const r = findRequest(requestId);
     return {
-      ...OK,
+      ...ok(),
       requestRef: r?.requestRef ?? null,
       createdAtUtc: r?.requestedAtUtc ?? null,
       createdBy: r?.requestedBy ?? null,
-      detailsJson: JSON.stringify({ event: 'CREATED', source_type: r?.sourceType ?? 'MANUAL', entity_type: 'EQUIPMENT', evidence: { seen_on: 'nameplate (mock)' } }),
+      detailsJson: JSON.stringify({
+        event: 'CREATED',
+        source_type: r?.sourceType ?? 'MANUAL',
+        entity_type: 'EQUIPMENT',
+        entity_key: r?.equipmentNumber ?? null,
+        evidence: r?.sourceType === 'FIELD' ? { seen_on: 'nameplate', photo_taken: true } : { seen_on: 'data sheet' },
+      }),
     };
   },
 
-  decideRequest: ({ requestId, decision, expectedStatus, returnTo }) => {
-    const r = requests.find((x) => x.requestId === requestId);
-    if (!r) return refused('There is no such request (mock).', 50301);
-    if (expectedStatus && r.requestStatus !== expectedStatus) return refused('The request has moved on since you opened it (mock).', 50310);
-    if (!r.requestStatus.startsWith('PENDING')) return refused('This request is not waiting for a decision (mock).', 50311);
-    const { previous, stage } = applyDecision(r, decision, returnTo);
-    const merged = r.requestStatus === 'APPROVED';
-    return { ...OK, requestId, requestRef: r.requestRef, decision, previousStatus: previous, newStatus: r.requestStatus, stage, needsMerge: false, merge: merged ? MERGED : null };
+  decideRequest: ({ requestId, decision, comment, expectedStatus, returnTo }) => {
+    const r = findRequest(requestId);
+    if (!r) return refused('There is no such request (sample data).', 50301);
+    if (expectedStatus && r.requestStatus !== expectedStatus) return refused('The request has moved on since you opened it.', 50310);
+    const who = eligibility(r);
+    if (!who.ok) return refused(who.reason ?? 'You may not decide this request.', 50140);
+    const { previous, stage } = applyDecision(r, decision, comment, returnTo);
+    return {
+      ...ok(),
+      requestId,
+      requestRef: r.requestRef,
+      decision,
+      previousStatus: previous,
+      newStatus: r.requestStatus,
+      stage,
+      needsMerge: false,
+      merge: r.requestStatus === 'APPROVED' ? MERGED : null,
+    };
   },
 
-  bulkApprove: ({ requestIds }) => {
+  bulkApprove: ({ requestIds, comment }) => {
     const ids = requestIds.split(',').map((s) => Number(s.trim())).filter((n) => Number.isFinite(n));
     const results = ids.map((id) => {
-      const r = requests.find((x) => x.requestId === id);
-      if (!r || !r.requestStatus.startsWith('PENDING')) {
-        return { requestId: id, requestRef: r?.requestRef ?? null, outcome: 'SKIPPED', newStatus: null, reason: 'Not waiting for a decision (mock).', merge: null };
+      const r = findRequest(id);
+      const who = r ? eligibility(r) : null;
+      if (!r || !who?.ok) {
+        return { requestId: id, requestRef: r?.requestRef ?? null, outcome: 'SKIPPED', newStatus: null, reason: who?.reason ?? 'There is no such request.', merge: null };
       }
-      applyDecision(r, 'APPROVE', '');
-      return { requestId: id, requestRef: r.requestRef, outcome: 'APPROVED', newStatus: r.requestStatus, reason: null, merge: r.requestStatus === 'APPROVED' ? MERGED : null };
+      applyDecision(r, 'APPROVE', comment, '');
+      return { requestId: id, requestRef: r.requestRef, outcome: 'DECIDED', newStatus: r.requestStatus, reason: null, merge: r.requestStatus === 'APPROVED' ? MERGED : null };
     });
-    return { ...OK, decided: results.filter((x) => x.outcome === 'APPROVED').length, skipped: results.filter((x) => x.outcome === 'SKIPPED').length, results };
+    return { ...ok(), decided: results.filter((x) => x.outcome === 'DECIDED').length, skipped: results.filter((x) => x.outcome === 'SKIPPED').length, results };
   },
 
-  resubmitRequest: ({ requestId, newValue }) => {
-    const r = requests.find((x) => x.requestId === requestId);
-    if (!r) return refused('There is no such request (mock).', 50301);
+  resubmitRequest: ({ requestId, newValue, comment }) => {
+    const r = findRequest(requestId);
+    if (!r) return refused('There is no such request (sample data).', 50301);
+    if (r.requestStatus !== 'RETURNED') return refused('Only a returned request can be resubmitted.', 50150);
+    if (r.returnRecipient !== me() && !currentPersona().canManageAdmin) return refused('Only the person it was returned to (or an admin) can resubmit it.', 50151);
+    const previous = r.requestStatus;
     r.requestStatus = 'PENDING_RESPONSIBLE';
     r.approvalStage = 'RESPONSIBLE';
     r.returnRecipient = null;
     r.returnRecipientType = null;
     if (newValue) r.newValue = newValue;
     r.canApprove = true;
-    return { ...OK, requestId, requestRef: r.requestRef, newStatus: r.requestStatus, newValue: r.newValue };
+    r.updatedAtUtc = nowIso();
+    addEvent(r.requestId, { eventType: 'RESUBMITTED', comments: comment || null, statusFrom: previous, statusTo: r.requestStatus });
+    notify(r, `group:${r.responsibleGroup}`, 'REQUEST_PENDING_RESPONSIBLE', 'A corrected request is waiting for you');
+    return { ...ok(), requestId, requestRef: r.requestRef, newStatus: r.requestStatus, newValue: r.newValue };
   },
 
-  cancelRequest: ({ requestId }) => {
-    const r = requests.find((x) => x.requestId === requestId);
-    if (!r) return refused('There is no such request (mock).', 50301);
+  cancelRequest: ({ requestId, comment }) => {
+    const r = findRequest(requestId);
+    if (!r) return refused('There is no such request (sample data).', 50301);
+    if (!isOpen(r)) return refused('This request is already closed.', 50160);
+    if (r.requestedBy !== me() && !currentPersona().canManageAdmin) return refused('Only the person who raised it (or an admin) can withdraw it.', 50161);
     const previous = r.requestStatus;
     r.requestStatus = 'CANCELLED';
     r.approvalStage = null;
     r.canApprove = false;
-    return { ...OK, requestId, requestRef: r.requestRef, previousStatus: previous, newStatus: r.requestStatus };
+    r.updatedAtUtc = nowIso();
+    addEvent(r.requestId, { eventType: 'CANCELLED', comments: comment || null, statusFrom: previous, statusTo: 'CANCELLED' });
+    return { ...ok(), requestId, requestRef: r.requestRef, previousStatus: previous, newStatus: r.requestStatus };
   },
 
   getMyNotifications: ({ limit }) => {
-    const items = [
-      { notificationId: 3, topic: 'REQUEST_DECIDED', requestId: 15, requestRef: refOf(15), title: 'Your request was approved', body: 'SYNTHETIC notification for the mock build.', createdAtUtc: hoursAgo(2), isRead: false },
-      { notificationId: 2, topic: 'REQUEST_RETURNED', requestId: 13, requestRef: refOf(13), title: 'A request was returned to you', body: 'SYNTHETIC notification for the mock build.', createdAtUtc: hoursAgo(20), isRead: false },
-      { notificationId: 1, topic: 'REQUEST_CREATED', requestId: 1, requestRef: refOf(1), title: 'A request is waiting for you', body: 'SYNTHETIC notification for the mock build.', createdAtUtc: hoursAgo(50), isRead: true },
-    ].slice(0, limit);
-    return { ...OK, unreadCount: items.filter((i) => !i.isRead).length, items };
+    const mine = inboxOf();
+    const items = mine.slice(0, limit).map((n) => ({
+      notificationId: n.notificationId,
+      topic: n.topic,
+      requestId: n.requestId,
+      requestRef: n.requestRef,
+      title: n.title,
+      body: n.body,
+      createdAtUtc: n.createdAtUtc,
+      isRead: isReadBy(n, me()),
+    }));
+    return { ...ok(), unreadCount: mine.filter((n) => !isReadBy(n, me())).length, items };
   },
 };

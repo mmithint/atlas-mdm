@@ -19,6 +19,7 @@ export type ScreenId =
   | 'new-heater'
   | 'new-field'
   | 'rules'
+  | 'rule'
   | 'measures'
   | 'export'
   | 'notifications'
@@ -135,6 +136,16 @@ export const ROUTES: readonly RouteDef[] = [
     summary: 'The business rules that check heater data: catalogue, editor, test, preview, publish.',
     pattern: '/rules',
     inMenu: true,
+    needsAdmin: false,
+    builtIn: 'APP-5',
+  },
+  {
+    id: 'rule',
+    screen: 'S-9',
+    title: 'Rule',
+    summary: 'One business rule: its SQL, tests, preview of the requests it would create, versions and runs.',
+    pattern: '/rules/:id',
+    inMenu: false,
     needsAdmin: false,
     builtIn: 'APP-5',
   },

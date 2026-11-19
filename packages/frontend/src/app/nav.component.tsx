@@ -33,21 +33,25 @@ const PARENT: Partial<Record<ScreenId, ScreenId>> = {
   'equipment-detail': 'equipment',
   request: 'approvals',
   'new-heater': 'equipment',
+  rule: 'rules',
 };
 
 /**
  * The menu. Admin entries appear only for people with the admin right (a convenience:
  * the server checks the right again on every admin action). Screens that a later phase
- * builds are shown dimmed with a note, so nobody wonders why they are empty.
+ * builds are shown dimmed with a note, so nobody wonders why they are empty. In the demo build
+ * (`preview`, FINAL PLAN/11) every page opens, so no entry is dimmed; the page header says "Preview".
  */
 export function Nav({
   current,
   canManageAdmin,
   onNavigate,
+  preview = false,
 }: {
   current: ScreenId | null;
   canManageAdmin: boolean;
   onNavigate?: () => void;
+  preview?: boolean;
 }) {
   const active = current ? (PARENT[current] ?? current) : null;
   return (
@@ -56,7 +60,7 @@ export function Nav({
         {menuRoutes(canManageAdmin).map((route) => {
           const Icon = ICONS[route.id];
           const isCurrent = route.id === active;
-          const built = isBuilt(route);
+          const built = preview || isBuilt(route);
           return (
             <li key={route.id}>
               <a

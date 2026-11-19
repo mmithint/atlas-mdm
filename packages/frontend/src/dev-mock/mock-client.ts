@@ -76,7 +76,8 @@ export function createMockAuthService(): IAuthService {
 /** A fixed label on every screen: nobody should mistake this for the real app. */
 function installBanner(): void {
   const banner = document.createElement('div');
-  banner.textContent = 'MOCK DATA: invented rows, no server (npm run dev:mock)';
+  // FINAL PLAN/11 §3 F4: the wording the client sees during the demo.
+  banner.textContent = 'DEMO · sample data · nothing is saved';
   banner.setAttribute('role', 'status');
   banner.style.cssText =
     'position:fixed;left:8px;bottom:8px;z-index:2147483647;padding:4px 10px;border-radius:6px;' +
