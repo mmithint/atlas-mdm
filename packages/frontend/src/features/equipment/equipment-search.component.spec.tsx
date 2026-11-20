@@ -1,25 +1,25 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { fetchSortedPage, fetchBestMatches } = vi.hoisted(() => ({
-  fetchSortedPage: vi.fn(),
-  fetchBestMatches: vi.fn(),
-}));
-vi.mock('./equipment-api', () => ({ fetchSortedPage, fetchBestMatches }));
+const { fetchSortedPage } = vi.hoisted(() => ({ fetchSortedPage: vi.fn() }));
+vi.mock('./equipment-api', () => ({ fetchSortedPage }));
 
 import { EquipmentSearch } from './equipment-search.component';
 import { searchRow } from './test-fixtures';
 
-const page = (rows = [searchRow(1), searchRow(2, { equipmentTagNumber: null, superiorFunctionalLocation: null })], hasNext = false) => ({
+const page = (rows = [searchRow(1), searchRow(2, { equipmentTagNumber: null, superiorFunctionalLocation: null })], hasNext = false, total = rows.length) => ({
   rows,
   hasNext,
   endCursor: hasNext ? 'C' : null,
+  total,
 });
+
+const SEARCH = { name: 'Search with the column filters' };
+const type = (label: string, value: string) => fireEvent.change(screen.getByLabelText(label), { target: { value } });
 
 describe('S-4 Equipment search', () => {
   beforeEach(() => {
     fetchSortedPage.mockReset();
-    fetchBestMatches.mockReset();
     window.location.hash = '#/equipment';
   });
   afterEach(() => {
@@ -41,49 +41,163 @@ describe('S-4 Equipment search', () => {
     render(<EquipmentSearch />);
     await screen.findByRole('link', { name: 'SYN-TAG-0001' });
     const rows = screen.getAllByRole('row');
-    // row 0 is the header; row 2 is the heater without a tag and without a facility
-    const blankRow = within(rows[2]!);
+    // row 0 is the header, row 1 the filter boxes, row 3 is the heater without a tag and without a facility
+    const blankRow = within(rows[3]!);
     expect(blankRow.getAllByText('—').length).toBeGreaterThanOrEqual(2);
     // it can still be opened through its equipment number
     expect(blankRow.getByRole('link', { name: 'SYN-EQ-0002' })).toHaveAttribute('href', '#/equipment/2');
   });
 
-  it('searches in the chosen field and puts the search in the address', async () => {
+  it('puts a filter box under every text column and none under a count, a percentage or a date', async () => {
+    fetchSortedPage.mockResolvedValue(page());
+    render(<EquipmentSearch />);
+    await screen.findByRole('link', { name: 'SYN-TAG-0001' });
+    for (const label of ['Tag', 'Serial number', 'Equipment no.', 'Facility', 'Manufacturer', 'Class', 'Profit centre']) {
+      expect(screen.getByLabelText(`Filter ${label}`)).toBeInTheDocument();
+    }
+    expect(screen.queryByLabelText('Filter Open requests')).toBeNull();
+    expect(screen.queryByLabelText('Filter Verified')).toBeNull();
+    expect(within(screen.getByRole('table')).getAllByRole('textbox')).toHaveLength(7);
+  });
+
+  it('offers a filter box in the column chooser for every text column, shown or not, and none for the others', async () => {
+    fetchSortedPage.mockResolvedValue(page());
+    render(<EquipmentSearch />);
+    await screen.findByRole('link', { name: 'SYN-TAG-0001' });
+    for (const label of ['Tag', 'FLOC', 'Description', 'Model', 'Manufacturer']) {
+      expect(screen.getByLabelText(`${label} filter value`)).toBeInTheDocument();
+    }
+    for (const label of ['Open requests', 'Verified', 'Heat duty (MMBTU/hr)', 'Invalid rules', 'Last changed']) {
+      expect(screen.queryByLabelText(`${label} filter value`)).toBeNull();
+      expect(screen.getByLabelText(label)).toBeInTheDocument(); // still a checkbox
+    }
+  });
+
+  it('searches a hidden column from the chooser with Apply, without showing the column', async () => {
     fetchSortedPage.mockResolvedValue(page());
     render(<EquipmentSearch />);
     await screen.findByRole('link', { name: 'SYN-TAG-0001' });
 
-    fireEvent.change(screen.getByLabelText('Search in'), { target: { value: 'serial' } });
-    fireEvent.change(screen.getByLabelText('Value'), { target: { value: 'SYN-SN-0004' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Search' }));
+    type('Model filter value', ' H-100 ');
+    type('Manufacturer filter value', 'heat');
+    expect(window.location.hash).toBe('#/equipment'); // typing alone searches nothing
+    expect(screen.getByLabelText('Filter Manufacturer')).toHaveValue('heat'); // shared with the header box
 
-    expect(window.location.hash).toBe('#/equipment?field=serial&q=SYN-SN-0004');
+    fireEvent.click(screen.getByRole('button', { name: 'Apply filters' }));
+    expect(window.location.hash).toBe('#/equipment?f.manufacturer=heat&f.modelNumber=H-100');
+    await waitFor(() => expect(fetchSortedPage).toHaveBeenCalledTimes(2));
+    expect(fetchSortedPage.mock.calls[1]?.[0].filters).toEqual([
+      { column: 'manufacturer', text: 'heat' },
+      { column: 'modelNumber', text: 'H-100' },
+    ]);
+    expect(screen.queryByRole('columnheader', { name: /Model/ })).toBeNull(); // the column stays hidden
   });
 
-  it('shows closest matches first and says how many were found', async () => {
-    window.location.hash = '#/equipment?q=SYN';
-    fetchBestMatches.mockResolvedValue({ rows: [searchRow(1), searchRow(2), searchRow(3)], truncated: false });
+  it('marks an applied filter on a hidden column in the chooser, and lets the column be shown or hidden freely', async () => {
+    window.location.hash = '#/equipment?f.functionalLocation=SYN-FL';
+    fetchSortedPage.mockResolvedValue(page());
     render(<EquipmentSearch />);
-    expect(await screen.findByText(/closest first/)).toBeInTheDocument();
-    expect(screen.getByText('3')).toBeInTheDocument();
-    expect(fetchBestMatches).toHaveBeenCalledTimes(1);
+    await screen.findByRole('link', { name: 'SYN-TAG-0001' });
+
+    expect(screen.queryByRole('columnheader', { name: /^FLOC/ })).toBeNull();
+    expect(screen.getByLabelText('FLOC filter value')).toHaveValue('SYN-FL');
+    const toggle = screen.getByLabelText('FLOC (filtered)');
+    expect(toggle).toBeEnabled();
+    fireEvent.click(toggle);
+    expect(screen.getByRole('columnheader', { name: /^FLOC/ })).toBeInTheDocument();
   });
 
-  it('warns when there may be more matches than were fetched', async () => {
-    window.location.hash = '#/equipment?q=S';
-    fetchBestMatches.mockResolvedValue({ rows: [searchRow(1)], truncated: true });
+  it('searches only when the search icon is pressed, with every filled box, and puts the search in the address', async () => {
+    fetchSortedPage.mockResolvedValue(page());
     render(<EquipmentSearch />);
-    expect(await screen.findByText(/more exist/)).toBeInTheDocument();
+    await screen.findByRole('link', { name: 'SYN-TAG-0001' });
+    expect(fetchSortedPage).toHaveBeenCalledTimes(1);
+
+    type('Filter Manufacturer', ' heat ');
+    type('Filter Class', 'fired');
+    type('Filter Serial number', '   '); // blank: not a filter
+    expect(window.location.hash).toBe('#/equipment'); // typing alone searches nothing
+    expect(fetchSortedPage).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(screen.getByRole('button', SEARCH));
+    expect(window.location.hash).toBe('#/equipment?f.manufacturer=heat&f.equipClass=fired');
+    await waitFor(() => expect(fetchSortedPage).toHaveBeenCalledTimes(2));
+    expect(fetchSortedPage.mock.calls[1]?.[0].filters).toEqual([
+      { column: 'manufacturer', text: 'heat' },
+      { column: 'equipClass', text: 'fired' },
+    ]);
+    await screen.findByRole('link', { name: 'SYN-TAG-0001' });
+    expect(screen.getByLabelText('Filter Manufacturer')).toHaveValue('heat'); // the boxes show what is applied
   });
 
-  it('lists every heater of a facility and offers a way back to all of them', async () => {
+  it('keeps the sort when the filters change', async () => {
+    window.location.hash = '#/equipment?sort=manufacturer&dir=desc';
+    fetchSortedPage.mockResolvedValue(page());
+    render(<EquipmentSearch />);
+    await screen.findByRole('link', { name: 'SYN-TAG-0001' });
+    type('Filter Class', 'fired');
+    fireEvent.click(screen.getByRole('button', SEARCH));
+    expect(window.location.hash).toBe('#/equipment?f.equipClass=fired&sort=manufacturer&dir=desc');
+  });
+
+  it('says how many heaters match and which page this is', async () => {
+    window.location.hash = '#/equipment?f.manufacturer=heat';
+    fetchSortedPage.mockResolvedValue(page([searchRow(1), searchRow(2), searchRow(3)], true, 120));
+    render(<EquipmentSearch />);
+    expect(await screen.findByText('120')).toBeInTheDocument();
+    expect(screen.getByText(/heaters\s*match/)).toBeInTheDocument();
+    expect(screen.getByText(/page 1 of 3/)).toBeInTheDocument();
+  });
+
+  it('shows the filters of the address in the boxes, and keeps a hidden column hidden', async () => {
+    fetchSortedPage.mockResolvedValue(page());
+    render(<EquipmentSearch />);
+    await screen.findByRole('link', { name: 'SYN-TAG-0001' });
+    expect(screen.queryByRole('columnheader', { name: /^FLOC/ })).toBeNull();
+
+    window.location.hash = '#/equipment?f.manufacturer=heat&f.functionalLocation=SYN-FL';
+    await waitFor(() => expect(screen.getByLabelText('Filter Manufacturer')).toHaveValue('heat'));
+    expect(screen.getByLabelText('FLOC filter value')).toHaveValue('SYN-FL');
+    expect(screen.queryByRole('columnheader', { name: /^FLOC/ })).toBeNull();
+  });
+
+  it('clears all the filters, the boxes and the address', async () => {
+    window.location.hash = '#/equipment?f.manufacturer=heat&f.equipClass=fired&sort=manufacturer';
+    fetchSortedPage.mockResolvedValue(page());
+    render(<EquipmentSearch />);
+    await screen.findByRole('link', { name: 'SYN-TAG-0001' });
+    expect(screen.getByLabelText('Filter Manufacturer')).toHaveValue('heat');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Clear filters' }));
+    expect(window.location.hash).toBe('#/equipment?sort=manufacturer');
+    await waitFor(() => expect(screen.getByLabelText('Filter Manufacturer')).toHaveValue(''));
+    expect(screen.getByLabelText('Filter Class')).toHaveValue('');
+    expect(screen.queryByRole('button', { name: 'Clear filters' })).toBeNull();
+  });
+
+  it('offers to clear text that was typed but not searched yet, and empties the boxes', async () => {
+    fetchSortedPage.mockResolvedValue(page());
+    render(<EquipmentSearch />);
+    await screen.findByRole('link', { name: 'SYN-TAG-0001' });
+    expect(screen.queryByRole('button', { name: 'Clear filters' })).toBeNull();
+
+    type('Filter Manufacturer', 'heat');
+    fireEvent.click(screen.getByRole('button', { name: 'Clear filters' }));
+    expect(screen.getByLabelText('Filter Manufacturer')).toHaveValue('');
+    expect(window.location.hash).toBe('#/equipment');
+    expect(fetchSortedPage).toHaveBeenCalledTimes(1);
+  });
+
+  it('lists every heater of a facility and offers a way back to all of them, keeping the filters', async () => {
     window.location.hash = '#/equipment?facility=SYN-FL-AREA-01';
     fetchSortedPage.mockResolvedValue(page());
     render(<EquipmentSearch />);
     await screen.findByRole('link', { name: 'SYN-TAG-0001' });
     expect(fetchSortedPage).toHaveBeenCalledWith(expect.objectContaining({ facility: 'SYN-FL-AREA-01' }), null);
-    const back = screen.getByRole('link', { name: /Show all facilities/ });
-    expect(back).toHaveAttribute('href', '#/equipment');
+    expect(screen.getByRole('link', { name: /Show all facilities/ })).toHaveAttribute('href', '#/equipment');
+
+    window.location.hash = '#/equipment?f.manufacturer=heat&facility=SYN-FL-AREA-01';
+    await waitFor(() => expect(screen.getByRole('link', { name: /Show all facilities/ })).toHaveAttribute('href', '#/equipment?f.manufacturer=heat'));
   });
 
   it('sorts by a column when its header is clicked, and the other way on a second click', async () => {
@@ -107,40 +221,39 @@ describe('S-4 Equipment search', () => {
 
     fireEvent.click(screen.getByLabelText('Model'));
     expect(screen.getByRole('columnheader', { name: /Model/ })).toBeInTheDocument();
+    expect(screen.getByLabelText('Filter Model')).toBeInTheDocument(); // a newly shown text column gets its box
     fireEvent.click(screen.getByLabelText('Model'));
     expect(screen.queryByRole('columnheader', { name: /Model/ })).toBeNull();
   });
 
-  it('always shows the column that is being searched, even when it is not a default column', async () => {
-    fetchSortedPage.mockResolvedValue(page());
+  it('keeps the filter boxes while it searches, so a filter can be changed at once', async () => {
+    fetchSortedPage.mockReturnValue(new Promise(() => undefined)); // never answers
     render(<EquipmentSearch />);
-    await screen.findByRole('link', { name: 'SYN-TAG-0001' });
-    expect(screen.queryByRole('columnheader', { name: /^FLOC/ })).toBeNull();
-
-    window.location.hash = '#/equipment?field=floc&sort=equipmentNumber';
-    expect(await screen.findByRole('columnheader', { name: /^FLOC/ })).toBeInTheDocument();
-    expect(screen.getByLabelText('FLOC (searched)')).toBeDisabled(); // locked on in the column chooser
+    expect(await screen.findByLabelText('Filter Manufacturer')).toBeInTheDocument();
+    expect(screen.getByText('Searching…')).toBeInTheDocument();
   });
 
-  it('explains an empty result in words', async () => {
-    window.location.hash = '#/equipment?q=nothing';
-    fetchBestMatches.mockResolvedValue({ rows: [], truncated: false });
+  it('explains an empty result in words, and keeps the boxes', async () => {
+    window.location.hash = '#/equipment?f.manufacturer=nothing&f.equipClass=x';
+    fetchSortedPage.mockResolvedValue(page([], false, 0));
     render(<EquipmentSearch />);
     expect(await screen.findByText('No heater found')).toBeInTheDocument();
-    expect(screen.getByText(/Nothing matches "nothing" in engineering tag/)).toBeInTheDocument();
+    expect(screen.getByText(/Nothing matches Manufacturer contains "nothing" and Class contains "x"/)).toBeInTheDocument();
+    expect(screen.getByLabelText('Filter Manufacturer')).toHaveValue('nothing');
   });
 
-  it('shows a failure with a way to try again', async () => {
+  it('shows a failure with a way to try again, and keeps the boxes', async () => {
     fetchSortedPage.mockRejectedValueOnce(new Error('connector said no')).mockResolvedValueOnce(page());
     render(<EquipmentSearch />);
     expect(await screen.findByRole('alert')).toHaveTextContent('connector said no');
+    expect(screen.getByLabelText('Filter Manufacturer')).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
     expect(await screen.findByRole('link', { name: 'SYN-TAG-0001' })).toBeInTheDocument();
   });
 
   it('pages forward and back', async () => {
-    fetchSortedPage.mockResolvedValue(page([searchRow(1)], true));
+    fetchSortedPage.mockResolvedValue(page([searchRow(1)], true, 120));
     render(<EquipmentSearch />);
     await screen.findByRole('link', { name: 'SYN-TAG-0001' });
     expect(screen.getByRole('button', { name: 'Previous' })).toBeDisabled();

@@ -18,8 +18,8 @@ import { getRayfinClient } from '@/lib/rayfin-client';
 
 import type { FieldCatalog } from '../../../../../rayfin/connectors/atlas_sql_db/schema';
 
-import { DEFAULT_SORT, fieldById } from './columns';
-import { sortOf, type SearchCriteria } from './search-model';
+import { UNUSED_SEARCH_COLUMN } from './columns';
+import { sortOf, type ColumnFilter, type SearchCriteria } from './search-model';
 
 type Detail = AppFunctionsSchema['getEquipmentDetail']['output'];
 
@@ -61,52 +61,40 @@ export interface SortedPage {
    * every order ends with the heater id).
    */
   endCursor: string | null;
+  /** Every heater that matches the filters and the facility (all pages), as counted by the procedure. */
+  total: number;
 }
 
-/** One page of a list ordered by a column; `cursor` is the previous page's `endCursor`. */
+/** The boxes as the function wants them: one JSON text, empty when no box holds text. */
+export const filtersJsonOf = (filters: readonly ColumnFilter[]): string =>
+  filters.length === 0 ? '' : JSON.stringify(filters.map((f) => ({ column: f.column, text: f.text })));
+
+/**
+ * One page of the list, ordered by a column; `cursor` is the previous page's `endCursor`.
+ * Every box that holds text is one "contains" condition and all must hold (CR-1). The older
+ * single column and text of the function are not used by the screen: an empty text.
+ */
 export async function fetchSortedPage(c: SearchCriteria, cursor: string | null): Promise<SortedPage> {
   const { column, direction } = sortOf(c);
   const parsed = cursor === null ? 0 : Number(cursor);
   const offset = Number.isInteger(parsed) && parsed >= 0 ? parsed : 0;
   const answer = await search({
     mode: 'SORTED',
-    searchColumn: fieldById(c.fieldId).column,
-    searchText: c.query,
+    searchColumn: UNUSED_SEARCH_COLUMN,
+    searchText: '',
     facility: c.facility,
     sortColumn: column,
     sortDirection: direction,
     offset,
     pageSize: Math.min(c.pageSize, PAGE_LIMIT),
+    filtersJson: filtersJsonOf(c.filters),
   });
   return {
     rows: answer.rows,
     hasNext: answer.hasMore,
     endCursor: answer.hasMore ? String(offset + answer.rows.length) : null,
+    total: answer.totalMatches,
   };
-}
-
-export interface BestMatches {
-  rows: SearchRow[];
-  /** True when a closeness tier hit its cap: there may be more matches than are listed. */
-  truncated: boolean;
-}
-
-/**
- * Closest matches first (POC-APP-05): equal to the text, then starting with it, then merely
- * containing it. The ordering and the row caps are the procedure's; this is one call.
- */
-export async function fetchBestMatches(c: SearchCriteria): Promise<BestMatches> {
-  const answer = await search({
-    mode: 'MATCH',
-    searchColumn: fieldById(c.fieldId).column,
-    searchText: c.query,
-    facility: c.facility,
-    sortColumn: DEFAULT_SORT, // the closeness tiers set the order; this is only the tie-break
-    sortDirection: 'asc',
-    offset: 0,
-    pageSize: PAGE_LIMIT, // not used in MATCH mode, but the function checks it
-  });
-  return { rows: answer.rows, truncated: answer.truncated };
 }
 
 // ---- one heater (screen S-5) -------------------------------------------------

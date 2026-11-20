@@ -73,6 +73,7 @@ const request = (over: Partial<SearchRequest> = {}): SearchRequest => ({
   sortDirection: 'desc',
   offset: 50,
   pageSize: 25,
+  filtersJson: '',
   ...over,
 });
 
@@ -113,6 +114,7 @@ describe('checkSearch', () => {
       sortDirection: 'DESC',
       offset: 50,
       pageSize: 25,
+      filtersJson: '',
     });
   });
 
@@ -131,12 +133,47 @@ describe('checkSearch', () => {
     ['a facility over 40 characters', { facility: 'x'.repeat(41) }],
     ['a search text that is not text', { searchText: 42 as unknown as string }],
     ['a page size that is not a number', { pageSize: '50' as unknown as number }],
+    ['filters that are not text', { filtersJson: [] as unknown as string }],
+    ['filters that are not JSON', { filtersJson: 'not json' }],
+    ['filters that are an object, not a list', { filtersJson: '{"column":"manufacturer","text":"x"}' }],
+    ['a filter that is not an object', { filtersJson: '["manufacturer"]' }],
+    ['a filter with null in it', { filtersJson: '[null]' }],
+    ['a filter without a column', { filtersJson: '[{"text":"x"}]' }],
+    ['a filter without a text', { filtersJson: '[{"column":"manufacturer"}]' }],
+    ['a filter text that is not text', { filtersJson: '[{"column":"manufacturer","text":5}]' }],
+    ['a filter column that is not an identifier', { filtersJson: '[{"column":"manufacturer]; DROP TABLE x;--","text":"x"}]' }],
+    ['a filter text over 100 characters', { filtersJson: JSON.stringify([{ column: 'manufacturer', text: 'x'.repeat(101) }]) }],
+    ['21 filters', { filtersJson: JSON.stringify(Array.from({ length: 21 }, () => ({ column: 'manufacturer', text: 'a' }))) }],
+    ['filters longer than 4000 characters', { filtersJson: ' '.repeat(4001) + '[]' }],
   ])('refuses %s', (_label, over) => {
     expect(() => checkSearch(request(over))).toThrow(/Invalid search/);
   });
 
   it('accepts the biggest page and the first page', () => {
     expect(() => checkSearch(request({ pageSize: 100, offset: 0 }))).not.toThrow();
+  });
+
+  describe('the column filters (CR-1)', () => {
+    const filters = (list: unknown) => checkSearch(request({ filtersJson: JSON.stringify(list) })).filtersJson;
+
+    it('hands the procedure one canonical form: snake_case columns, trimmed texts, blank entries dropped', () => {
+      const text = 'A "B" \\ C'; // A, a quoted B, a backslash, C
+      expect(filters([{ column: 'equipClass', text: '  fired ' }, { column: 'manufacturer', text }, { column: 'plannerGroup', text: '   ' }])).toBe(
+        '[{"column":"equip_class","text":"fired"},{"column":"manufacturer","text":"A \\"B\\" \\\\ C"}]'
+      );
+    });
+
+    it('means no filter for an empty text, an empty list and a list of blanks', () => {
+      expect(checkSearch(request({ filtersJson: '' })).filtersJson).toBe('');
+      expect(checkSearch(request({ filtersJson: '   ' })).filtersJson).toBe('');
+      expect(filters([])).toBe('');
+      expect(filters([{ column: 'manufacturer', text: ' ' }])).toBe('');
+    });
+
+    it('accepts 20 filters and a text of 100 characters (which columns are allowed is up to the procedure)', () => {
+      expect(() => filters(Array.from({ length: 20 }, () => ({ column: 'manufacturer', text: 'a' })))).not.toThrow();
+      expect(() => filters([{ column: 'manufacturer', text: 'x'.repeat(100) }])).not.toThrow();
+    });
   });
 });
 
@@ -176,9 +213,23 @@ describe('runEquipmentSearch', () => {
         sort_direction: 'DESC',
         offset: 50,
         page_size: 25,
+        filters_json: '',
       },
       outputs: ['total_matches', 'has_more', 'truncated'],
     });
+  });
+
+  it('passes the column filters to the procedure as one JSON text, cleaned', async () => {
+    const { calls } = makePool({ recordset: [], output: {} });
+    const list = [{ column: 'manufacturer', text: ' heat ' }, { column: 'equipClass', text: 'fired' }];
+    await runEquipmentSearch(request({ filtersJson: JSON.stringify(list) }), TOKEN, getSqlToken);
+    expect(calls[0]?.inputs['filters_json']).toBe('[{"column":"manufacturer","text":"heat"},{"column":"equip_class","text":"fired"}]');
+  });
+
+  it('refuses bad filters before touching the database', async () => {
+    const r = await runEquipmentSearch(request({ filtersJson: 'not json' }), TOKEN, getSqlToken);
+    expect(r.error).toMatch(/Invalid search: filters are not valid JSON/);
+    expect(openPool).not.toHaveBeenCalled();
   });
 
   it('returns typed rows: camelCase, blanks as null, dates as ISO text, unknown columns dropped', async () => {

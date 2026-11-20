@@ -101,10 +101,6 @@ export function Approvals() {
     <div className="space-y-300">
       <header>
         <h1 className="text-600 font-semibold">Approvals</h1>
-        <p className="mt-100 text-300 text-muted-foreground">
-          The change requests waiting for you at each stage, and the ones you raised. Open a request to see its checks and history, or select
-          several and approve them together.
-        </p>
       </header>
 
       <section aria-label="Requests" className={card}>
@@ -269,7 +265,7 @@ function Filters({
   onChange: (next: QueueCriteria) => void;
 }) {
   const choose = (label: string, value: string, kind: string, apply: (v: string) => QueueCriteria, none: string) => (
-    <label className="flex flex-col gap-50 text-200 font-medium text-muted-foreground">
+    <label className="flex flex-col gap-100 text-200 font-medium text-muted-foreground">
       {label}
       <select className={selectClass} value={value} onChange={(event) => onChange(apply(event.target.value))}>
         <option value="">{none}</option>
@@ -289,7 +285,7 @@ function Filters({
         {choose('Field', criteria.fieldCode, 'FIELD', (v) => ({ ...criteria, fieldCode: v }), 'All fields')}
         {choose('Rule', criteria.ruleId, 'RULE', (v) => ({ ...criteria, ruleId: v }), 'All rules')}
         <label className="flex flex-col gap-100 text-200 font-medium text-muted-foreground">
-          Age
+          Pending Since
           <select
             className={selectClass}
             value={criteria.minAgeHours}
@@ -304,10 +300,10 @@ function Filters({
             ))}
           </select>
         </label>
-        <label className="flex items-center gap-200 text-300">
+        {/* <label className="flex items-center gap-200 text-300">
           <input type="checkbox" checked={criteria.noteOnly} onChange={(event) => onChange({ ...criteria, noteOnly: event.target.checked })} />
           Has a note (TBD)
-        </label>
+        </label> */}
         {hasFilters(criteria) ? (
           <button type="button" className={`${button.small} w-full`} onClick={() => onChange(withoutFilters(criteria))}>
             Clear filters
@@ -442,22 +438,22 @@ function Line({
         <a className="id-plate font-medium text-brand-foreground underline-offset-2 hover:underline" href={hrefFor(`/requests/${row.requestId}`)}>
           {row.requestRef}
         </a>
-        <div className="mt-100">
+        {/* <div className="mt-100">
           <span className={badge[status.tone]}>{status.label}</span>
-        </div>
+        </div> */}
       </td>
 
       <td className="px-200 py-300">
         {isFloc ? <span className="text-200 text-muted-foreground">Location request</span> : <Plate value={row.equipmentNumber} />}
-        {!isFloc && !isBlank(row.equipmentTagNumber) ? <div className="mt-100 text-200 text-muted-foreground">{row.equipmentTagNumber}</div> : null}
+        {/* {!isFloc && !isBlank(row.equipmentTagNumber) ? <div className="mt-100 text-200 text-muted-foreground">{row.equipmentTagNumber}</div> : null}
         <div className="mt-100">
           <Plate value={row.functionalLocation} />
-        </div>
+        </div> */}
       </td>
 
       <td className="px-200 py-300">
         {orBlank(row.fieldLabel ?? row.fieldCode)}
-        {!isBlank(row.sapField) ? <div className="mt-100 text-200 text-muted-foreground">SAP: {row.sapField}</div> : null}
+        {/* {!isBlank(row.sapField) ? <div className="mt-100 text-200 text-muted-foreground">SAP: {row.sapField}</div> : null} */}
       </td>
 
       <td className="px-200 py-300">
@@ -474,31 +470,31 @@ function Line({
           <span className="mt-100 flex flex-wrap items-center gap-200">
             {note ? (
               note.tbd ? (
-                <span className={badge.warning} title="Marked to be decided (TBD)">
+                <span title="Marked to be decided (TBD)">
                   TBD
                 </span>
               ) : (
                 <span className="text-200 text-muted-foreground">Note: {note.text}</span>
               )
             ) : null}
-            {row.photoCount > 0 ? (
+            {/* {row.photoCount > 0 ? (
               <span className="inline-flex items-center gap-100 text-200 text-muted-foreground" title={`${row.photoCount} photo(s) attached`}>
                 <Camera aria-hidden="true" className="icon-size-200" />
                 {row.photoCount}
                 <span className="sr-only"> photo(s) attached</span>
               </span>
-            ) : null}
+            ) : null} */}
           </span>
         ) : null}
       </td>
 
       <td className="px-200 py-300">
         {source.label}
-        {source.by ? <div className="mt-100 break-all text-200 text-muted-foreground">by {source.by}</div> : null}
+        {/* {source.by ? <div className="mt-100 break-all text-200 text-muted-foreground">by {source.by}</div> : null} */}
       </td>
 
       <td className="whitespace-nowrap px-200 py-300 text-200">
-        <div className="text-muted-foreground">{time.label}</div>
+        {/* <div className="text-muted-foreground">{time.label}</div> */}
         <div>{formatUtc(time.iso)}</div>
         {age ? <div className="mt-100 text-muted-foreground">open {age}</div> : null}
       </td>

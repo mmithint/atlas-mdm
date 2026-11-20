@@ -85,10 +85,11 @@ udf.func(
     sortDirection: string,
     offset: number,
     pageSize: number,
+    filtersJson: string,
     ctx: RayfinContext<Record<string, any>, AudienceType.Sql>
   ): Promise<EquipmentSearchResult> =>
     runEquipmentSearch(
-      { mode, searchColumn, searchText, facility, sortColumn, sortDirection, offset, pageSize },
+      { mode, searchColumn, searchText, facility, sortColumn, sortDirection, offset, pageSize, filtersJson },
       await trustedAccessToken(ctx),
       () => ctx.Tokens.Sql
     ),

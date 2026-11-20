@@ -26,6 +26,7 @@ function choice(over: Partial<FieldChoice> = {}): FieldChoice {
     valuesFromList: false,
     current: 'SYNTHETIC MFR A',
     rawCurrent: 'SYNTHETIC MFR A',
+    baseline: null,
     responsibleRole: 'Operations-IOC',
     accountableRole: 'SAPBusinessSupport',
     unavailableReason: null,

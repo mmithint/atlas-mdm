@@ -40,31 +40,6 @@ export const SEARCH_SELECT = [
 
 export type SearchColumn = (typeof SEARCH_SELECT)[number];
 
-/** The text columns a person can search in (POC-APP-05). */
-export interface SearchField {
-  /** The value in the address (`?field=tag`). */
-  id: string;
-  label: string;
-  column: SearchColumn;
-}
-
-export const SEARCH_FIELDS: readonly SearchField[] = [
-  { id: 'tag', label: 'Engineering tag', column: 'equipmentTagNumber' },
-  { id: 'serial', label: 'Serial number', column: 'manufacturerSerialNumber' },
-  { id: 'equipment', label: 'Equipment number', column: 'equipmentNumber' },
-  { id: 'floc', label: 'Functional location (FLOC)', column: 'functionalLocation' },
-  { id: 'manufacturer', label: 'Manufacturer', column: 'manufacturer' },
-  { id: 'class', label: 'Equipment class', column: 'equipClass' },
-  { id: 'floc-class', label: 'FLOC class', column: 'flocClass' },
-  { id: 'profit-center', label: 'Profit centre', column: 'profitCenterName' },
-];
-
-export const DEFAULT_FIELD_ID = 'tag';
-
-export function fieldById(id: string | null | undefined): SearchField {
-  return SEARCH_FIELDS.find((f) => f.id === id) ?? SEARCH_FIELDS[0]!;
-}
-
 /** How a cell is drawn. */
 export type CellKind =
   | 'tag' // identifier plate that links to the heater (the tag, and the equipment number for heaters without a tag)
@@ -114,6 +89,29 @@ export const COLUMNS: readonly ColumnDef[] = [
 ];
 
 export const DEFAULT_COLUMNS: readonly SearchColumn[] = COLUMNS.filter((c) => c.defaultVisible).map((c) => c.column);
+
+/**
+ * The columns that get a filter box under their header (CR-1, 19 Nov): the text columns, not the
+ * counts, the percentage, the heat duty and the date. The procedure `app.usp_equipment_search` holds
+ * the same list (`@filter_cols`); a unit test (`search-model.spec.ts`) compares the two.
+ * In the order of `COLUMNS`, which is also the order filters take in the address.
+ */
+const TEXT_KINDS: readonly CellKind[] = ['tag', 'plate', 'facility', 'text'];
+export const FILTER_COLUMNS: readonly SearchColumn[] = COLUMNS.filter((c) => TEXT_KINDS.includes(c.kind)).map((c) => c.column);
+
+export const isFilterColumn = (value: string): value is SearchColumn => (FILTER_COLUMNS as readonly string[]).includes(value);
+
+/** The longest text a filter box takes: the function and the procedure refuse more. */
+export const MAX_FILTER_TEXT = 100;
+
+export const labelOf = (column: SearchColumn): string => COLUMNS.find((c) => c.column === column)?.label ?? column;
+
+/**
+ * The function `searchEquipment` still names ONE search column and ONE text (the closest-match mode,
+ * which the screen no longer uses). The screen sends this column with an empty text, and the boxes
+ * travel in `filtersJson`.
+ */
+export const UNUSED_SEARCH_COLUMN: SearchColumn = 'equipmentTagNumber';
 
 /** Rows per page offered on the screen. */
 export const PAGE_SIZES: readonly number[] = [25, 50, 100];

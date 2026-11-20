@@ -2,7 +2,7 @@ import { Check, CornerUpLeft, Undo2, X } from 'lucide-react';
 import { useId, useState, type ReactNode } from 'react';
 
 import { Modal } from '@/components/modal.component';
-import { button, card, input } from '@/components/ui';
+import { button, input } from '@/components/ui';
 import { errorText } from '@/lib/act-answer';
 
 import { decide, withdraw, type CheckRow, type DetailRow, type ReturnCandidate, type Viewer } from './request-api';
@@ -16,6 +16,13 @@ const COMMENT_MAX = 1000;
 
 const DESTRUCTIVE =
   'inline-flex items-center justify-center gap-200 rounded-md bg-destructive px-400 py-200 text-300 font-medium text-destructive-foreground transition-colors hover:bg-destructive/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50';
+
+/** Compact (small padding, no wrapping) versions of the shared buttons, so the whole panel fits one row. */
+const COMPACT_BASE =
+  'inline-flex items-center justify-center gap-100 whitespace-nowrap rounded-md px-300 py-100 text-200 font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50';
+const COMPACT_PRIMARY = `${COMPACT_BASE} bg-primary text-primary-foreground hover:bg-primary/90`;
+const COMPACT_SECONDARY = `${COMPACT_BASE} border border-border bg-card text-foreground hover:bg-accent`;
+const COMPACT_GHOST = `${COMPACT_BASE} text-foreground hover:bg-accent`;
 
 export interface DecisionPanelProps {
   request: DetailRow;
@@ -76,6 +83,10 @@ export function DecisionPanel({ request, viewer, checks, returnCandidates = [], 
   const defaultTarget = returnTarget(viewer);
   const picked = returnCandidates.find((c) => c.email === returnTo);
   const target = picked ? candidateText(picked) : defaultTarget;
+  const adminNote =
+    viewer.canDecide && viewer.decidedAs === 'ADMIN'
+      ? `You may decide this stage as an admin: you are not a member of ${stage === 'ACCOUNTABLE' ? request.accountableGroup : request.responsibleGroup}. The history will say so.`
+      : null;
   const required = action === 'REJECT' || action === 'RETURN';
   const trimmed = comment.trim();
 
@@ -104,16 +115,13 @@ export function DecisionPanel({ request, viewer, checks, returnCandidates = [], 
   };
 
   return (
-    <section aria-label="Decision" className={`${card} p-400`}>
-      <h2 className="text-400 font-semibold">Decision</h2>
-      <p className="mt-100 text-200 text-muted-foreground">
-        A decision applies to the submitted value, not to a different suggestion. Reject and Return need a comment.
-      </p>
-
-      <div className="mt-300 flex flex-wrap items-center gap-200">
+    // One compact row that sits beside the page header. The reasons a button is off are now tooltips (a `title` on
+    // the wrapper, since a disabled button shows none of its own) and stay in the page for screen readers (sr-only).
+    <section aria-label="Decision" title={adminNote ?? undefined} className="flex flex-nowrap items-center gap-100">
+      <span title={approveReason ?? undefined} className="inline-flex">
         <button
           type="button"
-          className={button.primary}
+          className={COMPACT_PRIMARY}
           disabled={approveReason !== null}
           aria-describedby={approveReason === null ? undefined : sameReason ? reasonId : approveReasonId}
           onClick={() => open('APPROVE')}
@@ -121,9 +129,11 @@ export function DecisionPanel({ request, viewer, checks, returnCandidates = [], 
           <Check aria-hidden="true" className="icon-size-200" />
           Approve
         </button>
+      </span>
+      <span title={rejectReason ?? undefined} className="inline-flex">
         <button
           type="button"
-          className={button.secondary}
+          className={COMPACT_SECONDARY}
           disabled={rejectReason !== null}
           aria-describedby={rejectReason === null ? undefined : reasonId}
           onClick={() => open('REJECT')}
@@ -131,9 +141,11 @@ export function DecisionPanel({ request, viewer, checks, returnCandidates = [], 
           <X aria-hidden="true" className="icon-size-200" />
           Reject
         </button>
+      </span>
+      <span title={rejectReason ?? undefined} className="inline-flex">
         <button
           type="button"
-          className={button.secondary}
+          className={COMPACT_SECONDARY}
           disabled={rejectReason !== null}
           aria-describedby={rejectReason === null ? undefined : reasonId}
           onClick={() => open('RETURN')}
@@ -141,35 +153,30 @@ export function DecisionPanel({ request, viewer, checks, returnCandidates = [], 
           <CornerUpLeft aria-hidden="true" className="icon-size-200" />
           Return for correction
         </button>
-        {viewer.canCancel ? (
-          <button type="button" className={`${button.ghost} ml-auto`} onClick={() => open('WITHDRAW')}>
-            <Undo2 aria-hidden="true" className="icon-size-200" />
-            Withdraw request
-          </button>
-        ) : null}
-      </div>
-
-      {viewer.canDecide && viewer.decidedAs === 'ADMIN' ? (
-        <p className="mt-200 text-300 text-muted-foreground">
-          You may decide this stage as an admin: you are not a member of{' '}
-          {stage === 'ACCOUNTABLE' ? request.accountableGroup : request.responsibleGroup}. The history will say so.
-        </p>
+      </span>
+      {viewer.canCancel ? (
+        <button type="button" className={COMPACT_GHOST} onClick={() => open('WITHDRAW')}>
+          <Undo2 aria-hidden="true" className="icon-size-200" />
+          Withdraw request
+        </button>
       ) : null}
 
+      {adminNote !== null ? <p className="sr-only">{adminNote}</p> : null}
+
       {sameReason ? (
-        <p id={reasonId} className="mt-200 text-300 text-muted-foreground">
-          <span className="font-medium text-foreground">Approve, Reject and Return are off:</span> {approveReason}
+        <p id={reasonId} className="sr-only">
+          <span className="font-medium">Approve, Reject and Return are off:</span> {approveReason}
         </p>
       ) : (
         <>
           {approveReason !== null ? (
-            <p id={approveReasonId} className="mt-200 text-300 text-muted-foreground">
-              <span className="font-medium text-foreground">Approve is off:</span> {approveReason}
+            <p id={approveReasonId} className="sr-only">
+              <span className="font-medium">Approve is off:</span> {approveReason}
             </p>
           ) : null}
           {rejectReason !== null ? (
-            <p id={reasonId} className="mt-200 text-300 text-muted-foreground">
-              <span className="font-medium text-foreground">Reject and Return are off:</span> {rejectReason}
+            <p id={reasonId} className="sr-only">
+              <span className="font-medium">Reject and Return are off:</span> {rejectReason}
             </p>
           ) : null}
         </>

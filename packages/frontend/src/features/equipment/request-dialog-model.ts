@@ -50,6 +50,8 @@ export interface FieldChoice {
   current: string | null;
   /** The value as gold holds it, sent to the server as "the value I saw". */
   rawCurrent: string | null;
+  /** The value in the SAP baseline, as shown; null when the view does not give one. */
+  baseline: string | null;
   responsibleRole: string | null;
   accountableRole: string | null;
   /** Why this person cannot request a change to the field, or null when they can. */
@@ -87,6 +89,7 @@ export function buildFieldChoices(
       valuesFromList: info?.allowedValuesSource === 'LIST',
       current: f.current,
       rawCurrent: rawByCode.get(f.fieldCode) ?? f.current,
+      baseline: f.baseline,
       responsibleRole: f.responsibleRole,
       accountableRole: f.accountableRole,
       unavailableReason: !f.isEditable ? NOT_EDITABLE : blockedReason !== undefined ? blockedReason.trim() || ADMIN_ONLY : null,

@@ -64,9 +64,8 @@ function Heater({ detail }: { detail: HeaterDetail }) {
     () => buildFieldRows(detail.catalog, detail.fieldValues, detail.ownership, heater),
     [detail.catalog, detail.fieldValues, detail.ownership, heater]
   );
-  const levels = flocLevels(floc);
+  const columns = useMemo(() => buildColumns(heater, flocLevels(floc), fields), [heater, floc, fields]);
   const title = heater.equipmentTagNumber || heater.equipmentNumber || `Heater ${heater.equipmentId}`;
-  const facility = heater.superiorFunctionalLocation;
 
   // What this person may request: the person (profile) and the form options, loaded once beside the page. A
   // failure here only switches the buttons off with the reason; it never breaks the page.
@@ -101,10 +100,10 @@ function Heater({ detail }: { detail: HeaterDetail }) {
   return (
     <>
       <header className="flex flex-wrap items-start justify-between gap-300">
-        <div className="min-w-0">
+        <div className="min-w-0 flex">
           <h1 className="break-words text-600 font-semibold">{title}</h1>
-          <p className="mt-100 text-300 text-muted-foreground">{orBlank(heater.equipmentDescription)}</p>
-          <p className="mt-200 flex flex-wrap items-center gap-200">
+          {/* <p className="mt-100 text-300 text-muted-foreground">{orBlank(heater.equipmentDescription)}</p> */}
+          <p className="ml-4 flex flex-wrap items-center gap-200">
             {heater.equipmentNumber ? <span className="id-plate">{heater.equipmentNumber}</span> : null}
             {heater.functionalLocation ? <span className="id-plate">{heater.functionalLocation}</span> : null}
           </p>
@@ -121,54 +120,14 @@ function Heater({ detail }: { detail: HeaterDetail }) {
         </button>
       </header>
 
-      <div className="grid gap-300 md:grid-cols-2 xl:grid-cols-4">
-        <SummaryCard title="Identity">
-          <Item label="Equipment number" plate={heater.equipmentNumber} />
-          <Item label="Engineering tag" plate={heater.equipmentTagNumber} />
-          <Item label="Serial number" plate={heater.manufacturerSerialNumber} />
-          <Item label="Description" value={heater.equipmentDescription} />
-        </SummaryCard>
-
-        <SummaryCard title="Location">
-          <Item label="Functional location (FLOC)" plate={heater.functionalLocation} />
-          <Item label="FLOC description" value={heater.flocDescription} />
-          <Item label="Facility (parent FLOC)">
-            {facility ? (
-              <a className="id-plate text-brand-foreground underline-offset-2 hover:underline" href={hrefFor('/equipment', { facility })} title="List every heater at this facility">
-                {facility}
-              </a>
-            ) : (
-              BLANK
-            )}
-          </Item>
-          {levels.length > 0 ? (
-            <Item label="Hierarchy, top level first">
-              <span className="break-words text-200 text-muted-foreground">{levels.join('  ›  ')}</span>
-            </Item>
-          ) : null}
-        </SummaryCard>
-
-        <SummaryCard title="Classification">
-          <Item label="Equipment class" value={heater.equipClass} />
-          <Item label="Class type" value={heater.classType} />
-          <Item label="Object type" value={heater.objectType} />
-          <Item label="FLOC class" value={heater.flocClass} />
-          <Item label="Technical object type" value={heater.techObjectType} />
-        </SummaryCard>
-
-        <SummaryCard title="Business">
-          <Item label="Profit centre" value={heater.profitCenterName} />
-          <Item label="Planner group" value={heater.plannerGroup} />
-          <Item label="Equipment status" value={heater.equipmentUserStatus} />
-          <Item label="FLOC status" value={heater.flocUserStatus} />
-        </SummaryCard>
-      </div>
-
-      <FieldsTable
-        fields={fields}
+      <FieldsTables
+        columns={columns}
         requestBlock={(code) => blockReason ?? choiceByCode.get(code)?.unavailableReason ?? null}
         onRequest={(code) => setDialog({ fieldCode: code })}
       />
+      {fields.length === 0 ? (
+        <EmptyState title="No catalogue fields to show" hint="The field catalogue is empty. Run the seed 0106 (field catalogue) in the database." />
+      ) : null}
 
       <p className="text-200 text-muted-foreground">
         Golden record version {orBlank(heater.goldenVersionId)}. Last approved change:{' '}
@@ -203,147 +162,168 @@ function Heater({ detail }: { detail: HeaterDetail }) {
   );
 }
 
-function SummaryCard({ title, children }: { title: string; children: ReactNode }) {
+/** One line of a table: a label and what to show as its value. */
+interface DetailRow {
+  label: string;
+  value: ReactNode;
+  /** Set for a catalogue field, which can be changed by request. The heater's own columns are read-only. */
+  fieldCode?: string;
+}
+
+interface DetailGroup {
+  title: string;
+  rows: DetailRow[];
+}
+
+const plate = (value: string | null | undefined): ReactNode => (value ? <span className="id-plate">{value}</span> : BLANK);
+
+function summaryGroups(heater: HeaterDetail['heater'], levels: readonly string[]) {
+  const facility = heater.superiorFunctionalLocation;
+  const identity: DetailGroup = {
+    title: 'Identity',
+    rows: [
+      { label: 'Equipment number', value: plate(heater.equipmentNumber) },
+      { label: 'Engineering tag', value: plate(heater.equipmentTagNumber) },
+      { label: 'Serial number', value: plate(heater.manufacturerSerialNumber) },
+      { label: 'Description', value: orBlank(heater.equipmentDescription) },
+    ],
+  };
+  const location: DetailGroup = {
+    title: 'Location',
+    rows: [
+      { label: 'Functional location (FLOC)', value: plate(heater.functionalLocation) },
+      { label: 'FLOC description', value: orBlank(heater.flocDescription) },
+      {
+        label: 'Facility (parent FLOC)',
+        value: facility ? (
+          <a className="id-plate text-brand-foreground underline-offset-2 hover:underline" href={hrefFor('/equipment', { facility })} title="List every heater at this facility">
+            {facility}
+          </a>
+        ) : (
+          BLANK
+        ),
+      },
+      ...(levels.length > 0
+        ? [{ label: 'Hierarchy, top level first', value: <span className="text-200 text-muted-foreground">{levels.join('  ›  ')}</span> }]
+        : []),
+    ],
+  };
+  const classification: DetailGroup = {
+    title: 'Classification',
+    rows: [
+      { label: 'Equipment class', value: orBlank(heater.equipClass) },
+      { label: 'Class type', value: orBlank(heater.classType) },
+      { label: 'Object type', value: orBlank(heater.objectType) },
+      { label: 'FLOC class', value: orBlank(heater.flocClass) },
+      { label: 'Technical object type', value: orBlank(heater.techObjectType) },
+    ],
+  };
+  const business: DetailGroup = {
+    title: 'Business',
+    rows: [
+      { label: 'Profit centre', value: orBlank(heater.profitCenterName) },
+      { label: 'Planner group', value: orBlank(heater.plannerGroup) },
+      { label: 'Equipment status', value: orBlank(heater.equipmentUserStatus) },
+      { label: 'FLOC status', value: orBlank(heater.flocUserStatus) },
+    ],
+  };
+  return { identity, location, classification, business };
+}
+
+function catalogueGroup(title: string, fields: readonly FieldRow[]): DetailGroup {
+  return {
+    title,
+    rows: fields.map((f) => ({
+      label: f.label,
+      fieldCode: f.fieldCode,
+      value: plate(f.current && f.unit ? `${f.current} ${f.unit}` : f.current),
+    })),
+  };
+}
+
+/** The two tables shown side by side, each a list of groups. Groups without rows are left out. */
+function buildColumns(heater: HeaterDetail['heater'], levels: readonly string[], fields: readonly FieldRow[]): DetailGroup[][] {
+  const { identity, location, classification, business } = summaryGroups(heater, levels);
+  const keyFields = catalogueGroup('Key fields', fields.filter((f) => f.group === 'KEY'));
+  const additionalDetails = catalogueGroup('Additional details', fields.filter((f) => f.group === 'ADDITIONAL'));
+  return [
+    [identity, location, keyFields],
+    [classification, business, additionalDetails],
+  ].map((groups) => groups.filter((g) => g.rows.length > 0));
+}
+
+interface RequestControls {
+  /** Why a change to this field cannot be requested right now (the button's title), or null when it can. */
+  requestBlock: (fieldCode: string) => string | null;
+  onRequest: (fieldCode: string) => void;
+}
+
+function FieldsTables({ columns, ...request }: { columns: readonly (readonly DetailGroup[])[] } & RequestControls) {
   return (
-    <section className={`${card} p-400`} aria-label={title}>
-      <h2 className="text-200 font-semibold uppercase tracking-wide text-muted-foreground">{title}</h2>
-      <dl className="mt-300 space-y-300">{children}</dl>
+    <section aria-labelledby="fields-title" className="space-y-300">
+      <h2 id="fields-title" className="text-400 font-semibold">
+        Fields
+      </h2>
+      <div className="grid items-start gap-300 md:grid-cols-2">
+        {columns.map((groups) => (
+          <FieldsTable key={groups.map((g) => g.title).join()} groups={groups} {...request} />
+        ))}
+      </div>
     </section>
   );
 }
 
-function Item({
-  label,
-  value,
-  plate,
-  children,
-}: {
-  label: string;
-  value?: string | null;
-  plate?: string | null;
-  children?: ReactNode;
-}) {
-  let body: ReactNode;
-  if (children !== undefined) body = children;
-  else if (plate !== undefined) body = plate ? <span className="id-plate">{plate}</span> : BLANK;
-  else body = orBlank(value);
+function FieldsTable({ groups, ...request }: { groups: readonly DetailGroup[] } & RequestControls) {
   return (
-    <div>
-      <dt className="text-200 text-muted-foreground">{label}</dt>
-      <dd className="mt-100 break-words text-300">{body}</dd>
+    <div className={`${card} overflow-hidden`}>
+      <table className="w-full border-collapse text-300">
+        <caption className="sr-only">{groups.map((g) => g.title).join(', ')}</caption>
+        <thead>
+          <tr className="bg-muted text-left text-200 uppercase tracking-wide text-muted-foreground">
+            <th scope="col" className="px-400 py-200 font-semibold">Field</th>
+            <th scope="col" className="px-400 py-200 font-semibold">Current value</th>
+          </tr>
+        </thead>
+        {groups.map((g) => (
+          <tbody key={g.title}>
+            <tr>
+              <th scope="rowgroup" colSpan={2} className="bg-accent px-400 py-100 text-left text-200 font-semibold text-accent-foreground">
+                {g.title}
+              </th>
+            </tr>
+            {g.rows.map((row) => (
+              <FieldLine key={row.fieldCode ?? row.label} row={row} {...request} />
+            ))}
+          </tbody>
+        ))}
+      </table>
     </div>
   );
 }
 
-const SOURCE_BADGE: Record<string, { text: string; className: string }> = {
-  STATED: { text: 'stated', className: badge.neutral },
-  ASSUMED: { text: 'assumed', className: badge.warning },
-  MISSING: { text: 'missing', className: badge.warning },
-  FIELD_VERIFIED: { text: 'field verified', className: badge.success },
-  CORRECTED: { text: 'corrected', className: badge.info },
-};
-
-function FieldsTable({
-  fields,
-  requestBlock,
-  onRequest,
-}: {
-  fields: readonly FieldRow[];
-  /** Why a change to this field cannot be requested right now (the button's title), or null when it can. */
-  requestBlock: (fieldCode: string) => string | null;
-  onRequest: (fieldCode: string) => void;
-}) {
-  if (fields.length === 0) {
-    return <EmptyState title="No fields to show" hint="The field catalogue is empty. Run the seed 0106 (field catalogue) in the database." />;
-  }
-  const groups: { title: string; rows: FieldRow[] }[] = [
-    { title: 'Key fields', rows: fields.filter((f) => f.group === 'KEY') },
-    { title: 'Additional details', rows: fields.filter((f) => f.group === 'ADDITIONAL') },
-  ];
-  return (
-    <section aria-labelledby="fields-title" className={card}>
-      <div className="border-b border-border px-400 py-300">
-        <h2 id="fields-title" className="text-400 font-semibold">
-          Fields
-        </h2>
-        <p className="mt-100 text-200 text-muted-foreground">
-          The golden value of each field, the value in the SAP baseline, and who answers first and signs off second when someone proposes a change.
-        </p>
-      </div>
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-max border-collapse text-300">
-          <caption className="sr-only">All fields of this heater</caption>
-          <thead>
-            <tr className="bg-muted text-left text-200 uppercase tracking-wide text-muted-foreground">
-              <th scope="col" className="px-400 py-200 font-semibold">Field</th>
-              <th scope="col" className="px-400 py-200 font-semibold">Current value</th>
-              <th scope="col" className="px-400 py-200 font-semibold">SAP baseline</th>
-              <th scope="col" className="px-400 py-200 font-semibold">Answers first, signs off second</th>
-              <th scope="col" className="px-400 py-200 font-semibold">
-                <span className="sr-only">Actions</span>
-              </th>
-            </tr>
-          </thead>
-          {groups
-            .filter((g) => g.rows.length > 0)
-            .map((g) => (
-              <tbody key={g.title}>
-                <tr>
-                  <th scope="rowgroup" colSpan={5} className="bg-accent px-400 py-100 text-left text-200 font-semibold text-accent-foreground">
-                    {g.title}
-                  </th>
-                </tr>
-                {g.rows.map((f) => (
-                  <FieldLine key={f.fieldCode} field={f} blockedBecause={requestBlock(f.fieldCode)} onRequest={() => onRequest(f.fieldCode)} />
-                ))}
-              </tbody>
-            ))}
-        </table>
-      </div>
-    </section>
-  );
-}
-
-function FieldLine({ field, blockedBecause, onRequest }: { field: FieldRow; blockedBecause: string | null; onRequest: () => void }) {
-  const source = field.valueSource ? (SOURCE_BADGE[field.valueSource] ?? { text: field.valueSource.toLowerCase(), className: badge.neutral }) : null;
-  const unit = field.unit && field.current ? ` ${field.unit}` : '';
+function FieldLine({ row, requestBlock, onRequest }: { row: DetailRow } & RequestControls) {
+  const { fieldCode } = row;
   return (
     <tr className="border-t border-border align-top">
       <th scope="row" className="px-400 py-300 text-left font-medium">
-        {field.label}
-        {field.isKeyVerificationField ? <span className="ml-200 text-200 font-normal text-muted-foreground">counts toward verification</span> : null}
+        {row.label}
       </th>
       <td className="px-400 py-300">
-        <span className="flex flex-wrap items-center gap-200">
-          <span className={field.current ? 'id-plate' : 'text-muted-foreground'}>{field.current ? `${field.current}${unit}` : BLANK}</span>
-          {source ? <span className={source.className}>{source.text}</span> : null}
-          {field.changedFromBaseline ? <span className={badge.info}>changed</span> : null}
-        </span>
-      </td>
-      <td className="px-400 py-300 text-muted-foreground">{field.baseline ? `${field.baseline}${field.unit ? ` ${field.unit}` : ''}` : BLANK}</td>
-      <td className="px-400 py-300">
-        {field.responsibleRole && field.accountableRole ? (
-          <span>
-            {field.responsibleRole} <span aria-hidden="true">→</span>
-            <span className="sr-only"> then </span> {field.accountableRole}
-          </span>
-        ) : (
-          <span className={badge.warning} title="No approval route matches this field. An admin sees it on the route check.">
-            no route
-          </span>
-        )}
-      </td>
-      <td className="px-400 py-300 text-right">
-        <button
-          type="button"
-          className={button.small}
-          disabled={blockedBecause !== null}
-          aria-label={`Request a change to ${field.label}`}
-          title={blockedBecause ?? `Request a change to ${field.label}`}
-          onClick={onRequest}
-        >
-          <Pencil aria-hidden="true" className="icon-size-100" />
-        </button>
+        <div className="flex items-start justify-between gap-200">
+          <span className="min-w-0 break-words">{row.value}</span>
+          {fieldCode !== undefined ? (
+            <button
+              type="button"
+              className={button.small}
+              disabled={requestBlock(fieldCode) !== null}
+              aria-label={`Request a change to ${row.label}`}
+              title={requestBlock(fieldCode) ?? `Request a change to ${row.label}`}
+              onClick={() => onRequest(fieldCode)}
+            >
+              <Pencil aria-hidden="true" className="icon-size-100" />
+            </button>
+          ) : null}
+        </div>
       </td>
     </tr>
   );

@@ -101,30 +101,39 @@ function Loaded({ initial, requestId }: { initial: RequestView; requestId: numbe
         <ErrorState title="The request could not be refreshed" message={reloadError} onRetry={() => void reload()} />
       ) : null}
 
-      <header className="space-y-200">
-        <p className="flex flex-wrap items-center gap-200">
-          <span className="id-plate">{request.requestRef}</span>
-          <StatusBadge status={request.requestStatus} />
-          {request.approvalStage ? <span className="text-200 text-muted-foreground">{stageLabel(request.approvalStage)}</span> : null}
-          {age !== null ? <span className="text-200 text-muted-foreground">open for {age}</span> : null}
-        </p>
-        <h1 className="break-words text-600 font-semibold">{requestTitle(request)}</h1>
-        <p className="flex flex-wrap items-center gap-200">
-          {request.equipmentNumber ? <span className="id-plate" title="Equipment number">{request.equipmentNumber}</span> : null}
-          {request.equipmentTagNumber ? <span className="id-plate" title="Engineering tag">{request.equipmentTagNumber}</span> : null}
-          {request.functionalLocation ? <span className="id-plate" title="Functional location">{request.functionalLocation}</span> : null}
-          {request.sapField ? <span className="id-plate" title="SAP field this changes">{request.sapField}</span> : null}
-        </p>
-        {request.equipmentId !== null ? (
-          <p>
-            <a className="text-300 font-medium text-brand-foreground underline-offset-2 hover:underline" href={hrefFor(`/equipment/${request.equipmentId}`)}>
-              Open the heater
-            </a>
-          </p>
-        ) : null}
-      </header>
+      {/* The decision buttons sit on the same row as the header; they wrap below it only on a narrow screen. */}
+      <div className="flex flex-wrap items-start justify-between gap-300">
+        <header className="min-w-0 flex-1 space-y-200">
+          <h1 className="break-words text-600 font-semibold">{requestTitle(request)}</h1>
+          <p className="flex flex-wrap items-center gap-200">
+            <span className="id-plate">{request.requestRef}</span>
 
-      <DecisionPanel request={request} viewer={view.viewer} checks={checks} returnCandidates={view.returnCandidates} onDone={onDone} />
+            {request.equipmentNumber ? (
+              request.equipmentId !== null ? (
+                <a
+                  className="id-plate underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  href={hrefFor(`/equipment/${request.equipmentId}`)}
+                  title="Open the heater"
+                >
+                  {request.equipmentNumber}
+                </a>
+              ) : (
+                <span className="id-plate" title="Equipment number">{request.equipmentNumber}</span>
+              )
+            ) : null}
+            {request.equipmentTagNumber ? <span className="id-plate" title="Engineering tag">{request.equipmentTagNumber}</span> : null}
+            {request.functionalLocation ? <span className="id-plate" title="Functional location">{request.functionalLocation}</span> : null}
+            {/* {request.sapField ? <span className="id-plate" title="SAP field this changes">{request.sapField}</span> : null} */}
+            {/* <p className="flex flex-wrap items-center gap-200"> */}
+            {/* <StatusBadge status={request.requestStatus} /> */}
+            {request.approvalStage ? <span className="text-200 text-muted-foreground">{stageLabel(request.approvalStage)}</span> : null}
+            {age !== null ? <span className="text-200 text-muted-foreground">open for {age}</span> : null}
+            {/* </p> */}
+          </p>
+        </header>
+
+        <DecisionPanel request={request} viewer={view.viewer} checks={checks} returnCandidates={view.returnCandidates} onDone={onDone} />
+      </div>
 
       <RequestTabs view={view} checks={checks} onRecheck={onRecheck} />
     </>

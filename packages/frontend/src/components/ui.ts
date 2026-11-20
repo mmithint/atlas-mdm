@@ -19,6 +19,10 @@ export const button = {
 export const input =
   'w-full rounded-md border border-input bg-card px-300 py-200 text-300 text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50';
 
+/** A compact input for a filter box under a table header (written out, not `input` plus overrides: the classes would clash). */
+export const inputCompact =
+  'w-full min-w-28 rounded-md border border-input bg-card px-200 py-100 text-200 text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50';
+
 /** A small coloured label. `warning` = needs a person, `success` = done, `info` = FYI. */
 export const badge = {
   neutral: 'inline-flex items-center rounded-sm bg-muted px-200 py-100 text-200 font-medium text-muted-foreground',

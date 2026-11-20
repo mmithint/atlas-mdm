@@ -22,7 +22,7 @@ vi.mock('@/lib/rayfin-client', () => ({
   }),
 }));
 
-import { fetchBestMatches, fetchHeater, fetchSortedPage } from './equipment-api';
+import { fetchHeater, fetchSortedPage, filtersJsonOf } from './equipment-api';
 import { criteriaFromQuery } from './search-model';
 import { heaterDetail, searchRow } from './test-fixtures';
 
@@ -39,32 +39,33 @@ beforeEach(() => {
 });
 
 describe('fetchSortedPage', () => {
-  it('asks the function for one page in the chosen order, from the start', async () => {
+  it('asks the function for one page in the chosen order, from the start, with the boxes as one JSON text', async () => {
     searchInvoke.mockResolvedValue({ rows: [searchRow(1)], totalMatches: 1, hasMore: false, truncated: false, timing: TIMING, error: null });
-    await fetchSortedPage(criteria('field=serial&q=SYN&facility=AREA-01&sort=manufacturer&dir=desc&size=25'), null);
+    await fetchSortedPage(criteria('f.manufacturer=heat&f.equipClass=fired&facility=AREA-01&sort=manufacturer&dir=desc&size=25'), null);
     expect(searchInvoke).toHaveBeenCalledWith({
       mode: 'SORTED',
-      searchColumn: 'manufacturerSerialNumber',
-      searchText: 'SYN',
+      searchColumn: 'equipmentTagNumber', // the older single column and text: not used by the screen, an empty text
+      searchText: '',
       facility: 'AREA-01',
       sortColumn: 'manufacturer',
       sortDirection: 'desc',
       offset: 0,
       pageSize: 25,
+      filtersJson: '[{"column":"manufacturer","text":"heat"},{"column":"equipClass","text":"fired"}]', // in the order of the columns, not of the address
     });
   });
 
   it('orders by equipment number when no sort is chosen', async () => {
     searchInvoke.mockResolvedValue({ rows: [], totalMatches: 0, hasMore: false, truncated: false, timing: TIMING, error: null });
     await fetchSortedPage(criteria(''), null);
-    expect(searchInvoke.mock.calls[0]?.[0]).toMatchObject({ sortColumn: 'equipmentNumber', sortDirection: 'asc', searchColumn: 'equipmentTagNumber' });
+    expect(searchInvoke.mock.calls[0]?.[0]).toMatchObject({ sortColumn: 'equipmentNumber', sortDirection: 'asc', searchColumn: 'equipmentTagNumber', filtersJson: '' });
   });
 
   it('turns "more pages" into a cursor that is the next row offset, and the last page into no cursor', async () => {
     const rows = [searchRow(1), searchRow(2), searchRow(3)];
     searchInvoke.mockResolvedValueOnce({ rows, totalMatches: 9, hasMore: true, truncated: false, timing: TIMING, error: null });
     const first = await fetchSortedPage(criteria('size=25'), null);
-    expect(first).toEqual({ rows, hasNext: true, endCursor: '3' });
+    expect(first).toEqual({ rows, hasNext: true, endCursor: '3', total: 9 });
 
     searchInvoke.mockResolvedValueOnce({ rows, totalMatches: 9, hasMore: true, truncated: false, timing: TIMING, error: null });
     const second = await fetchSortedPage(criteria('size=25'), first.endCursor);
@@ -92,27 +93,16 @@ describe('fetchSortedPage', () => {
   it('turns the function\'s own `error` text back into an exception', async () => {
     searchInvoke.mockResolvedValue({ rows: [], totalMatches: 0, hasMore: false, truncated: false, timing: TIMING, error: 'Could not read the equipment (229): permission denied.' });
     await expect(fetchSortedPage(criteria(''), null)).rejects.toThrow(/229.*permission denied/);
-    await expect(fetchBestMatches(criteria('q=SYN'))).rejects.toThrow(/229/);
   });
 });
 
-describe('fetchBestMatches', () => {
-  it('makes one closest-match call and passes the rows and the truncation flag on', async () => {
-    const rows = [searchRow(4), searchRow(5)];
-    searchInvoke.mockResolvedValue({ rows, totalMatches: 2, hasMore: false, truncated: true, timing: TIMING, error: null });
-    const result = await fetchBestMatches(criteria('q=SYN-TAG-0004&facility=AREA-02'));
-    expect(searchInvoke).toHaveBeenCalledTimes(1);
-    expect(searchInvoke).toHaveBeenCalledWith({
-      mode: 'MATCH',
-      searchColumn: 'equipmentTagNumber',
-      searchText: 'SYN-TAG-0004',
-      facility: 'AREA-02',
-      sortColumn: 'equipmentNumber',
-      sortDirection: 'asc',
-      offset: 0,
-      pageSize: 100,
-    });
-    expect(result).toEqual({ rows, truncated: true });
+describe('filtersJsonOf', () => {
+  it('is empty text when no box holds text, and a JSON list of column and text otherwise', () => {
+    expect(filtersJsonOf([])).toBe('');
+    // quotes and backslashes survive the round trip (the procedure reads this text with OPENJSON)
+    const text = 'A "B" \\ C';
+    expect(filtersJsonOf([{ column: 'manufacturer', text }])).toBe('[{"column":"manufacturer","text":"A \\"B\\" \\\\ C"}]');
+    expect(JSON.parse(filtersJsonOf([{ column: 'manufacturer', text }]))).toEqual([{ column: 'manufacturer', text }]);
   });
 });
 

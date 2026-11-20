@@ -43,7 +43,7 @@ const TABS: readonly { id: TabId; label: string }[] = [
   { id: 'request', label: 'Request & related' },
   { id: 'equipment', label: 'Equipment & FLOC' },
   { id: 'evidence', label: 'Evidence' },
-  { id: 'audit', label: 'Audit & routing' },
+  // { id: 'audit', label: 'Audit & routing' },
 ];
 
 export interface RequestTabsProps {
@@ -92,9 +92,8 @@ export function RequestTabs({ view, checks, onRecheck }: RequestTabsProps) {
               tabIndex={selected ? 0 : -1}
               onClick={() => setActive(tab.id)}
               onKeyDown={(event) => onKeyDown(event, index)}
-              className={`-mb-px rounded-t-md border-b-2 px-400 py-200 text-300 font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-                selected ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'
-              }`}
+              className={`-mb-px rounded-t-md border-b-2 px-400 py-200 text-300 font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${selected ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'
+                }`}
             >
               {tab.label}
             </button>
@@ -105,7 +104,7 @@ export function RequestTabs({ view, checks, onRecheck }: RequestTabsProps) {
         {active === 'request' ? <RequestPanel view={view} /> : null}
         {active === 'equipment' ? <EquipmentPanel view={view} checks={checks} onRecheck={onRecheck} /> : null}
         {active === 'evidence' ? <EvidencePanel view={view} /> : null}
-        {active === 'audit' ? <AuditPanel view={view} /> : null}
+        {/* {active === 'audit' ? <AuditPanel view={view} /> : null} */}
       </div>
     </section>
   );
@@ -161,13 +160,13 @@ function RequestPanel({ view }: { view: RequestView }) {
 
   return (
     <div className="space-y-400">
-      <Section title="What is proposed">
+      <Section title="Proposed Changes">
         <div className="flex flex-wrap items-center gap-400">
           <ValueBox label="Value the requester saw" value={valueText(request.oldValue, unit)} />
           <ArrowRight aria-hidden="true" className="icon-size-300 text-muted-foreground" />
           <ValueBox label="Proposed value" value={valueText(request.newValue, unit)} />
         </div>
-        <dl className="mt-400 grid gap-300 md:grid-cols-2">
+        <dl className="mt-400 grid gap-300 md:grid-cols-4">
           <Item label="Field">
             {orBlank(request.fieldLabel ?? request.fieldCode)}
             {request.sapField ? (
@@ -180,9 +179,10 @@ function RequestPanel({ view }: { view: RequestView }) {
             ) : null}
           </Item>
           <Item label="Reason">{orBlank(request.reason)}</Item>
-          <Item label="Note">{request.note ? <span className={badge.warning}>{request.note}</span> : BLANK}</Item>
+          <Item label="Note">{request.note ? <span>{request.note}</span> : BLANK}</Item>
           <Item label="Raised by">
-            {request.sourceLabel} <span className="text-muted-foreground">by {actorText(request.requestedBy)}</span>
+            {/* {request.sourceLabel} */}
+            <span className="text-muted-foreground">by {actorText(request.requestedBy)}</span>
           </Item>
           <Item label="Submitted">{formatUtc(request.requestedAtUtc)}</Item>
           <Item label="Detected by a rule">{request.detectedAtUtc ? formatUtc(request.detectedAtUtc) : 'Not from a rule'}</Item>
@@ -191,7 +191,7 @@ function RequestPanel({ view }: { view: RequestView }) {
         </dl>
       </Section>
 
-      <Section title="Evidence snapshot" hint="What the requester or the rule had in front of them when the request was created.">
+      {/* <Section title="Evidence snapshot" hint="What the requester or the rule had in front of them when the request was created.">
         {evidenceError !== null ? (
           <p className="text-300 text-muted-foreground">
             The evidence snapshot could not be read ({evidenceError}). The rest of this page is not affected.
@@ -235,7 +235,7 @@ function RequestPanel({ view }: { view: RequestView }) {
             )}
           </div>
         ) : null}
-      </Section>
+      </Section> */}
 
       <RelatedTable rows={related} />
     </div>
@@ -244,7 +244,7 @@ function RequestPanel({ view }: { view: RequestView }) {
 
 function RelatedTable({ rows }: { rows: readonly RelatedRow[] }) {
   return (
-    <Section title="Related requests" hint="Other requests on this heater, or at its functional location, open and closed.">
+    <Section title="Related requests">
       {rows.length === 0 ? (
         <p className="text-300 text-muted-foreground">No other request on this heater or location.</p>
       ) : (
@@ -305,11 +305,11 @@ function EquipmentPanel({ view, checks, onRecheck }: { view: RequestView; checks
 
   return (
     <div className="space-y-400">
-      <Section title={isFloc ? 'Functional location in the golden record now' : 'Heater in the golden record now'}>
+      <Section title={isFloc ? 'Functional location in the golden record now' : 'Gold Layer'}>
         {gold === null ? (
           <p className="text-300 text-muted-foreground">The heater or location is no longer in the golden record.</p>
         ) : (
-          <dl className="grid gap-300 md:grid-cols-2 xl:grid-cols-3">
+          <dl className="grid gap-300 md:grid-cols-2 xl:grid-cols-4">
             <Item label="Equipment number"><Plate value={gold.equipmentNumber} /></Item>
             <Item label="Engineering tag"><Plate value={gold.equipmentTagNumber} /></Item>
             <Item label="Description">{orBlank(gold.equipmentDescription)}</Item>
@@ -327,7 +327,7 @@ function EquipmentPanel({ view, checks, onRecheck }: { view: RequestView; checks
         )}
       </Section>
 
-      <Section title="The field being changed" hint="Blank means no value is held, not zero.">
+      {/* <Section title="The field being changed" hint="Blank means no value is held, not zero.">
         <div className="flex flex-wrap items-center gap-400">
           <ValueBox label="Value the requester saw" value={valueText(request.oldValue, unit)} />
           <ValueBox label="Value in the golden record now" value={valueText(gold?.fieldCurrentValue, unit)} />
@@ -344,7 +344,7 @@ function EquipmentPanel({ view, checks, onRecheck }: { view: RequestView; checks
             The request is closed, so the values are not compared: the golden record may have changed since.
           </p>
         ) : null}
-      </Section>
+      </Section> */}
 
       <ChecksTable checks={checks} onRecheck={onRecheck} />
     </div>
@@ -370,7 +370,7 @@ function ChecksTable({ checks, onRecheck }: { checks: readonly CheckRow[]; onRec
   };
 
   return (
-    <Section title="Approval checks" hint="Worked out live from the golden record. A failed check blocks approval; rejecting or returning stays possible.">
+    <Section title="Approval checks">
       <div className="flex flex-wrap items-center justify-between gap-300">
         <p className="text-300 text-muted-foreground">
           {summary.pass} passed, {summary.fail} failed, {summary.notChecked} not checked
@@ -431,10 +431,10 @@ function ChecksTable({ checks, onRecheck }: { checks: readonly CheckRow[]; onRec
 function EvidencePanel({ view }: { view: RequestView }) {
   const count = view.request.photoCount;
   return (
-    <Section title="Photos and drawings" hint="Photos from the field arrive in APP-7 and the P&ID drawings of the site in APP-9. This tab shows what is linked to the request so far.">
+    <Section title="Photos and drawings" hint="Photos from the field : APP-7. This tab shows what is linked to the request so far.">
       {count === 0 ? (
         <p className="flex flex-wrap items-center gap-200 text-300">
-          <span className={badge.warning}>Evidence missing</span>
+          {/* <span className={badge.warning}>Evidence missing</span> */}
           <span className="text-muted-foreground">No photo is attached to this request.</span>
         </p>
       ) : (
@@ -455,8 +455,8 @@ function AuditPanel({ view }: { view: RequestView }) {
 
   return (
     <div className="space-y-400">
-      <Section title="Routing" hint="Who answers first and who signs off second, and the route that chose them.">
-        <dl className="grid gap-300 md:grid-cols-2">
+      <Section title="Routing">
+        <dl className="grid gap-300 md:grid-cols-3">
           <Item label="Responsible group (first stage)">
             <span className="id-plate">{request.responsibleGroup}</span>
           </Item>

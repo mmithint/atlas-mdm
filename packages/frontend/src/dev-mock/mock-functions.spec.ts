@@ -17,7 +17,7 @@ describe('mock functions (npm run dev:mock)', () => {
   });
 
   it('search pages, filters and counts open requests', () => {
-    const base = { mode: 'sorted', searchColumn: '', searchText: '', facility: '', sortColumn: 'equipmentNumber', sortDirection: 'asc', offset: 0, pageSize: 25 };
+    const base = { mode: 'sorted', searchColumn: '', searchText: '', facility: '', sortColumn: 'equipmentNumber', sortDirection: 'asc', offset: 0, pageSize: 25, filtersJson: '' };
     const first = h.searchEquipment(base);
     expect(first.rows).toHaveLength(25);
     expect(first.totalMatches).toBe(60);
@@ -27,6 +27,25 @@ describe('mock functions (npm run dev:mock)', () => {
     const hit = h.searchEquipment({ ...base, mode: 'match', searchText: 'syn-eq-0007' });
     expect(hit.totalMatches).toBe(1);
     expect(hit.rows[0].equipmentNumber).toBe('SYN-EQ-0007');
+  });
+
+  it('search ANDs the column filters, ignores blank ones and anything unreadable (CR-1)', () => {
+    const base = { mode: 'SORTED', searchColumn: 'equipmentTagNumber', searchText: '', facility: '', sortColumn: 'equipmentNumber', sortDirection: 'asc', offset: 0, pageSize: 100 };
+    const filtered = (filters: unknown) => h.searchEquipment({ ...base, filtersJson: typeof filters === 'string' ? filters : JSON.stringify(filters) });
+    const all = filtered('').totalMatches;
+    expect(all).toBeGreaterThan(1);
+
+    const one = filtered([{ column: 'equipmentNumber', text: 'syn-eq-0007' }]);
+    expect(one.totalMatches).toBe(1);
+    expect(one.rows[0].equipmentNumber).toBe('SYN-EQ-0007');
+
+    // AND, not OR: a second box nothing satisfies empties the list
+    expect(filtered([{ column: 'equipmentNumber', text: 'SYN-EQ-0007' }, { column: 'manufacturer', text: 'ZZZ-NO-SUCH-MANUFACTURER' }]).totalMatches).toBe(0);
+
+    // blank boxes, an empty list, text that is not JSON and a JSON that is not a list change nothing
+    for (const nothing of [[{ column: 'manufacturer', text: '   ' }], [], '', 'not json', '{"column":"manufacturer","text":"x"}']) {
+      expect(filtered(nothing).totalMatches).toBe(all);
+    }
   });
 
   it('detail answers for a known heater and says not found for an unknown one', () => {

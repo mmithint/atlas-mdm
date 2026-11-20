@@ -17,6 +17,7 @@ const choice = (over: Partial<FieldChoice>): FieldChoice => ({
   valuesFromList: false,
   current: 'SYNTHETIC MFR A',
   rawCurrent: 'SYNTHETIC MFR A',
+  baseline: null,
   responsibleRole: 'Operations-IOC',
   accountableRole: 'SAPBusinessSupport',
   unavailableReason: null,
@@ -83,6 +84,19 @@ describe('Request dialog', () => {
     expect(within(dialog).getByText('2.5 MMBTU/hr')).toBeInTheDocument();
     expect(within(dialog).getByText(/Operations-IOC/)).toBeInTheDocument();
     expect(within(dialog).getByText(/SAPBusinessSupport/)).toBeInTheDocument();
+  });
+
+  it('shows the SAP baseline value of the chosen field, with its unit, when there is one', () => {
+    open({
+      initialFieldCode: 'HEAT_DUTY',
+      choices: CHOICES.map((c) => (c.fieldCode === 'HEAT_DUTY' ? { ...c, baseline: '2' } : c)),
+    });
+    expect(within(screen.getByRole('dialog')).getByText('SAP baseline').parentElement).toHaveTextContent('2 MMBTU/hr');
+  });
+
+  it('leaves the SAP baseline out when the field has none', () => {
+    open({ initialFieldCode: 'HEAT_DUTY' });
+    expect(screen.queryByText('SAP baseline')).toBeNull();
   });
 
   it('starts with no field when none was chosen, and offers only the fields the person may request', () => {

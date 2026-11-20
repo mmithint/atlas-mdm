@@ -34,16 +34,17 @@ describe('the page', () => {
     expect(screen.getByText('Waiting for responsible approval')).toBeInTheDocument();
     expect(screen.getByText('Responsible (first stage)')).toBeInTheDocument();
     expect(screen.getByText('open for 5 hours')).toBeInTheDocument();
-    expect(screen.getByTitle('Equipment number')).toHaveTextContent('SYN-EQ-0007');
+    // The equipment number is itself the link to the heater (there is no separate "Open the heater" button).
+    expect(screen.getByRole('link', { name: 'SYN-EQ-0007' })).toHaveAttribute('href', '#/equipment/7');
     expect(screen.getByTitle('Functional location')).toHaveTextContent('SYN-FL-0007');
     expect(screen.getByTitle('SAP field this changes')).toHaveTextContent('HERST');
     expect(screen.getByRole('link', { name: 'Approvals' })).toHaveAttribute('href', '#/approvals');
-    expect(screen.getByRole('link', { name: 'Open the heater' })).toHaveAttribute('href', '#/equipment/7');
+    expect(screen.queryByRole('button', { name: 'Open the heater' })).toBeNull();
   });
 
-  it('does not offer a heater link for a location request, and does not say a closed request is open', async () => {
+  it('does not link the equipment number for a location request, and does not say a closed request is open', async () => {
     await show(requestView({ request: detailRow({ entityType: 'FLOC', equipmentId: null, requestStatus: 'APPROVED', approvalStage: null }) }));
-    expect(screen.queryByRole('link', { name: 'Open the heater' })).toBeNull();
+    expect(screen.queryByRole('link', { name: 'SYN-EQ-0007' })).toBeNull();
     expect(screen.queryByText(/open for/)).toBeNull();
   });
 

@@ -66,27 +66,35 @@ describe('S-5 Equipment detail', () => {
     renderDetail();
     await screen.findByRole('heading', { level: 1 });
 
-    const table = screen.getByRole('table', { name: 'All fields of this heater' });
-    const groups = within(table).getAllByRole('rowgroup');
-    expect(within(groups[1]!).getByText('Key fields')).toBeInTheDocument();
-    expect(within(groups[2]!).getByText('Additional details')).toBeInTheDocument();
+    const left = screen.getByRole('table', { name: 'Identity, Location, Key fields' });
+    const right = screen.getByRole('table', { name: 'Classification, Business, Additional details' });
+    for (const title of ['Identity', 'Location', 'Key fields']) expect(within(left).getByText(title)).toBeInTheDocument();
+    for (const title of ['Classification', 'Business', 'Additional details']) expect(within(right).getByText(title)).toBeInTheDocument();
 
-    const duty = within(table).getByRole('row', { name: /Heat duty/ });
+    const duty = within(left).getByRole('row', { name: /Heat duty/ });
     expect(within(duty).getAllByText(/2\.5 MMBTU\/hr/).length).toBeGreaterThan(0);
     expect(within(duty).queryByText(/2\.5000/)).toBeNull();
-    // all four catalogue fields of the fixture are there
-    expect(within(table).getAllByRole('row').length).toBe(1 + 2 + 4); // header + two group rows + four fields
+    // all four catalogue fields of the fixture are in the tables, next to the heater's own columns
+    expect(within(left).getByRole('row', { name: /Manufacturer/ })).toBeInTheDocument();
+    expect(within(right).getByRole('button', { name: 'Request a change to FLOC class' })).toBeInTheDocument();
   });
 
-  it('shows who answers first and who signs off second next to a field, and "no route" when there is none', async () => {
+  it('shows only the field and its current value, with no baseline or approval-route columns', async () => {
     fetchHeater.mockResolvedValue(heaterDetail());
     renderDetail();
     await screen.findByRole('heading', { level: 1 });
-    const manufacturer = screen.getByRole('row', { name: /Manufacturer/ });
-    expect(within(manufacturer).getByText(/Operations-IOC/)).toBeInTheDocument();
-    expect(within(manufacturer).getByText(/SAPBusinessSupport/)).toBeInTheDocument();
-    const flocClass = screen.getByRole('row', { name: /FLOC class/ });
-    expect(within(flocClass).getByText('no route')).toBeInTheDocument();
+    for (const table of screen.getAllByRole('table')) {
+      expect(within(table).getAllByRole('columnheader').map((h) => h.textContent)).toEqual(['Field', 'Current value']);
+    }
+  });
+
+  it("shows the heater's own columns in the Identity, Location, Classification and Business groups", async () => {
+    fetchHeater.mockResolvedValue(heaterDetail());
+    renderDetail();
+    await screen.findByRole('heading', { level: 1 });
+    const identity = screen.getByRole('row', { name: /Equipment number/ });
+    expect(within(identity).getByText('SYN-EQ-0001')).toBeInTheDocument();
+    expect(within(identity).queryByRole('button')).toBeNull(); // read-only: no request button
   });
 
   it('shows the FLOC hierarchy and links the facility to the drill-down', async () => {
@@ -163,7 +171,8 @@ describe('S-5 Equipment detail', () => {
       fireEvent.click(rowButton('Heat duty (MMBTU/hr)'));
       const dialog = screen.getByRole('dialog');
       expect(within(dialog).getByLabelText('Field')).toHaveValue('HEAT_DUTY');
-      expect(within(dialog).getByText('2.5 MMBTU/hr')).toBeInTheDocument();
+      expect(within(dialog).getByText('Current value').parentElement).toHaveTextContent('2.5 MMBTU/hr');
+      expect(within(dialog).getByText('SAP baseline').parentElement).toHaveTextContent('2.5 MMBTU/hr');
     });
 
     it("keeps a blocked field's button off with the server's reason, and the others on", async () => {
@@ -214,7 +223,7 @@ describe('S-5 Equipment detail', () => {
       expect(await screen.findByRole('heading', { level: 1, name: 'SYN-TAG-0001' })).toBeInTheDocument();
       await waitFor(() => expect(header()).toHaveAttribute('title', expect.stringMatching(/options said no/)));
       expect(header()).toBeDisabled();
-      expect(screen.getByRole('table', { name: 'All fields of this heater' })).toBeInTheDocument();
+      expect(screen.getAllByRole('table')).toHaveLength(2);
     });
 
     it('waits while the options load, with a reason', async () => {

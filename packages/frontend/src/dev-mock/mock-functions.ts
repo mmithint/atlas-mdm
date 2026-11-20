@@ -153,6 +153,22 @@ function applyDecision(r: QueueRow, decision: string, comment: string, returnTo:
   return { previous, stage };
 }
 
+/** The column filters of a search (`filtersJson`, a JSON list of { column, text }) as the mock reads them; anything unreadable is no filter. */
+function mockFilters(filtersJson: unknown): { column: string; text: string }[] {
+  if (typeof filtersJson !== 'string' || filtersJson.trim() === '') return [];
+  try {
+    const parsed: unknown = JSON.parse(filtersJson);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.flatMap((item: unknown) => {
+      const e = (item ?? {}) as Record<string, unknown>;
+      const text = typeof e['text'] === 'string' ? e['text'].trim() : '';
+      return typeof e['column'] === 'string' && text !== '' ? [{ column: e['column'], text }] : [];
+    });
+  } catch {
+    return [];
+  }
+}
+
 /** Who the Return dialog offers (`app.fn_return_candidates`): the submitter, members of both groups, you. */
 function returnCandidatesFor(r: QueueRow) {
   const seen = new Set<string>();
@@ -180,6 +196,11 @@ export const mockHandlers: Handlers = {
         [h.equipmentNumber, h.equipmentDescription, h.functionalLocation, h.equipmentTagNumber, h.manufacturer, h.modelNumber, h.manufacturerSerialNumber]
           .some((v) => (v ?? '').toLowerCase().includes(text))
       );
+    }
+    // The boxes under the column headers (CR-1): every entry must contain its text, case-insensitive; a blank value never matches.
+    for (const f of mockFilters(input.filtersJson)) {
+      const column = f.column as keyof (typeof rows)[number];
+      rows = rows.filter((h) => String(h[column] ?? '').toLowerCase().includes(f.text.toLowerCase()));
     }
     const key = input.sortColumn as keyof (typeof rows)[number];
     if (key && rows.length > 0 && key in rows[0]) {

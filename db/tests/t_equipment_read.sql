@@ -35,6 +35,15 @@
          column that tries to inject SQL (errors 50011 to 50016)
      R12 usp_equipment_detail: first result set is the 26 contract columns, the procedure runs
          for a heater and for an unknown id, and its last set holds the field owners
+     R13 column filters (CR-1, 19 Nov), two filters: the rows are exactly those that satisfy both
+         (independent count), and it is AND, not OR (a second filter nothing satisfies empties the list)
+     R14 column filters: blank entries and an empty list change nothing; 20 filters are accepted;
+         a heater with a blank value never matches a filter on that column; % _ [ and \ are literal
+     R15 column filters together with the facility, with the older single text, and in MATCH mode
+     R16 column filter refusals: not JSON, not a list, missing column or text, a column off the
+         list (also one that carries SQL), a text over 100 characters, 21 filters (50017 to 50019)
+     R1 to R12 call the procedure without @filters_json (its default), so they also prove that the
+     old call shape still works.
    ===================================================================== */
 SET NOCOUNT ON;
 
@@ -494,6 +503,212 @@ BEGIN CATCH
     SET @fails += 1;
     PRINT 'FAIL R12 error ' + CAST(ERROR_NUMBER() AS varchar(12)) + ': ' + ERROR_MESSAGE();
 END CATCH;
+
+/* ---- R13 to R16: the column filters (CR-1) ---------------------------------------------------------
+   The same call with @filters_json. Expected values come from independent counts on the view that use
+   CHARINDEX (a literal "contains"; a blank value never matches), not from the procedure's own LIKE. */
+DECLARE @callF nvarchar(max), @pdefF nvarchar(max);
+SET @callF = REPLACE(@call, N'@page_size = @p_size,', N'@page_size = @p_size, @filters_json = @p_filters,');
+SET @pdefF = REPLACE(@pdef, N'@p_off int, @p_size int,', N'@p_off int, @p_size int, @p_filters nvarchar(4000),');
+
+DECLARE @fa nvarchar(100), @fb nvarchar(100), @ft nvarchar(100), @fJson nvarchar(4000);
+DECLARE @cA int, @cAB int, @allRows int, @k int, @kMax int, @ch nvarchar(4);
+SELECT @allRows = COUNT(*) FROM app.vw_equipment_search;
+
+-- the first word of a manufacturer, of an equipment class and of a tag (no spaces, so trimming cannot change it)
+SELECT TOP (1)
+       @fa = LEFT(LTRIM(manufacturer), CHARINDEX(N' ', LTRIM(manufacturer) + N' ') - 1),
+       @fb = LEFT(LTRIM(equip_class), CHARINDEX(N' ', LTRIM(equip_class) + N' ') - 1)
+FROM app.vw_equipment_search
+WHERE LTRIM(manufacturer) <> N'' AND LTRIM(equip_class) <> N''
+ORDER BY equipment_id;
+SELECT TOP (1) @ft = LEFT(LTRIM(equipment_tag_number), CHARINDEX(N' ', LTRIM(equipment_tag_number) + N' ') - 1)
+FROM app.vw_equipment_search
+WHERE LTRIM(equipment_tag_number) <> N''
+ORDER BY equipment_id;
+
+/* ---- R13 two filters, AND ------------------------------------------------------------------------------ */
+BEGIN TRY
+    IF @fa IS NULL OR @fb IS NULL
+        PRINT 'INFO R13 no heater has both a manufacturer and an equipment class: the filter check is skipped';
+    ELSE
+    BEGIN
+        SET @checks += 1;
+        SET @txt = N'';
+
+        -- two filters: exactly the heaters that satisfy both
+        SET @fJson = N'[{"column":"manufacturer","text":"' + STRING_ESCAPE(@fa, 'json') + N'"},{"column":"equip_class","text":"' + STRING_ESCAPE(@fb, 'json') + N'"}]';
+        SELECT @cAB = COUNT(*) FROM app.vw_equipment_search WHERE CHARINDEX(@fa, manufacturer) > 0 AND CHARINDEX(@fb, equip_class) > 0;
+        EXEC sp_executesql @callF, @pdefF, @p_mode = 'SORTED', @p_col = 'equipment_tag_number', @p_text = N'', @p_fac = N'',
+            @p_sort = 'equipment_number', @p_dir = 'ASC', @p_off = 0, @p_size = 100, @p_filters = @fJson,
+            @o_total = @t OUTPUT, @o_more = @m OUTPUT, @o_trunc = @tr OUTPUT;
+        SELECT @n = COUNT(*) FROM #r;
+        SELECT @n2 = COUNT(*) FROM #r WHERE CHARINDEX(@fa, manufacturer) > 0 AND CHARINDEX(@fb, equip_class) > 0;
+        IF NOT (@t = @cAB AND @n = @n2 AND @n = CASE WHEN @cAB < 100 THEN @cAB ELSE 100 END)
+            SET @txt += N' two filters gave total ' + ISNULL(CAST(@t AS nvarchar(10)), N'NULL') + N' and ' + CAST(@n AS nvarchar(10)) + N' row(s), ' + CAST(@n2 AS nvarchar(10)) + N' of them satisfy both (independent count ' + CAST(@cAB AS nvarchar(10)) + N');';
+
+        -- AND, not OR: the first filter matches, a second one nothing satisfies, so the list is empty
+        SELECT @cA = COUNT(*) FROM app.vw_equipment_search WHERE CHARINDEX(@fa, manufacturer) > 0;
+        SET @fJson = N'[{"column":"manufacturer","text":"' + STRING_ESCAPE(@fa, 'json') + N'"},{"column":"equip_class","text":"ZZZ-NO-SUCH-CLASS-ZZZ"}]';
+        EXEC sp_executesql @callF, @pdefF, @p_mode = 'SORTED', @p_col = 'equipment_tag_number', @p_text = N'', @p_fac = N'',
+            @p_sort = 'equipment_number', @p_dir = 'ASC', @p_off = 0, @p_size = 100, @p_filters = @fJson,
+            @o_total = @t OUTPUT, @o_more = @m OUTPUT, @o_trunc = @tr OUTPUT;
+        SELECT @n = COUNT(*) FROM #r;
+        IF NOT (@cA > 0 AND @t = 0 AND @n = 0)
+            SET @txt += N' a second filter nothing satisfies gave total ' + ISNULL(CAST(@t AS nvarchar(10)), N'NULL') + N' and ' + CAST(@n AS nvarchar(10)) + N' row(s) while the first alone matches ' + CAST(@cA AS nvarchar(10)) + N' (it behaves like OR);';
+
+        IF @txt = N'' PRINT 'OK  R13 two column filters give exactly the heaters that satisfy both (' + CAST(@cAB AS varchar(10)) + ' here), and a second filter nothing satisfies empties the list: AND';
+        ELSE BEGIN SET @fails += 1; PRINT 'FAIL R13 column filters:' + @txt; END
+    END
+END TRY
+BEGIN CATCH
+    SET @fails += 1;
+    PRINT 'FAIL R13 error ' + CAST(ERROR_NUMBER() AS varchar(12)) + ' on line ' + CAST(ERROR_LINE() AS varchar(12)) + ': ' + ERROR_MESSAGE();
+END CATCH;
+
+/* ---- R14 blanks, the limit of 20, blank values, literal characters --------------------------------------- */
+DECLARE @blankJ TABLE (n int IDENTITY(1,1), j nvarchar(200));
+INSERT INTO @blankJ (j) VALUES (N''), (N'[]'), (N'[{"column":"manufacturer","text":"   "}]');
+DECLARE @chars TABLE (n int IDENTITY(1,1), c nvarchar(4));
+INSERT INTO @chars (c) VALUES (N'%'), (N'_'), (N'['), (N'\');
+
+BEGIN TRY
+    SET @checks += 1;
+    SET @txt = N'';
+
+    -- an empty list, [] and an entry with a blank text all mean "no filter"
+    SET @k = 1; SELECT @kMax = COUNT(*) FROM @blankJ;
+    WHILE @k <= @kMax
+    BEGIN
+        SELECT @fJson = j FROM @blankJ WHERE n = @k;
+        EXEC sp_executesql @callF, @pdefF, @p_mode = 'SORTED', @p_col = 'equipment_tag_number', @p_text = N'', @p_fac = N'',
+            @p_sort = 'equipment_number', @p_dir = 'ASC', @p_off = 0, @p_size = 100, @p_filters = @fJson,
+            @o_total = @t OUTPUT, @o_more = @m OUTPUT, @o_trunc = @tr OUTPUT;
+        IF NOT (@t = @allRows) SET @txt += N' filters "' + @fJson + N'" gave total ' + ISNULL(CAST(@t AS nvarchar(10)), N'NULL') + N', expected ' + CAST(@allRows AS nvarchar(10)) + N';';
+        SET @k += 1;
+    END
+
+    -- 20 filters are accepted (the same column twenty times): the heaters whose manufacturer contains the letter a
+    SET @fJson = N'[' + REPLICATE(CAST(N'{"column":"manufacturer","text":"a"},' AS nvarchar(max)), 19) + N'{"column":"manufacturer","text":"a"}]';
+    SELECT @n = COUNT(*) FROM app.vw_equipment_search WHERE CHARINDEX(N'a', manufacturer) > 0;
+    EXEC sp_executesql @callF, @pdefF, @p_mode = 'SORTED', @p_col = 'equipment_tag_number', @p_text = N'', @p_fac = N'',
+        @p_sort = 'equipment_number', @p_dir = 'ASC', @p_off = 0, @p_size = 100, @p_filters = @fJson,
+        @o_total = @t OUTPUT, @o_more = @m OUTPUT, @o_trunc = @tr OUTPUT;
+    IF NOT (@t = @n) SET @txt += N' 20 filters gave total ' + ISNULL(CAST(@t AS nvarchar(10)), N'NULL') + N', expected ' + CAST(@n AS nvarchar(10)) + N';';
+
+    -- a heater with a blank value in the filtered column never matches (here the tag)
+    IF @ft IS NOT NULL
+    BEGIN
+        SET @fJson = N'[{"column":"equipment_tag_number","text":"' + STRING_ESCAPE(@ft, 'json') + N'"}]';
+        SELECT @n = COUNT(*) FROM app.vw_equipment_search WHERE CHARINDEX(@ft, equipment_tag_number) > 0;
+        EXEC sp_executesql @callF, @pdefF, @p_mode = 'SORTED', @p_col = 'equipment_tag_number', @p_text = N'', @p_fac = N'',
+            @p_sort = 'equipment_number', @p_dir = 'ASC', @p_off = 0, @p_size = 100, @p_filters = @fJson,
+            @o_total = @t OUTPUT, @o_more = @m OUTPUT, @o_trunc = @tr OUTPUT;
+        SELECT @n2 = COUNT(*) FROM #r WHERE equipment_tag_number IS NULL;
+        IF NOT (@t = @n AND @n2 = 0) SET @txt += N' tag filter gave total ' + ISNULL(CAST(@t AS nvarchar(10)), N'NULL') + N' (independent count ' + CAST(@n AS nvarchar(10)) + N') and ' + CAST(@n2 AS nvarchar(10)) + N' row(s) without a tag;';
+    END
+
+    -- % _ [ and \ typed in a box are those characters, not wildcards or escapes
+    SET @k = 1; SELECT @kMax = COUNT(*) FROM @chars;
+    WHILE @k <= @kMax
+    BEGIN
+        SELECT @ch = c FROM @chars WHERE n = @k;
+        SET @fJson = N'[{"column":"manufacturer","text":"' + STRING_ESCAPE(@ch, 'json') + N'"}]';
+        SELECT @n = COUNT(*) FROM app.vw_equipment_search WHERE CHARINDEX(@ch, manufacturer) > 0;
+        EXEC sp_executesql @callF, @pdefF, @p_mode = 'SORTED', @p_col = 'equipment_tag_number', @p_text = N'', @p_fac = N'',
+            @p_sort = 'equipment_number', @p_dir = 'ASC', @p_off = 0, @p_size = 100, @p_filters = @fJson,
+            @o_total = @t OUTPUT, @o_more = @m OUTPUT, @o_trunc = @tr OUTPUT;
+        IF NOT (@t = @n) SET @txt += N' the character ' + @ch + N' gave total ' + ISNULL(CAST(@t AS nvarchar(10)), N'NULL') + N', expected ' + CAST(@n AS nvarchar(10)) + N';';
+        SET @k += 1;
+    END
+
+    IF @txt = N'' PRINT 'OK  R14 blank entries and [] change nothing, 20 filters are accepted, a blank value never matches, and % _ [ \ are literal';
+    ELSE BEGIN SET @fails += 1; PRINT 'FAIL R14 column filters:' + @txt; END
+END TRY
+BEGIN CATCH
+    SET @fails += 1;
+    PRINT 'FAIL R14 error ' + CAST(ERROR_NUMBER() AS varchar(12)) + ' on line ' + CAST(ERROR_LINE() AS varchar(12)) + ': ' + ERROR_MESSAGE();
+END CATCH;
+
+/* ---- R15 with the facility, with the older single text, and in MATCH mode ---------------------------------- */
+BEGIN TRY
+    IF @fa IS NULL OR @ft IS NULL
+        PRINT 'INFO R15 no heater has both a manufacturer and a tag: the combined check is skipped';
+    ELSE
+    BEGIN
+        SET @checks += 1;
+        SET @txt = N'';
+        SET @fJson = N'[{"column":"manufacturer","text":"' + STRING_ESCAPE(@fa, 'json') + N'"}]';
+
+        -- SORTED: facility + the older single text (the tag) + one column filter, all ANDed
+        IF @fac IS NOT NULL
+        BEGIN
+            SELECT @n = COUNT(*) FROM app.vw_equipment_search
+            WHERE superior_functional_location = @fac AND CHARINDEX(@ft, equipment_tag_number) > 0 AND CHARINDEX(@fa, manufacturer) > 0;
+            EXEC sp_executesql @callF, @pdefF, @p_mode = 'SORTED', @p_col = 'equipment_tag_number', @p_text = @ft, @p_fac = @fac,
+                @p_sort = 'equipment_number', @p_dir = 'ASC', @p_off = 0, @p_size = 100, @p_filters = @fJson,
+                @o_total = @t OUTPUT, @o_more = @m OUTPUT, @o_trunc = @tr OUTPUT;
+            IF NOT (@t = @n) SET @txt += N' facility + text + filter gave total ' + ISNULL(CAST(@t AS nvarchar(10)), N'NULL') + N', expected ' + CAST(@n AS nvarchar(10)) + N';';
+        END
+
+        -- MATCH: the filter narrows the closest-match list too (compared when every tier is below its cap)
+        SELECT @n = COUNT(*) FROM app.vw_equipment_search WHERE CHARINDEX(@ft, equipment_tag_number) > 0 AND CHARINDEX(@fa, manufacturer) > 0;
+        EXEC sp_executesql @callF, @pdefF, @p_mode = 'MATCH', @p_col = 'equipment_tag_number', @p_text = @ft, @p_fac = N'',
+            @p_sort = 'equipment_number', @p_dir = 'ASC', @p_off = 0, @p_size = 100, @p_filters = @fJson,
+            @o_total = @t OUTPUT, @o_more = @m OUTPUT, @o_trunc = @tr OUTPUT;
+        SELECT @n2 = COUNT(*) FROM #r;
+        IF @n <= 200 AND NOT (@t = @n AND @n2 = @n AND @tr = 0)
+            SET @txt += N' MATCH + filter gave total ' + ISNULL(CAST(@t AS nvarchar(10)), N'NULL') + N' and ' + CAST(@n2 AS nvarchar(10)) + N' row(s), expected ' + CAST(@n AS nvarchar(10)) + N';';
+
+        IF @txt = N'' PRINT 'OK  R15 column filters are ANDed with the facility and the older single text, and narrow a MATCH list too';
+        ELSE BEGIN SET @fails += 1; PRINT 'FAIL R15 combined filters:' + @txt; END
+    END
+END TRY
+BEGIN CATCH
+    SET @fails += 1;
+    PRINT 'FAIL R15 error ' + CAST(ERROR_NUMBER() AS varchar(12)) + ' on line ' + CAST(ERROR_LINE() AS varchar(12)) + ': ' + ERROR_MESSAGE();
+END CATCH;
+
+/* ---- R16 refusals of a bad filter list -------------------------------------------------------------------------- */
+DECLARE @badF TABLE (n int IDENTITY(1,1), label varchar(60), j nvarchar(4000), expected_error int);
+INSERT INTO @badF (label, j, expected_error) VALUES
+    ('not JSON',                    N'this is not json',                                                                  50017),
+    ('an object, not a list',       N'{"column":"manufacturer","text":"x"}',                                              50017),
+    ('entry without a text',        N'[{"column":"manufacturer"}]',                                                       50017),
+    ('entry without a column',      N'[{"text":"x"}]',                                                                    50017),
+    ('entry that is not an object', N'["manufacturer"]',                                                                  50017),
+    ('column off the list (number)',N'[{"column":"heat_duty_mmbtu_hr","text":"1"}]',                                      50018),
+    ('column off the list (id)',    N'[{"column":"equipment_id","text":"1"}]',                                            50018),
+    ('column with SQL',             N'[{"column":"manufacturer]; DROP TABLE app.app_setting; --","text":"x"}]',           50018),
+    ('text of 101 characters',      N'[{"column":"manufacturer","text":"' + REPLICATE(CAST(N'x' AS nvarchar(max)), 101) + N'"}]', 50019),
+    ('21 filters',                  N'[' + REPLICATE(CAST(N'{"column":"manufacturer","text":"a"},' AS nvarchar(max)), 20) + N'{"column":"manufacturer","text":"a"}]', 50019);
+
+DECLARE @bj nvarchar(4000), @bjExpect int, @bjLabel varchar(60), @bjMax int = (SELECT COUNT(*) FROM @badF), @bjDone int = 0, @bjProblems nvarchar(1500) = N'';
+SET @i = 1;
+SET @checks += 1;
+WHILE @i <= @bjMax
+BEGIN
+    SELECT @bjLabel = label, @bj = j, @bjExpect = expected_error FROM @badF WHERE n = @i;
+    SET @err = NULL;
+    BEGIN TRY
+        EXEC sp_executesql @callF, @pdefF, @p_mode = 'SORTED', @p_col = 'equipment_tag_number', @p_text = N'', @p_fac = N'',
+            @p_sort = 'equipment_number', @p_dir = 'ASC', @p_off = 0, @p_size = 50, @p_filters = @bj,
+            @o_total = @t OUTPUT, @o_more = @m OUTPUT, @o_trunc = @tr OUTPUT;
+    END TRY
+    BEGIN CATCH
+        SET @err = ERROR_NUMBER();
+    END CATCH;
+    IF @err = @bjExpect SET @bjDone += 1;
+    ELSE SET @bjProblems += N' [' + @bjLabel + N': error ' + ISNULL(CAST(@err AS nvarchar(12)), N'none') + N', expected ' + CAST(@bjExpect AS nvarchar(12)) + N']';
+    SET @i += 1;
+END
+
+IF OBJECT_ID(N'app.app_setting', N'U') IS NULL
+    SET @bjProblems += N' [app.app_setting is gone: the injection attempt may have worked]';
+
+IF @bjDone = @bjMax AND @bjProblems = N''
+    PRINT 'OK  R16 all ' + CAST(@bjMax AS varchar(10)) + ' bad filter lists are refused with the expected error number (50017 to 50019), including a column name that carries SQL';
+ELSE BEGIN SET @fails += 1; PRINT 'FAIL R16 filter refusals:' + @bjProblems; END
 
 DROP TABLE IF EXISTS #r;
 

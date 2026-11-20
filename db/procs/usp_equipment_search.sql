@@ -32,16 +32,27 @@
                    against fixed lists or sys.columns and then written with QUOTENAME, and
                    every value goes in as a parameter, so no caller text becomes SQL.
    @facility       only heaters under this parent FLOC (the facility drill-down); empty = all.
+   @filters_json   the boxes under the column headers of the screen (CR-1, 19 Nov): a JSON list
+                   such as [{"column":"manufacturer","text":"abc"},{"column":"equip_class","text":"fired"}].
+                   Every entry must match ("contains", AND), on top of @facility and @search_text,
+                   in both modes. NULL, empty or [] = no column filters; an entry with a blank
+                   text is ignored. The column must be one of the 20 text columns listed below
+                   (@filter_cols); at most 20 entries, each text at most 100 characters. The list
+                   is parsed once into escaped patterns and handed to the dynamic query as ONE
+                   JSON parameter, so no caller text becomes SQL (column names come from the
+                   fixed list, through QUOTENAME).
 
    The text is matched literally: % _ and [ typed by the person are escaped. Comparison
-   follows the database collation (case-insensitive on this database).
+   follows the database collation (case-insensitive on this database). A heater whose value in
+   a filtered column is blank (NULL) never matches a filter on that column.
 
    Paging is stable: every order ends with equipment_id, so a column that is not unique
    (manufacturer, say) never repeats or drops a heater between pages.
 
    Errors (THROW): 50010 view missing, 50011 bad mode, 50012 bad direction, 50013 bad
    offset or page size, 50014 column not searchable, 50015 MATCH without text, 50016 sort
-   column unknown.
+   column unknown, 50017 @filters_json is not a JSON list of {column, text}, 50018 a filter
+   column cannot be searched, 50019 more than 20 filters or a filter text over 100 characters.
    ===================================================================== */
 CREATE OR ALTER PROCEDURE app.usp_equipment_search
     @mode           varchar(8),
@@ -52,6 +63,7 @@ CREATE OR ALTER PROCEDURE app.usp_equipment_search
     @sort_direction varchar(4)    = 'ASC',
     @offset         int           = 0,
     @page_size      int           = 50,
+    @filters_json   nvarchar(4000) = NULL,
     @total_matches  int OUTPUT,
     @has_more       bit OUTPUT,
     @truncated      bit OUTPUT
@@ -75,6 +87,19 @@ BEGIN
     SET @sort_direction = UPPER(LTRIM(RTRIM(ISNULL(@sort_direction, 'ASC'))));
     SET @offset         = ISNULL(@offset, 0);
     SET @page_size      = ISNULL(@page_size, 50);
+    SET @filters_json   = LTRIM(RTRIM(ISNULL(@filters_json, N'')));
+
+    /* the text columns a person can filter on (the boxes under the headers); the screen's list
+       (columns.ts, FILTER_COLUMNS) must equal this one: a unit test compares them */
+    DECLARE @filter_cols TABLE (col varchar(40) NOT NULL PRIMARY KEY);
+    INSERT INTO @filter_cols (col) VALUES
+        ('equipment_tag_number'), ('manufacturer_serial_number'), ('equipment_number'), ('functional_location'),
+        ('superior_functional_location'), ('manufacturer'), ('equip_class'), ('profit_center_name'),
+        ('equipment_description'), ('floc_description'), ('model_number'), ('fired_unfired'), ('class_type'),
+        ('object_type'), ('floc_class'), ('tech_object_type'), ('equipment_user_status'), ('floc_user_status'),
+        ('planner_group'), ('heater_population_method');
+    DECLARE @max_filters     int = 20;
+    DECLARE @max_filter_text int = 100;
 
     SET @total_matches = 0;
     SET @has_more      = 0;
@@ -97,6 +122,38 @@ BEGIN
     IF NOT EXISTS (SELECT 1 FROM sys.columns AS c WHERE c.object_id = @view_id AND c.name = @sort_column)
         THROW 50016, N'unknown sort column.', 1;
 
+    /* column filters: refuse a list that is not a JSON list of {column, text}, a column that is
+       not on the fixed list, too many entries, or a text that is too long */
+    DECLARE @fj nvarchar(max) = NULL;
+    IF @filters_json <> N''
+    BEGIN
+        IF ISJSON(@filters_json) <> 1 OR LEFT(@filters_json, 1) <> N'['
+            THROW 50017, N'filters must be a JSON list of {column, text}.', 1;
+        IF EXISTS (SELECT 1
+                   FROM OPENJSON(@filters_json) WITH (col nvarchar(200) '$.column', txt nvarchar(1000) '$.text') AS f
+                   WHERE f.col IS NULL OR f.txt IS NULL)
+            THROW 50017, N'every filter needs a column and a text.', 1;
+        IF EXISTS (SELECT 1
+                   FROM OPENJSON(@filters_json) WITH (col nvarchar(200) '$.column') AS f
+                   WHERE f.col NOT IN (SELECT fc.col FROM @filter_cols AS fc))
+            THROW 50018, N'a filter column cannot be searched.', 1;
+        IF (SELECT COUNT(*)
+            FROM OPENJSON(@filters_json) WITH (txt nvarchar(1000) '$.text') AS f
+            WHERE LTRIM(RTRIM(f.txt)) <> N'') > @max_filters
+           OR EXISTS (SELECT 1
+                      FROM OPENJSON(@filters_json) WITH (txt nvarchar(1000) '$.text') AS f
+                      WHERE LEN(LTRIM(RTRIM(f.txt))) > @max_filter_text)
+            THROW 50019, N'at most 20 filters, each text at most 100 characters.', 1;
+
+        /* the escaped patterns, one JSON parameter for the dynamic query below (NULL when every
+           text is blank). % _ [ and the escape character are escaped as for @search_text. */
+        SELECT @fj = (SELECT f.col AS [col],
+                             N'%' + REPLACE(REPLACE(REPLACE(REPLACE(LTRIM(RTRIM(f.txt)), N'\', N'\\'), N'%', N'\%'), N'_', N'\_'), N'[', N'\[') + N'%' AS [pat]
+                      FROM OPENJSON(@filters_json) WITH (col nvarchar(200) '$.column', txt nvarchar(1000) '$.text') AS f
+                      WHERE LTRIM(RTRIM(f.txt)) <> N''
+                      FOR JSON PATH);
+    END
+
     /* ---- the pieces of the query ------------------------------------------ */
     DECLARE @col  nvarchar(130) = QUOTENAME(@search_column);
     DECLARE @sort nvarchar(130) = QUOTENAME(@sort_column);
@@ -113,13 +170,28 @@ BEGIN
     IF @search_text <> N''
         SET @filter = @filter + N' AND v.' + @col + N' LIKE N''%'' + @esc + N''%'' ESCAPE N''\''';
 
+    /* the column filters: a heater passes when NO filter entry fails on it. For each entry the
+       heater's value in that entry's column is picked with a CASE over the fixed column list
+       (COLLATE DATABASE_DEFAULT so columns with different collations can share one CASE); a
+       blank (NULL) value fails the entry, because the CASE then yields NULL and NULL LIKE is
+       not a match. The patterns come from @fj, never from text pasted into the query. */
+    IF @fj IS NOT NULL
+    BEGIN
+        DECLARE @pick nvarchar(max);
+        SELECT @pick = N'CASE f.col ' + STRING_AGG(CAST(N'WHEN ''' + fc.col + N''' THEN v.' + QUOTENAME(fc.col) + N' COLLATE DATABASE_DEFAULT' AS nvarchar(max)), N' ') + N' END'
+        FROM @filter_cols AS fc;
+        SET @filter = @filter
+            + N' AND NOT EXISTS (SELECT 1 FROM OPENJSON(@fj) WITH (col varchar(40) ''$.col'', pat nvarchar(500) ''$.pat'') AS f'
+            + N' WHERE 1 = CASE WHEN (' + @pick + N') LIKE f.pat ESCAPE N''\'' THEN 0 ELSE 1 END)';
+    END
+
     DECLARE @sql nvarchar(max);
     DECLARE @n int = 0, @flag int = 0;
 
     DECLARE @p_count nvarchar(400) =
-        N'@text nvarchar(100), @esc nvarchar(400), @facility nvarchar(40), @cap1 int, @cap2 int, @cap3 int, @total int OUTPUT, @trunc int OUTPUT';
+        N'@text nvarchar(100), @esc nvarchar(400), @facility nvarchar(40), @fj nvarchar(max), @cap1 int, @cap2 int, @cap3 int, @total int OUTPUT, @trunc int OUTPUT';
     DECLARE @p_rows nvarchar(400) =
-        N'@text nvarchar(100), @esc nvarchar(400), @facility nvarchar(40), @cap1 int, @cap2 int, @cap3 int, @offset int, @page_size int';
+        N'@text nvarchar(100), @esc nvarchar(400), @facility nvarchar(40), @fj nvarchar(max), @cap1 int, @cap2 int, @cap3 int, @offset int, @page_size int';
 
     /* ---- MATCH: closest first --------------------------------------------- */
     IF @mode = 'MATCH'
@@ -137,7 +209,7 @@ BEGIN
             + N' @trunc = ISNULL(MAX(CASE WHEN (t.tier = 1 AND t.n > @cap1) OR (t.tier = 2 AND t.n > @cap2) OR (t.tier = 3 AND t.n > @cap3) THEN 1 ELSE 0 END), 0)'
             + N' FROM (SELECT tier, COUNT(*) AS n FROM hits GROUP BY tier) AS t';
         EXEC sp_executesql @sql, @p_count,
-            @text = @search_text, @esc = @esc, @facility = @facility,
+            @text = @search_text, @esc = @esc, @facility = @facility, @fj = @fj,
             @cap1 = @cap_exact, @cap2 = @cap_starts, @cap3 = @cap_contains,
             @total = @n OUTPUT, @trunc = @flag OUTPUT;
         SET @total_matches = @n;
@@ -154,7 +226,7 @@ BEGIN
             + N' WHERE r.rn <= CASE r.tier WHEN 1 THEN @cap1 WHEN 2 THEN @cap2 ELSE @cap3 END'
             + N' ORDER BY r.tier, r.' + @col + N', ' + @ties_r;
         EXEC sp_executesql @sql, @p_rows,
-            @text = @search_text, @esc = @esc, @facility = @facility,
+            @text = @search_text, @esc = @esc, @facility = @facility, @fj = @fj,
             @cap1 = @cap_exact, @cap2 = @cap_starts, @cap3 = @cap_contains,
             @offset = @offset, @page_size = @page_size;
         RETURN;
@@ -163,7 +235,7 @@ BEGIN
     /* ---- SORTED: one column order, page by page ---------------------------- */
     SET @sql = N'SELECT @total = COUNT(*) FROM app.vw_equipment_search AS v WHERE ' + @filter;
     EXEC sp_executesql @sql, @p_count,
-        @text = @search_text, @esc = @esc, @facility = @facility,
+        @text = @search_text, @esc = @esc, @facility = @facility, @fj = @fj,
         @cap1 = @cap_exact, @cap2 = @cap_starts, @cap3 = @cap_contains,
         @total = @n OUTPUT, @trunc = @flag OUTPUT;
     SET @total_matches = @n;
@@ -174,7 +246,7 @@ BEGIN
         + CASE WHEN @sort_column = 'equipment_id' THEN N'' ELSE N', v.equipment_id' END
         + N' OFFSET @offset ROWS FETCH NEXT @page_size ROWS ONLY';
     EXEC sp_executesql @sql, @p_rows,
-        @text = @search_text, @esc = @esc, @facility = @facility,
+        @text = @search_text, @esc = @esc, @facility = @facility, @fj = @fj,
         @cap1 = @cap_exact, @cap2 = @cap_starts, @cap3 = @cap_contains,
         @offset = @offset, @page_size = @page_size;
 END

@@ -59,6 +59,7 @@ async function runReadTiming() {
         sortDirection: 'asc',
         offset: 0,
         pageSize: 50,
+        filtersJson: '',
         ...over,
       })
     );

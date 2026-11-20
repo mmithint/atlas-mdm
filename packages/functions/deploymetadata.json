@@ -113,13 +113,18 @@
             "hasDefaultValue": false
           },
           {
+            "name": "filtersJson",
+            "dataType": "string",
+            "hasDefaultValue": false
+          },
+          {
             "name": "ctx",
             "dataType": "RayfinContext<Record<string, any>, AudienceType.Sql>",
             "hasDefaultValue": false
           }
         ]
       },
-      "functionCode": "udf.func(\n  'searchEquipment',\n  async (\n    mode: string,\n    searchColumn: string,\n    searchText: string,\n    facility: string,\n    sortColumn: string,\n    sortDirection: string,\n    offset: number,\n    pageSize: number,\n    ctx: RayfinContext<Record<string, any>, AudienceType.Sql>\n  ): Promise<EquipmentSearchResult> =>\n    runEquipmentSearch(\n      { mode, searchColumn, searchText, facility, sortColumn, sortDirection, offset, pageSize },\n      await trustedAccessToken(ctx),\n      () => ctx.Tokens.Sql\n    ),\n  []\n)"
+      "functionCode": "udf.func(\n  'searchEquipment',\n  async (\n    mode: string,\n    searchColumn: string,\n    searchText: string,\n    facility: string,\n    sortColumn: string,\n    sortDirection: string,\n    offset: number,\n    pageSize: number,\n    filtersJson: string,\n    ctx: RayfinContext<Record<string, any>, AudienceType.Sql>\n  ): Promise<EquipmentSearchResult> =>\n    runEquipmentSearch(\n      { mode, searchColumn, searchText, facility, sortColumn, sortDirection, offset, pageSize, filtersJson },\n      await trustedAccessToken(ctx),\n      () => ctx.Tokens.Sql\n    ),\n  []\n)"
     },
     {
       "name": "getEquipmentDetail",

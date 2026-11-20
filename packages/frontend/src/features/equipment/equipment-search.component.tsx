@@ -1,38 +1,56 @@
 import { ArrowDown, ArrowUp, ArrowUpDown, ChevronLeft, ChevronRight, Columns3, Search, X } from 'lucide-react';
-import { useMemo, useState, type FormEvent, type ReactNode } from 'react';
+import { useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
 
 import { hrefFor, navigate } from '@/app/router';
 import { EmptyState, ErrorState, LoadingState } from '@/components/states';
-import { badge, button, card, input } from '@/components/ui';
+import { badge, button, card, input, inputCompact } from '@/components/ui';
 import { useHashRoute } from '@/hooks/use-hash-route';
 import { BLANK, formatDecimal, formatPercent, formatUtc, isBlank, orBlank } from '@/lib/format';
 
-import { COLUMNS, DEFAULT_COLUMNS, PAGE_SIZES, SEARCH_FIELDS, fieldById, type ColumnDef, type SearchColumn } from './columns';
+import { COLUMNS, DEFAULT_COLUMNS, MAX_FILTER_TEXT, PAGE_SIZES, isFilterColumn, labelOf, type ColumnDef, type SearchColumn } from './columns';
 import type { SearchRow } from './equipment-api';
 import {
   criteriaFromQuery,
-  criteriaKey,
+  filtersFromValues,
   queryFromCriteria,
+  valuesFromFilters,
+  type FilterValues,
   type SearchCriteria,
 } from './search-model';
 import { useEquipmentSearch } from './use-equipment-search';
 
 /**
- * S-4 Equipment search (POC-APP-05): pick a field, type a value, see the closest heaters
- * first; choose the columns and the rows per page; click a facility to list every heater
- * under that parent FLOC. The address holds the search, so a result can be shared.
+ * S-4 Equipment search (POC-APP-05, changed by CR-1 on 19 Nov): type in the boxes under the column
+ * headers and press the search icon; every box with text must match (AND). The column chooser
+ * holds a box for every text column, shown or not, and shares the same typed values with the header
+ * boxes. Choose the columns and the rows per page; click a facility to list every heater under that
+ * parent FLOC. The address holds the search, so a result can be shared.
  */
 export function EquipmentSearch() {
   const route = useHashRoute();
   const criteria = useMemo(() => criteriaFromQuery(route.query), [route.query]);
   const view = useEquipmentSearch(criteria);
   const [visible, setVisible] = useState<readonly SearchColumn[]>(DEFAULT_COLUMNS);
-  // The column being searched is always shown, so a match can be seen where it matched.
-  const searched = fieldById(criteria.fieldId).column;
-  const columns = COLUMNS.filter((c) => visible.includes(c.column) || c.column === searched);
+  // Any text column can be filtered from the column chooser, shown or not; a hidden column's filter still cuts the list.
+  const filtered = useMemo(() => new Set<SearchColumn>(criteria.filters.map((f) => f.column)), [criteria.filters]);
+  const columns = COLUMNS.filter((c) => visible.includes(c.column));
+
+  // What is typed in the boxes counts only when the search icon is pressed. When the applied filters
+  // change (a search, Clear, the Back button) the boxes show what is applied again.
+  const appliedKey = JSON.stringify(criteria.filters);
+  const [typed, setTyped] = useState<{ key: string; values: FilterValues }>({ key: appliedKey, values: valuesFromFilters(criteria.filters) });
+  const values = typed.key === appliedKey ? typed.values : valuesFromFilters(criteria.filters);
+  const setValue = (column: SearchColumn, text: string) => setTyped({ key: appliedKey, values: { ...values, [column]: text } });
+  const anyFilter = criteria.filters.length > 0 || Object.values(values).some((text) => (text ?? '').trim() !== '');
 
   const go = (change: Partial<SearchCriteria>) =>
     navigate('/equipment', queryFromCriteria({ ...criteria, ...change }));
+
+  const search = () => go({ filters: filtersFromValues(values) });
+  const clear = () => {
+    setTyped({ key: appliedKey, values: {} });
+    go({ filters: [] });
+  };
 
   const onSort = (column: SearchColumn) =>
     go({
@@ -42,14 +60,12 @@ export function EquipmentSearch() {
 
   return (
     <div className="space-y-400">
-      <header>
+      {/*<header>
         <h1 className="text-600 font-semibold">Equipment</h1>
-        <p className="mt-100 text-300 text-muted-foreground">
-          Find a heater by its engineering tag, serial number or equipment number, or list every heater at a facility.
-        </p>
-      </header>
-
-      <SearchForm key={criteriaKey(criteria)} criteria={criteria} onSearch={(fieldId, query) => go({ fieldId, query, sort: null })} />
+         <p className="mt-100 text-300 text-muted-foreground">
+          Type in the boxes under the column headers, then press the search icon: a heater is listed only when every filled box matches. Or click a facility to list every heater there.
+        </p> 
+      </header>*/}
 
       {criteria.facility ? (
         <div className="flex flex-wrap items-center gap-300 rounded-md border border-border bg-info px-400 py-200 text-300 text-info-foreground">
@@ -68,9 +84,19 @@ export function EquipmentSearch() {
 
       <section aria-label="Search results" className={card}>
         <div className="flex flex-wrap items-center justify-between gap-300 border-b border-border px-400 py-300">
-          <Summary view={view} />
+          <h1 className="text-600 font-semibold">Equipment</h1>
+          {/* <Summary view={view} filtered={criteria.filters.length > 0} /> */}
           <div className="flex flex-wrap items-center gap-300">
-            <ColumnChooser visible={visible} locked={searched} onChange={setVisible} />
+            {anyFilter ? (
+              <button type="button" className={button.small} onClick={clear}>
+                <X aria-hidden="true" className="icon-size-200" />
+                Clear filters
+              </button>
+            ) : null}
+            <button type="button" className={button.small} onClick={search} aria-label="Search with the column filters" title="Search with the column filters">
+              <Search aria-hidden="true" className="icon-size-200" />
+            </button>
+            <ColumnChooser visible={visible} onChange={setVisible} values={values} onValue={setValue} applied={filtered} onApply={search} />
             <label className="flex items-center gap-200 whitespace-nowrap text-200 text-muted-foreground">
               Rows per page
               <select
@@ -89,23 +115,39 @@ export function EquipmentSearch() {
         </div>
 
         <div className="p-400">
-          {view.status === 'loading' ? <LoadingState rows={8} label="Searching" /> : null}
-          {view.status === 'error' ? (
-            <ErrorState title="The search failed" message={view.message} onRetry={view.retry} />
+          {/* The header and the filter boxes stay on screen while loading, on an error and when nothing matches, so a filter can always be changed. */}
+          <ResultTable
+            rows={view.status === 'ready' ? view.rows : []}
+            columns={columns}
+            criteria={criteria}
+            onSort={onSort}
+            values={values}
+            onValue={setValue}
+          />
+          {view.status === 'loading' ? (
+            <div className="mt-400">
+              <LoadingState rows={6} label="Searching" />
+            </div>
           ) : null}
-          {view.status === 'ready' && view.rows.length === 0 ? <NothingFound criteria={criteria} /> : null}
+          {view.status === 'error' ? (
+            <div className="mt-400">
+              <ErrorState title="The search failed" message={view.message} onRetry={view.retry} />
+            </div>
+          ) : null}
+          {view.status === 'ready' && view.rows.length === 0 ? (
+            <div className="mt-400">
+              <NothingFound criteria={criteria} />
+            </div>
+          ) : null}
           {view.status === 'ready' && view.rows.length > 0 ? (
-            <>
-              <ResultTable rows={view.rows} columns={columns} criteria={criteria} onSort={onSort} />
-              <Pager
-                page={view.page}
-                pageCount={view.pageCount}
-                hasPrevious={view.hasPrevious}
-                hasNext={view.hasNext}
-                onPrevious={view.previous}
-                onNext={view.next}
-              />
-            </>
+            <Pager
+              page={view.page}
+              pageCount={view.pageCount}
+              hasPrevious={view.hasPrevious}
+              hasNext={view.hasNext}
+              onPrevious={view.previous}
+              onNext={view.next}
+            />
           ) : null}
         </div>
       </section>
@@ -113,80 +155,27 @@ export function EquipmentSearch() {
   );
 }
 
-function SearchForm({
-  criteria,
-  onSearch,
-}: {
-  criteria: SearchCriteria;
-  onSearch: (fieldId: string, query: string) => void;
-}) {
-  const submit = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const data = new FormData(event.currentTarget);
-    onSearch(String(data.get('field') ?? ''), String(data.get('q') ?? '').trim());
-  };
-
-  return (
-    <form role="search" aria-label="Find a heater" onSubmit={submit} className={`${card} flex flex-wrap items-end gap-300 p-400`}>
-      <label className="flex min-w-48 flex-col gap-100 text-200 font-medium text-muted-foreground">
-        Search in
-        <select name="field" className={input} defaultValue={criteria.fieldId}>
-          {SEARCH_FIELDS.map((f) => (
-            <option key={f.id} value={f.id}>
-              {f.label}
-            </option>
-          ))}
-        </select>
-      </label>
-      <label className="flex min-w-64 flex-1 flex-col gap-100 text-200 font-medium text-muted-foreground">
-        Value
-        <input
-          name="q"
-          type="search"
-          className={input}
-          defaultValue={criteria.query}
-          placeholder="Type part or all of the value"
-          autoComplete="off"
-        />
-      </label>
-      <button type="submit" className={button.primary}>
-        <Search aria-hidden="true" className="icon-size-200" />
-        Search
-      </button>
-      <a className={button.secondary} href={hrefFor('/equipment', criteria.facility ? { facility: criteria.facility } : undefined)}>
-        Clear
-      </a>
-    </form>
-  );
-}
-
-function Summary({ view }: { view: ReturnType<typeof useEquipmentSearch> }) {
+function Summary({ view, filtered }: { view: ReturnType<typeof useEquipmentSearch>; filtered: boolean }) {
   if (view.status !== 'ready') return <p className="text-300 text-muted-foreground">{view.status === 'loading' ? 'Searching…' : ''}</p>;
-  const timing = `Loaded in ${view.ms} ms`;
-  if (view.mode === 'match') {
-    return (
-      <p className="text-300">
-        <strong>{view.total}</strong> {view.total === 1 ? 'match' : 'matches'}, closest first
-        {view.truncated ? ' (more exist: add letters to narrow the search)' : ''}
-        <span className="ml-300 text-200 text-muted-foreground">{timing}</span>
-      </p>
-    );
-  }
   return (
     <p className="text-300">
-      Page <strong>{view.page}</strong>
-      <span className="ml-300 text-200 text-muted-foreground">{timing}</span>
+      <strong>{view.total}</strong> {view.total === 1 ? 'heater' : 'heaters'}
+      {filtered ? ' match' : ''}
+      <span className="text-muted-foreground">
+        , page {view.page} of {view.pageCount}
+      </span>
+      <span className="ml-300 text-200 text-muted-foreground">Loaded in {view.ms} ms</span>
     </p>
   );
 }
 
 function NothingFound({ criteria }: { criteria: SearchCriteria }) {
-  const field = fieldById(criteria.fieldId).label.toLowerCase();
-  if (criteria.query) {
+  if (criteria.filters.length > 0) {
+    const said = criteria.filters.map((f) => `${labelOf(f.column)} contains "${f.text}"`).join(' and ');
     return (
       <EmptyState
         title="No heater found"
-        hint={`Nothing matches "${criteria.query}" in ${field}${criteria.facility ? ` under facility ${criteria.facility}` : ''}. Try fewer letters, or search in another field.`}
+        hint={`Nothing matches ${said}${criteria.facility ? ` under facility ${criteria.facility}` : ''}. Try fewer letters, or clear a filter.`}
       />
     );
   }
@@ -198,41 +187,88 @@ function NothingFound({ criteria }: { criteria: SearchCriteria }) {
   );
 }
 
+/**
+ * Chooses which columns the table shows, and holds a filter box next to every text column, shown or
+ * not. The boxes edit the same typed values as the ones under the column headers; Apply (or Enter)
+ * runs the search and closes the list.
+ */
 function ColumnChooser({
   visible,
-  locked,
   onChange,
+  values,
+  onValue,
+  applied,
+  onApply,
 }: {
   visible: readonly SearchColumn[];
-  /** The column being searched: always shown, so it cannot be switched off. */
-  locked: SearchColumn;
   onChange: (next: readonly SearchColumn[]) => void;
+  /** What is typed in the filter boxes, by column. */
+  values: FilterValues;
+  onValue: (column: SearchColumn, text: string) => void;
+  /** The columns that hold an applied filter: marked, because a hidden column's filter is not visible in the table. */
+  applied: ReadonlySet<SearchColumn>;
+  onApply: () => void;
 }) {
+  const detailsRef = useRef<HTMLDetailsElement>(null);
+
   const toggle = (column: SearchColumn, on: boolean) => {
     const next = COLUMNS.map((c) => c.column).filter((c) => (c === column ? on : visible.includes(c)));
     if (next.length > 0) onChange(next);
   };
+
+  const apply = (event: FormEvent) => {
+    event.preventDefault();
+    onApply();
+    if (detailsRef.current) detailsRef.current.open = false;
+  };
+
   return (
-    <details className="relative">
+    <details ref={detailsRef} className="relative">
       <summary className={`${button.small} cursor-pointer list-none`}>
         <Columns3 aria-hidden="true" className="icon-size-200" />
         Columns
       </summary>
-      <fieldset className="absolute right-0 z-10 mt-100 max-h-96 w-64 overflow-auto rounded-md border border-border bg-popover p-300 text-popover-foreground shadow-lg">
-        <legend className="sr-only">Columns to show</legend>
-        {COLUMNS.map((c) => (
-          <label key={c.column} className="flex items-center gap-200 py-100 text-300">
-            <input
-              type="checkbox"
-              checked={visible.includes(c.column) || c.column === locked}
-              disabled={c.column === locked || (visible.length === 1 && visible.includes(c.column))}
-              onChange={(e) => toggle(c.column, e.target.checked)}
-            />
-            {c.label}
-            {c.column === locked ? <span className="text-200 text-muted-foreground"> (searched)</span> : null}
-          </label>
-        ))}
-      </fieldset>
+      <form
+        onSubmit={apply}
+        className="absolute right-0 z-10 mt-100 w-96 rounded-md border border-border bg-popover text-popover-foreground shadow-lg"
+      >
+        <fieldset className="max-h-96 overflow-auto p-300">
+          <legend className="sr-only">Columns to show and filter</legend>
+          {COLUMNS.map((c) => (
+            <div key={c.column} className="flex items-center justify-between gap-200 py-100">
+              <label className="flex min-w-0 items-center gap-200 text-300">
+                <input
+                  type="checkbox"
+                  checked={visible.includes(c.column)}
+                  disabled={visible.length === 1 && visible.includes(c.column)}
+                  onChange={(e) => toggle(c.column, e.target.checked)}
+                />
+                {c.label}
+                {applied.has(c.column) ? <span className="text-200 text-muted-foreground"> (filtered)</span> : null}
+              </label>
+              {isFilterColumn(c.column) ? (
+                <div className="w-40 shrink-0">
+                  <input
+                    type="text"
+                    aria-label={`${c.label} filter value`}
+                    className={inputCompact}
+                    value={values[c.column] ?? ''}
+                    maxLength={MAX_FILTER_TEXT}
+                    placeholder="Filter"
+                    autoComplete="off"
+                    onChange={(e) => onValue(c.column, e.target.value)}
+                  />
+                </div>
+              ) : null}
+            </div>
+          ))}
+        </fieldset>
+        <div className="flex justify-end border-t border-border px-300 py-200">
+          <button type="submit" className={button.primary}>
+            Apply filters
+          </button>
+        </div>
+      </form>
     </details>
   );
 }
@@ -242,11 +278,16 @@ function ResultTable({
   columns,
   criteria,
   onSort,
+  values,
+  onValue,
 }: {
   rows: readonly SearchRow[];
   columns: readonly ColumnDef[];
   criteria: SearchCriteria;
   onSort: (column: SearchColumn) => void;
+  /** What is typed in the filter boxes, by column. */
+  values: FilterValues;
+  onValue: (column: SearchColumn, text: string) => void;
 }) {
   return (
     <div className="overflow-x-auto">
@@ -271,6 +312,24 @@ function ResultTable({
                 </th>
               );
             })}
+          </tr>
+          <tr className="bg-muted/50">
+            {columns.map((c) => (
+              <td key={c.column} className="px-200 pb-200 align-middle">
+                {isFilterColumn(c.column) ? (
+                  <input
+                    type="text"
+                    aria-label={`Filter ${c.label}`}
+                    className={inputCompact}
+                    value={values[c.column] ?? ''}
+                    maxLength={MAX_FILTER_TEXT}
+                    placeholder="Filter"
+                    autoComplete="off"
+                    onChange={(e) => onValue(c.column, e.target.value)}
+                  />
+                ) : null}
+              </td>
+            ))}
           </tr>
         </thead>
         <tbody>

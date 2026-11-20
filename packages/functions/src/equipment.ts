@@ -371,11 +371,21 @@ export interface SearchRequest {
   sortDirection: string;
   offset: number;
   pageSize: number;
+  /**
+   * The boxes under the column headers (CR-1): a JSON list of `{ "column": "manufacturer", "text": "abc" }`,
+   * column in camelCase. Every entry must match ("contains"), on top of everything else. Empty text or `[]` = none.
+   */
+  filtersJson: string;
 }
 
 const COLUMN_NAME = /^[a-z][A-Za-z0-9]{0,39}$/;
 export const MAX_PAGE_SIZE = 100;
 const MAX_OFFSET = 1_000_000;
+/** One filter per filterable column (the procedure holds the list of the 20 columns and checks it again). */
+export const MAX_FILTERS = 20;
+const MAX_FILTER_TEXT = 100;
+/** The size of the procedure's @filters_json parameter. */
+const MAX_FILTERS_JSON = 4000;
 
 interface CheckedSearch {
   mode: 'MATCH' | 'SORTED';
@@ -386,6 +396,8 @@ interface CheckedSearch {
   sortDirection: 'ASC' | 'DESC';
   offset: number;
   pageSize: number;
+  /** The filters as the procedure reads them (snake_case columns, trimmed texts, blanks dropped); '' = none. */
+  filtersJson: string;
 }
 
 function text(label: string, value: unknown, max: number): string {
@@ -409,6 +421,38 @@ function whole(label: string, value: unknown, min: number, max: number): number 
   return value;
 }
 
+/**
+ * The column filters as the procedure wants them. Only the shape is checked here (a JSON list, plain
+ * identifiers, text length, how many); WHICH columns may be filtered is the procedure's list.
+ * Blank texts are dropped, columns become snake_case, so the procedure receives one canonical form.
+ */
+function filters(value: unknown): string {
+  if (typeof value !== 'string') throw new Error('Invalid search: filters must be text.');
+  if (value.trim() === '') return '';
+  if (value.length > MAX_FILTERS_JSON) throw new Error(`Invalid search: filters are longer than ${MAX_FILTERS_JSON} characters.`);
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(value);
+  } catch {
+    throw new Error('Invalid search: filters are not valid JSON.');
+  }
+  if (!Array.isArray(parsed)) throw new Error('Invalid search: filters must be a list.');
+
+  const entries: { column: string; text: string }[] = [];
+  for (const item of parsed as unknown[]) {
+    if (typeof item !== 'object' || item === null) throw new Error('Invalid search: every filter needs a column and a text.');
+    const raw = item as Record<string, unknown>;
+    const col = column('filter column', raw['column']);
+    const txt = text('filter text', raw['text'], MAX_FILTER_TEXT);
+    if (txt !== '') entries.push({ column: col, text: txt });
+  }
+  if (entries.length > MAX_FILTERS) throw new Error(`Invalid search: more than ${MAX_FILTERS} filters.`);
+  if (entries.length === 0) return '';
+  const canonical = JSON.stringify(entries);
+  if (canonical.length > MAX_FILTERS_JSON) throw new Error(`Invalid search: filters are longer than ${MAX_FILTERS_JSON} characters.`);
+  return canonical;
+}
+
 /** Input checks only. The search rules (which columns, order, caps) are the procedure's. */
 export function checkSearch(request: SearchRequest): CheckedSearch {
   const mode = text('mode', request.mode, 8).toUpperCase();
@@ -424,6 +468,7 @@ export function checkSearch(request: SearchRequest): CheckedSearch {
     sortDirection: direction,
     offset: whole('offset', request.offset, 0, MAX_OFFSET),
     pageSize: whole('page size', request.pageSize, 1, MAX_PAGE_SIZE),
+    filtersJson: filters(request.filtersJson),
   };
 }
 
@@ -468,6 +513,7 @@ async function searchOrThrow(
       .input('sort_direction', sql.VarChar(4), p.sortDirection)
       .input('offset', sql.Int, p.offset)
       .input('page_size', sql.Int, p.pageSize)
+      .input('filters_json', sql.NVarChar(MAX_FILTERS_JSON), p.filtersJson)
       .output('total_matches', sql.Int)
       .output('has_more', sql.Bit)
       .output('truncated', sql.Bit)

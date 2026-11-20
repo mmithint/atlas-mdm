@@ -147,12 +147,20 @@ export function RequestDialog({ heater, choices, allowedValues, initialFieldCode
                 <dt className="text-200 text-muted-foreground">Current value</dt>
                 <dd className="mt-100 break-words text-300">
                   {field.current ? (
-                    <span className="id-plate">{field.unit ? `${field.current} ${field.unit}` : field.current}</span>
+                    <span className="id-plate">{withUnit(field.current, field.unit)}</span>
                   ) : (
                     <span className="text-muted-foreground">{BLANK} (blank)</span>
                   )}
                 </dd>
               </div>
+              {field.baseline ? (
+                <div>
+                  <dt className="text-200 text-muted-foreground">SAP baseline</dt>
+                  <dd className="mt-100 break-words text-300">
+                    <span className="id-plate">{withUnit(field.baseline, field.unit)}</span>
+                  </dd>
+                </div>
+              ) : null}
               <div>
                 <dt className="text-200 text-muted-foreground">Answers first, signs off second</dt>
                 <dd className="mt-100 text-300">
@@ -238,6 +246,8 @@ export function RequestDialog({ heater, choices, allowedValues, initialFieldCode
     </Modal>
   );
 }
+
+const withUnit = (value: string, unit: string | null): string => (unit ? `${value} ${unit}` : value);
 
 function Outcome({ answer }: { answer: CreateAnswer }) {
   const link =
