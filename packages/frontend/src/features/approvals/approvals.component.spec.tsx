@@ -255,14 +255,14 @@ describe('S-2 Approvals', () => {
     fireEvent.change(screen.getByLabelText('Rule'), { target: { value: 'HEATER_CLASS_FIRED' } });
     await waitFor(() => expect(fetchQueue).toHaveBeenLastCalledWith(expect.objectContaining({ ruleId: 'HEATER_CLASS_FIRED' }), 0));
 
-    fireEvent.change(screen.getByLabelText('Age'), { target: { value: '72' } });
+    fireEvent.change(screen.getByLabelText('Pending Since'), { target: { value: '72' } });
     await waitFor(() => expect(fetchQueue).toHaveBeenLastCalledWith(expect.objectContaining({ minAgeHours: 72 }), 0));
 
-    fireEvent.click(screen.getByLabelText('Has a note (TBD)'));
-    await waitFor(() => expect(fetchQueue).toHaveBeenLastCalledWith(expect.objectContaining({ noteOnly: true }), 0));
+    // The "Has a note (TBD)" tick box is not on the screen any more (taken out for the 20 Nov demo).
+    expect(screen.queryByLabelText('Has a note (TBD)')).toBeNull();
 
     const query = new URLSearchParams(window.location.hash.split('?')[1]);
-    expect(Object.fromEntries(query)).toEqual({ pc: 'ROCKIES-DJ BASIN', field: 'MANUFACTURER', rule: 'HEATER_CLASS_FIRED', age: '72', note: '1' });
+    expect(Object.fromEntries(query)).toEqual({ pc: 'ROCKIES-DJ BASIN', field: 'MANUFACTURER', rule: 'HEATER_CLASS_FIRED', age: '72' });
 
     fireEvent.click(await screen.findByRole('button', { name: 'Clear filters' }));
     await waitFor(() => expect(window.location.hash).toBe('#/approvals'));
@@ -291,7 +291,7 @@ describe('S-2 Approvals', () => {
     await screen.findByRole('link', { name: 'CR-000001' });
 
     openFilters();
-    const age = screen.getByLabelText('Age');
+    const age = screen.getByLabelText('Pending Since');
     expect(age).toBeDisabled();
     expect(age).toHaveAttribute('title', expect.stringContaining('open requests only'));
     expect(fetchQueue).toHaveBeenCalledWith(expect.objectContaining({ tab: 'APPROVED', minAgeHours: 0 }), 0);
@@ -304,10 +304,10 @@ describe('S-2 Approvals', () => {
     render(<Approvals />);
     await screen.findByRole('link', { name: 'CR-000001' });
     openFilters();
-    expect(screen.getByLabelText('Age')).toBeEnabled();
+    expect(screen.getByLabelText('Pending Since')).toBeEnabled();
   });
 
-  it('shows the request in the client\'s terms: blanks as dashes, TBD as a badge, rule requests with the time they were detected', async () => {
+  it('shows the request in the client\'s terms: blanks as dashes, TBD marked, rule requests with their source and note', async () => {
     fetchQueue.mockResolvedValue(
       queuePage([
         queueRow(1, { oldValue: null, note: 'TBD', photoCount: 2, ageHours: 79 }),
@@ -334,16 +334,16 @@ describe('S-2 Approvals', () => {
     expect(a.getByText('TBD')).toBeInTheDocument();
     expect(a.getByText('SYNTHETIC MFR B')).toBeInTheDocument();
     expect(a.getAllByText('—').length).toBeGreaterThanOrEqual(1); // the blank old value
-    expect(a.getByText('SAP: HERST')).toBeInTheDocument();
-    expect(a.getByText('by someone@example.test')).toBeInTheDocument();
+    // Not on the screen any more (taken out for the 20 Nov demo): the SAP field name, "by <person>", the photo count and the status badge.
+    expect(a.queryByText('SAP: HERST')).toBeNull();
+    expect(a.queryByText('by someone@example.test')).toBeNull();
+    expect(a.queryByText(/photo\(s\) attached/)).toBeNull();
+    expect(a.queryByText('Awaiting responsible')).toBeNull();
     expect(a.getByText('open 3 d')).toBeInTheDocument();
-    expect(a.getByText(/photo\(s\) attached/)).toBeInTheDocument();
-    expect(a.getByText('Awaiting responsible')).toBeInTheDocument();
 
     const b = within(second!);
     expect(b.getByText('Rule HEATER_CLASS_FIRED v1')).toBeInTheDocument();
     expect(b.queryByText(/^by /)).toBeNull();
-    expect(b.getByText('Detected')).toBeInTheDocument();
     expect(b.getByText('Note: check with site')).toBeInTheDocument();
     expect(b.getByText('Location request')).toBeInTheDocument();
   });

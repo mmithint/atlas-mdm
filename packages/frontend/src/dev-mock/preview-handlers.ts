@@ -6,7 +6,10 @@
 import type { ActAnswer } from '@/lib/act-answer';
 import type { PreviewFunctions } from '@/lib/preview-functions';
 
+import * as admin from './demo-admin';
 import * as field from './demo-field';
+import * as fieldForm from './demo-field-form';
+import { homeSummary } from './demo-home';
 import * as rules from './demo-rules';
 import { inboxOf, isReadBy, me } from './demo-store';
 import { Refusal } from './refusal';
@@ -44,7 +47,19 @@ export const previewHandlers: PreviewHandlers = {
   registerPhoto: (input) => answer(() => ({ photo: field.registerPhoto(input) })),
   extractNameplate: ({ equipmentId, fileId }) => answer(() => field.extractNameplate(equipmentId, fileId)),
   submitFieldVerification: ({ equipmentId, entries, photoIds }) => answer(() => field.submit(equipmentId, entries, photoIds)),
+  getFieldLookups: () => answer(() => fieldForm.lookups()),
+  getSiteHeaters: ({ site, subAsset }) => answer(() => fieldForm.siteHeaters(site, subAsset)),
+  getFieldForm: ({ equipmentId }) => answer(() => fieldForm.form(equipmentId)),
+  submitFieldForm: (input) => answer(() => fieldForm.submitForm(input)),
+  getAdminData: () => answer(() => admin.adminData()),
+  adminAddMember: ({ groupKey, displayName, email }) => answer(() => (admin.addMember(groupKey, displayName, email), { done: true })),
+  adminRemoveMember: ({ groupKey, email }) => answer(() => (admin.removeMember(groupKey, email), { done: true })),
+  adminSetRoute: ({ routeId, responsibleRole, accountableRole }) => answer(() => (admin.setRoute(routeId, responsibleRole, accountableRole), { done: true })),
+  adminSetDropdownValue: ({ fieldCode, value, active }) => answer(() => (admin.setDropdown(fieldCode, value, active), { done: true })),
+  adminSetMandatory: ({ fieldCode, mandatory }) => answer(() => (admin.setMandatory(fieldCode, mandatory), { done: true })),
   getVerificationScorecard: ({ profitCenter }) => answer(() => field.scorecard(profitCenter)),
+
+  getHomeSummary: () => answer(() => homeSummary()),
 
   markNotificationsRead: ({ notificationIds }) =>
     answer(() => {

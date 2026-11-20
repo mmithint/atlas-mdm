@@ -61,7 +61,8 @@ describe('App shell', () => {
     expect(screen.getByLabelText('Your roles')).toHaveTextContent('GeneralViewer, Operations-IOC');
 
     const names = within(menu()).getAllByRole('link').map((a) => a.textContent?.replace(/soon$/, '').trim());
-    expect(names).toEqual(['Home', 'Approvals', 'Equipment', 'Field view', 'New field request', 'Rules', 'Verification', 'EVOLVE export', 'Notifications']);
+    // New field request, Verification and Notifications are left out of the menu on purpose (20 Nov demo).
+    expect(names).toEqual(['Home', 'Equipment', 'Approvals', 'Field view', 'Rules', 'EVOLVE export']);
     expect(within(menu()).queryByRole('link', { name: /Admin/ })).toBeNull();
   });
 

@@ -16,8 +16,8 @@ import type {
   RunRuleLine,
 } from '@/features/rules/rules-types';
 
-import { ALLOWED_VALUES, fieldOf } from './catalog';
-import { createRequest, demo, isOpen, me, nowIso, publishedVersions, RULE_ENGINE, storeResults } from './demo-store';
+import { fieldOf } from './catalog';
+import { activeValues, createRequest, demo, isOpen, me, nowIso, publishedVersions, RULE_ENGINE, storeResults } from './demo-store';
 import { currentPersona } from './personas';
 import { Refusal } from './refusal';
 import { fingerprint, hasGroupBy, SAMPLE_RULES, sampleRule, stripComments, type Violation } from './rule-samples';
@@ -46,9 +46,9 @@ const DENY = /\b(INSERT|UPDATE|DELETE|MERGE|CREATE|ALTER|DROP|TRUNCATE|EXEC|EXEC
 const key = (ruleId: string, version: number) => `${ruleId}|${version}`;
 
 /** What a test fingerprints: the SQL and the policy fields. Name, description and reason do not make a test stale. */
-function definitionHash(v: Pick<RuleVersion, 'queryText' | 'routingMode' | 'resolutionGroup' | 'responsibleGroup' | 'accountableGroup' | 'allowedTargets' | 'applicability' | 'effectiveFromUtc' | 'effectiveToUtc'>): string {
+function definitionHash(v: Pick<RuleVersion, 'executionTarget' | 'queryText' | 'routingMode' | 'resolutionGroup' | 'responsibleGroup' | 'accountableGroup' | 'allowedTargets' | 'applicability' | 'effectiveFromUtc' | 'effectiveToUtc'>): string {
   return fingerprint(
-    JSON.stringify([v.queryText, v.routingMode, v.resolutionGroup, v.responsibleGroup, v.accountableGroup, [...v.allowedTargets].sort(), [...v.applicability].sort(), v.effectiveFromUtc, v.effectiveToUtc])
+    JSON.stringify([v.executionTarget, v.queryText, v.routingMode, v.resolutionGroup, v.responsibleGroup, v.accountableGroup, [...v.allowedTargets].sort(), [...v.applicability].sort(), v.effectiveFromUtc, v.effectiveToUtc])
   );
 }
 
@@ -126,9 +126,11 @@ export function saveDraft(input: RuleDraftInput): RuleVersion {
   Object.assign(v, {
     ruleName: input.ruleName.trim(),
     description: input.description,
+    executionTarget: input.executionTarget,
     queryText: input.queryText,
     routingMode: input.routingMode,
-    resolutionGroup: input.resolutionGroup,
+    // The sheet has no resolution role; the rule editor role resolves what the rule finds.
+    resolutionGroup: input.editorGroup,
     editorGroup: input.editorGroup,
     responsibleGroup: input.responsibleGroup,
     accountableGroup: input.accountableGroup,
@@ -167,8 +169,8 @@ export function createVersion(ruleId: string, ruleName: string): RuleVersion {
         status: 'DRAFT',
         ruleName: ruleName.trim(),
         description: '',
-        queryLanguage: 'T-SQL',
-        executionTarget: 'ATLAS_DB · gold views',
+        queryLanguage: 'TSQL',
+        executionTarget: '',
         queryText: '',
         routingMode: 'MANUAL',
         resolutionGroup: 'DataQualityOwner',
@@ -185,7 +187,6 @@ export function createVersion(ruleId: string, ruleName: string): RuleVersion {
         testedBy: null,
         publishedBy: null,
         publishedAtUtc: null,
-        queryHash: null,
         createdBy: me(),
         updatedAtUtc: now,
       };
@@ -199,7 +200,6 @@ export function createVersion(ruleId: string, ruleName: string): RuleVersion {
     testedBy: null,
     publishedBy: null,
     publishedAtUtc: null,
-    queryHash: null,
     createdBy: me(),
     updatedAtUtc: now,
   });
@@ -269,7 +269,7 @@ export function test(ruleId: string, version: number): { test: RuleTestResult; v
       x.proposedValue !== null &&
       x.fieldCode !== null &&
       v.allowedTargets.includes(x.fieldCode) &&
-      (fieldOf(x.fieldCode)?.allowedValuesSource !== 'LIST' || ALLOWED_VALUES.some((a) => a.fieldCode === x.fieldCode && a.value === x.proposedValue));
+      (fieldOf(x.fieldCode)?.allowedValuesSource !== 'LIST' || activeValues(x.fieldCode).includes(x.proposedValue ?? ''));
     checks.push(
       check('ONE_ROW_PER_HEATER_AND_FIELD', 'One row per heater and field', twice === 0, 'Every heater and field appears once.', `${twice} heater(s) have more than one row for the same field. Aggregate the rows (GROUP BY) so each appears once.`),
       v.routingMode === 'AUTO_ROUTE'
@@ -372,7 +372,6 @@ export function publish(ruleId: string, version: number, reason: string): RuleVe
     effectiveFromUtc: v.effectiveFromUtc && v.effectiveFromUtc > now ? v.effectiveFromUtc : now,
     publishedBy: me(),
     publishedAtUtc: now,
-    queryHash: fingerprint(v.queryText),
     updatedAtUtc: now,
   });
   return v;

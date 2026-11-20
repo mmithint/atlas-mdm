@@ -155,7 +155,8 @@ export function EquipmentSearch() {
   );
 }
 
-function Summary({ view, filtered }: { view: ReturnType<typeof useEquipmentSearch>; filtered: boolean }) {
+// Not shown at the moment (the summary line is commented out in the toolbar); exported so the code is kept and the build stays clean.
+export function Summary({ view, filtered }: { view: ReturnType<typeof useEquipmentSearch>; filtered: boolean }) {
   if (view.status !== 'ready') return <p className="text-300 text-muted-foreground">{view.status === 'loading' ? 'Searching…' : ''}</p>;
   return (
     <p className="text-300">

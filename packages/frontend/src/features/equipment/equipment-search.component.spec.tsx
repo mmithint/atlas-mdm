@@ -140,13 +140,12 @@ describe('S-4 Equipment search', () => {
     expect(window.location.hash).toBe('#/equipment?f.equipClass=fired&sort=manufacturer&dir=desc');
   });
 
-  it('says how many heaters match and which page this is', async () => {
+  // The summary line ("N heaters match") is not shown at the moment (commented out in the toolbar); the pager still says which page this is.
+  it('says which page this is, and how many pages there are', async () => {
     window.location.hash = '#/equipment?f.manufacturer=heat';
     fetchSortedPage.mockResolvedValue(page([searchRow(1), searchRow(2), searchRow(3)], true, 120));
     render(<EquipmentSearch />);
-    expect(await screen.findByText('120')).toBeInTheDocument();
-    expect(screen.getByText(/heaters\s*match/)).toBeInTheDocument();
-    expect(screen.getByText(/page 1 of 3/)).toBeInTheDocument();
+    expect(await screen.findByText('Page 1 of 3')).toBeInTheDocument();
   });
 
   it('shows the filters of the address in the boxes, and keeps a hidden column hidden', async () => {
@@ -230,7 +229,7 @@ describe('S-4 Equipment search', () => {
     fetchSortedPage.mockReturnValue(new Promise(() => undefined)); // never answers
     render(<EquipmentSearch />);
     expect(await screen.findByLabelText('Filter Manufacturer')).toBeInTheDocument();
-    expect(screen.getByText('Searching…')).toBeInTheDocument();
+    expect(screen.getByRole('status', { name: 'Searching' })).toBeInTheDocument();
   });
 
   it('explains an empty result in words, and keeps the boxes', async () => {

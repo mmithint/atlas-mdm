@@ -21,7 +21,7 @@ import type { QueueRow } from '../features/approvals/queue-api';
 import type { DetailRow } from '../features/approvals/request-api';
 import { checkRows, detailRow, goldRow, relatedRow, routeRow, viewer } from '../features/approvals/request-fixtures';
 
-import { ALLOWED_VALUES, CATALOG, fieldOf, fieldValueOf, setFieldValue } from './catalog';
+import { CATALOG, fieldOf, fieldValueOf, setFieldValue } from './catalog';
 import {
   ACCOUNTABLE_GROUP,
   addEvent,
@@ -268,7 +268,7 @@ export const mockHandlers: Handlers = {
       ...ok(),
       canSubmit: p.canSubmitRequests,
       isAdmin: p.canManageAdmin,
-      allowedValues: [...ALLOWED_VALUES],
+      allowedValues: demo().admin.dropdowns.filter((d) => d.active).map(({ fieldCode, value, order }) => ({ fieldCode, value, order })),
       blockedFields: p.canManageAdmin
         ? []
         : CATALOG.filter((c) => c.adminOnly).map((c) => ({ fieldCode: c.fieldCode, reason: 'Only an admin or a business rule may change this field.' })),

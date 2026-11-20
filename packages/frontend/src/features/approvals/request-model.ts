@@ -36,12 +36,6 @@ export function statusDisplay(status: string): StatusDisplay {
 /** A closed request: no decision is expected any more. */
 export const isClosed = (status: string): boolean => status === 'APPROVED' || status === 'REJECTED' || status === 'CANCELLED';
 
-export function stageLabel(stage: string | null | undefined): string {
-  if (stage === 'RESPONSIBLE') return 'Responsible (first stage)';
-  if (stage === 'ACCOUNTABLE') return 'Accountable (second stage)';
-  return BLANK;
-}
-
 const EVENT: Readonly<Record<string, string>> = {
   CREATED: 'Request created',
   RESPONSIBLE_APPROVED: 'Approved by the responsible stage',

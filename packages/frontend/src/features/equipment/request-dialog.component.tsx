@@ -143,16 +143,16 @@ export function RequestDialog({ heater, choices, allowedValues, initialFieldCode
         {field !== null ? (
           <>
             <dl className="grid gap-300 rounded-md bg-muted px-300 py-300 sm:grid-cols-2">
-              <div>
+              {/* <div>
                 <dt className="text-200 text-muted-foreground">Current value</dt>
-                <dd className="mt-100 break-words text-300">
+                 <dd className="mt-100 break-words text-300">
                   {field.current ? (
                     <span className="id-plate">{withUnit(field.current, field.unit)}</span>
                   ) : (
                     <span className="text-muted-foreground">{BLANK} (blank)</span>
                   )}
-                </dd>
-              </div>
+                </dd> 
+              </div> */}
               {field.baseline ? (
                 <div>
                   <dt className="text-200 text-muted-foreground">SAP baseline</dt>
@@ -162,7 +162,7 @@ export function RequestDialog({ heater, choices, allowedValues, initialFieldCode
                 </div>
               ) : null}
               <div>
-                <dt className="text-200 text-muted-foreground">Answers first, signs off second</dt>
+                <dt className="text-200 text-muted-foreground">Approval Stages</dt>
                 <dd className="mt-100 text-300">
                   {field.responsibleRole && field.accountableRole ? (
                     <span>

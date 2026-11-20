@@ -21,9 +21,7 @@ import {
   fromDateInput,
   GROUPS,
   isDirty,
-  ROUTING_TEXT,
   rowsLine,
-  shortHash,
   STATE_DISPLAY,
   TEST_DISPLAY,
   toDateInput,
@@ -137,14 +135,13 @@ function Loaded({ ruleId, data, refresh }: { ruleId: string; data: RuleData; ref
     <div className="space-y-400">
       <BackLink />
       <PageHeader title={v.ruleName} subtitle={v.description || undefined}>
-        <p className="mt-200 flex flex-wrap items-center gap-200">
+        {/* <p className="mt-200 flex flex-wrap items-center gap-200">
           <span className="id-plate">{ruleId}</span>
           <Pill tone={state_.tone}>
             {state_.text} v{v.version}
           </Pill>
           {v.status === 'DRAFT' ? <Pill tone={test.tone}>{test.text}</Pill> : null}
-          <span className="text-200 text-muted-foreground">{ROUTING_TEXT[v.routingMode]}</span>
-        </p>
+        </p> */}
       </PageHeader>
 
       {draft && published ? (
@@ -158,7 +155,7 @@ function Loaded({ ruleId, data, refresh }: { ruleId: string; data: RuleData; ref
         </div>
       ) : null}
 
-      <ActionBar
+      {/* <ActionBar
         v={v}
         editable={editable}
         canCreateVersion={!draft && canEditRule(person, v.editorGroup)}
@@ -169,7 +166,7 @@ function Loaded({ ruleId, data, refresh }: { ruleId: string; data: RuleData; ref
         onPreview={() => void runPreview()}
         onPublish={() => setPublishing(true)}
         onNewVersion={() => void newVersion()}
-      />
+      /> */}
 
       {notice ? (
         <p role="status" className={`rounded-md border px-300 py-200 text-300 ${notice.tone === 'danger' ? 'border-destructive' : 'border-border bg-card'}`}>
@@ -183,10 +180,10 @@ function Loaded({ ruleId, data, refresh }: { ruleId: string; data: RuleData; ref
         onChange={setTab}
         tabs={[
           { id: 'definition', label: 'Definition' },
-          { id: 'test', label: 'Test' },
-          { id: 'preview', label: 'Preview' },
-          { id: 'versions', label: `Versions (${data.versions.length})` },
-          { id: 'runs', label: 'Runs' },
+          // { id: 'test', label: 'Test' },
+          // { id: 'preview', label: 'Preview' },
+          // { id: 'versions', label: `Versions (${data.versions.length})` },
+          // { id: 'runs', label: 'Runs' },
         ]}
       >
         {tab === 'definition' ? (
@@ -199,7 +196,7 @@ function Loaded({ ruleId, data, refresh }: { ruleId: string; data: RuleData; ref
         {tab === 'test' ? <TestPanel test={lastTest} v={v} /> : null}
         {tab === 'preview' ? <PreviewPanel data={preview && preview.key === savedKey ? preview.data : null} blockedBecause={gate.preview} /> : null}
         {tab === 'versions' ? <VersionsTable versions={data.versions} /> : null}
-        {tab === 'runs' ? <RunsTable runs={data.runs} /> : null}
+        {/* {tab === 'runs' ? <RunsTable runs={data.runs} /> : null} */}
       </Tabs>
 
       {publishing ? (
@@ -221,76 +218,76 @@ function Loaded({ ruleId, data, refresh }: { ruleId: string; data: RuleData; ref
 
 // ---- action bar ---------------------------------------------------------------------
 
-function ActionBar({
-  v,
-  editable,
-  canCreateVersion,
-  gate,
-  busy,
-  onSave,
-  onTest,
-  onPreview,
-  onPublish,
-  onNewVersion,
-}: {
-  v: RuleVersion;
-  editable: boolean;
-  canCreateVersion: boolean;
-  gate: ReturnType<typeof actionGate>;
-  busy: string | null;
-  onSave: () => void;
-  onTest: () => void;
-  onPreview: () => void;
-  onPublish: () => void;
-  onNewVersion: () => void;
-}) {
-  if (v.status !== 'DRAFT') {
-    return (
-      <div className="flex flex-wrap items-center gap-300 rounded-lg border border-border bg-card px-400 py-300 text-300">
-        <span className="text-muted-foreground">
-          {v.status === 'PUBLISHED' ? 'Published versions never change. To change this rule, create a new version, test it and publish it.' : 'This version is retired.'}
-        </span>
-        {canCreateVersion && v.status === 'PUBLISHED' ? (
-          <button type="button" className={`${button.secondary} ml-auto`} onClick={onNewVersion} disabled={busy !== null}>
-            <GitBranchPlus aria-hidden="true" className="icon-size-200" />
-            Create new version
-          </button>
-        ) : null}
-      </div>
-    );
-  }
-  const steps: { key: keyof typeof gate; label: string; icon: ReactNode; onClick: () => void; primary?: boolean }[] = [
-    { key: 'save', label: 'Save draft', icon: <Save aria-hidden="true" className="icon-size-200" />, onClick: onSave },
-    { key: 'test', label: 'Test query', icon: <FlaskConical aria-hidden="true" className="icon-size-200" />, onClick: onTest },
-    { key: 'preview', label: 'Preview changes', icon: <Eye aria-hidden="true" className="icon-size-200" />, onClick: onPreview },
-    { key: 'publish', label: 'Publish', icon: <Send aria-hidden="true" className="icon-size-200" />, onClick: onPublish, primary: true },
-  ];
-  const firstBlock = steps.map((s) => gate[s.key]).find((r) => r !== null && r !== 'Nothing has changed.');
-  return (
-    <div className="space-y-200 rounded-lg border border-border bg-card px-400 py-300">
-      <div className="flex flex-wrap items-center gap-200">
-        {steps.map((s, i) => (
-          <span key={s.key} className="flex items-center gap-200">
-            {i > 0 ? <span aria-hidden="true" className="text-muted-foreground">→</span> : null}
-            <button
-              type="button"
-              className={s.primary ? button.primary : button.secondary}
-              disabled={gate[s.key] !== null || busy !== null}
-              title={gate[s.key] ?? undefined}
-              onClick={s.onClick}
-            >
-              {s.icon}
-              {busy === s.key ? 'Working…' : s.label}
-            </button>
-          </span>
-        ))}
-      </div>
-      <p className="text-200 text-muted-foreground">
-        {!editable ? 'You can read this draft. Only members of the editor group may change it.' : firstBlock ? `Next: ${firstBlock}` : 'Ready to publish.'}
-      </p>
-    </div>
-  );
-}
+// function ActionBar({
+//   v,
+//   editable,
+//   canCreateVersion,
+//   gate,
+//   busy,
+//   onSave,
+//   onTest,
+//   onPreview,
+//   onPublish,
+//   onNewVersion,
+// }: {
+//   v: RuleVersion;
+//   editable: boolean;
+//   canCreateVersion: boolean;
+//   gate: ReturnType<typeof actionGate>;
+//   busy: string | null;
+//   onSave: () => void;
+//   onTest: () => void;
+//   onPreview: () => void;
+//   onPublish: () => void;
+//   onNewVersion: () => void;
+// }) {
+//   if (v.status !== 'DRAFT') {
+//     return (
+//       <div className="flex flex-wrap items-center gap-300 rounded-lg border border-border bg-card px-400 py-300 text-300">
+//         <span className="text-muted-foreground">
+//           {v.status === 'PUBLISHED' ? 'Published versions never change. To change this rule, create a new version, test it and publish it.' : 'This version is retired.'}
+//         </span>
+//         {canCreateVersion && v.status === 'PUBLISHED' ? (
+//           <button type="button" className={`${button.secondary} ml-auto`} onClick={onNewVersion} disabled={busy !== null}>
+//             <GitBranchPlus aria-hidden="true" className="icon-size-200" />
+//             Create new version
+//           </button>
+//         ) : null}
+//       </div>
+//     );
+//   }
+//   const steps: { key: keyof typeof gate; label: string; icon: ReactNode; onClick: () => void; primary?: boolean }[] = [
+//     { key: 'save', label: 'Save draft', icon: <Save aria-hidden="true" className="icon-size-200" />, onClick: onSave },
+//     { key: 'test', label: 'Test query', icon: <FlaskConical aria-hidden="true" className="icon-size-200" />, onClick: onTest },
+//     { key: 'preview', label: 'Preview changes', icon: <Eye aria-hidden="true" className="icon-size-200" />, onClick: onPreview },
+//     { key: 'publish', label: 'Publish', icon: <Send aria-hidden="true" className="icon-size-200" />, onClick: onPublish, primary: true },
+//   ];
+//   const firstBlock = steps.map((s) => gate[s.key]).find((r) => r !== null && r !== 'Nothing has changed.');
+//   return (
+//     <div className="space-y-200 rounded-lg border border-border bg-card px-400 py-300">
+//       <div className="flex flex-wrap items-center gap-200">
+//         {steps.map((s, i) => (
+//           <span key={s.key} className="flex items-center gap-200">
+//             {i > 0 ? <span aria-hidden="true" className="text-muted-foreground">→</span> : null}
+//             <button
+//               type="button"
+//               className={s.primary ? button.primary : button.secondary}
+//               disabled={gate[s.key] !== null || busy !== null}
+//               title={gate[s.key] ?? undefined}
+//               onClick={s.onClick}
+//             >
+//               {s.icon}
+//               {busy === s.key ? 'Working…' : s.label}
+//             </button>
+//           </span>
+//         ))}
+//       </div>
+//       <p className="text-200 text-muted-foreground">
+//         {!editable ? 'You can read this draft. Only members of the editor group may change it.' : firstBlock ? `Next: ${firstBlock}` : 'Ready to publish.'}
+//       </p>
+//     </div>
+//   );
+// }
 
 // ---- definition ---------------------------------------------------------------------
 
@@ -305,26 +302,28 @@ function DefinitionForm({ form, update, catalog }: { form: RuleDraftInput; updat
             <FormField label="Rule ID" htmlFor={`${ids}-id`} hint="Fixed after the first save.">
               <input id={`${ids}-id`} className={`${input} font-mono`} value={form.ruleId} readOnly />
             </FormField>
-            <FormField label="Name" htmlFor={`${ids}-name`} error={form.ruleName.trim() ? null : 'A name is required.'}>
+            <FormField label="Rule name" htmlFor={`${ids}-name`} error={form.ruleName.trim() ? null : 'A name is required.'}>
               <input id={`${ids}-name`} className={input} value={form.ruleName} onChange={(e) => update({ ruleName: e.target.value })} maxLength={120} />
             </FormField>
           </div>
           <div className="mt-300">
-            <FormField label="Description" htmlFor={`${ids}-desc`} hint="What the rule checks, in plain words.">
+            <FormField label="Rule description" htmlFor={`${ids}-desc`} hint="What the rule checks, in plain words.">
               <textarea id={`${ids}-desc`} className={input} rows={3} value={form.description} onChange={(e) => update({ description: e.target.value })} />
             </FormField>
           </div>
         </Panel>
-        <Panel title="Query" hint="T-SQL over the gold views only, returning the ten columns of the output contract (01 §6.4). It runs read-only, inside a transaction that is always rolled back.">
-          <div className="mb-300 flex flex-wrap gap-300 text-200 text-muted-foreground">
-            <span>
-              Language <strong className="text-foreground">T-SQL</strong>
-            </span>
-            <span>
-              Runs on <strong className="text-foreground">ATLAS_DB · gold views</strong>
-            </span>
+        <Panel title="Query" hint="Returns the ten columns of the output contract (01 §6.4). It runs read-only, inside a transaction that is always rolled back.">
+          <div className="mb-300 grid gap-300 sm:grid-cols-3">
+            <FormField label="Query language" htmlFor={`${ids}-lang`}>
+              <input id={`${ids}-lang`} className={`${input} font-mono`} value="TSQL" readOnly />
+            </FormField>
+            <div className="sm:col-span-2">
+              <FormField label="Execution target" htmlFor={`${ids}-target`} hint="The source tables the rule checks. ATLAS reads their gold copies.">
+                <input id={`${ids}-target`} className={`${input} font-mono`} value={form.executionTarget} onChange={(e) => update({ executionTarget: e.target.value })} maxLength={200} />
+              </FormField>
+            </div>
           </div>
-          <SqlEditor id={`${ids}-sql`} label="Rule SQL" value={form.queryText} onChange={(queryText) => update({ queryText })} />
+          <SqlEditor id={`${ids}-sql`} label="Query text" value={form.queryText} onChange={(queryText) => update({ queryText })} />
         </Panel>
       </div>
       <div className="space-y-400">
@@ -336,21 +335,25 @@ function DefinitionForm({ form, update, catalog }: { form: RuleDraftInput; updat
                 <input type="radio" name={`${ids}-routing`} checked={form.routingMode === mode} onChange={() => update({ routingMode: mode })} className="mt-100" />
                 <span>
                   <span className="font-medium">{mode === 'MANUAL' ? 'Manual' : 'Auto-route'}</span>
-                  <span className="block text-200 text-muted-foreground">{ROUTING_TEXT[mode]}</span>
                 </span>
               </label>
             ))}
           </fieldset>
           <div className="mt-300 space-y-300">
-            <GroupSelect id={`${ids}-res`} label="Resolution group" hint="Reviews what a manual rule finds." value={form.resolutionGroup} onChange={(resolutionGroup) => update({ resolutionGroup })} allowNone />
-            <GroupSelect id={`${ids}-resp`} label="Responsible group" value={form.responsibleGroup} onChange={(responsibleGroup) => update({ responsibleGroup })} routeTable />
-            <GroupSelect id={`${ids}-acc`} label="Accountable group" value={form.accountableGroup} onChange={(accountableGroup) => update({ accountableGroup })} routeTable />
+            <GroupSelect id={`${ids}-resp`} label="Responsible role" value={form.responsibleGroup} onChange={(responsibleGroup) => update({ responsibleGroup })} routeTable />
+            <GroupSelect id={`${ids}-acc`} label="Accountable role" value={form.accountableGroup} onChange={(accountableGroup) => update({ accountableGroup })} routeTable />
           </div>
         </Panel>
         <Panel title="Ownership">
-          <GroupSelect id={`${ids}-ed`} label="Editor group" hint="Its members may edit and test this rule." value={form.editorGroup} onChange={(g) => update({ editorGroup: g ?? 'DataQualityOwner' })} />
+          <GroupSelect
+            id={`${ids}-ed`}
+            label="Rule editor role"
+            hint="Its members may edit and test this rule, and review what a manual rule finds."
+            value={form.editorGroup}
+            onChange={(g) => update({ editorGroup: g ?? 'DataQualityOwner', resolutionGroup: g ?? 'DataQualityOwner' })}
+          />
         </Panel>
-        <Panel title="Scope">
+        <Panel title="Scope" hint="ATLAS settings, not columns of the client's rule sheet.">
           <fieldset>
             <legend className="text-300 font-medium">Fields it may change</legend>
             <div className="mt-200 max-h-48 space-y-100 overflow-y-auto">
@@ -376,15 +379,15 @@ function DefinitionForm({ form, update, catalog }: { form: RuleDraftInput; updat
         </Panel>
         <Panel title="Period and reason">
           <div className="grid gap-300 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
-            <FormField label="In force from" htmlFor={`${ids}-from`} hint="Empty = when published.">
+            <FormField label="Effective from (UTC)" htmlFor={`${ids}-from`} hint="Empty = when published.">
               <input id={`${ids}-from`} type="date" className={input} value={toDateInput(form.effectiveFromUtc)} onChange={(e) => update({ effectiveFromUtc: fromDateInput(e.target.value) })} />
             </FormField>
-            <FormField label="In force until" htmlFor={`${ids}-to`} hint="Empty = open-ended.">
+            <FormField label="Effective to (UTC)" htmlFor={`${ids}-to`} hint="Empty = open-ended.">
               <input id={`${ids}-to`} type="date" className={input} value={toDateInput(form.effectiveToUtc)} onChange={(e) => update({ effectiveToUtc: fromDateInput(e.target.value) })} />
             </FormField>
           </div>
           <div className="mt-300">
-            <FormField label="Change reason" htmlFor={`${ids}-reason`} hint="Required to publish.">
+            <FormField label="Version change reason" htmlFor={`${ids}-reason`} hint="Required to publish.">
               <textarea id={`${ids}-reason`} className={input} rows={2} value={form.changeReason} onChange={(e) => update({ changeReason: e.target.value })} />
             </FormField>
           </div>
@@ -415,6 +418,7 @@ function GroupSelect({
     <FormField label={label} htmlFor={id} hint={hint ?? (routeTable ? 'Empty = the approval route table decides.' : undefined)}>
       <select id={id} className={input} value={value ?? ''} onChange={(e) => onChange(e.target.value || null)}>
         {routeTable ? <option value="">From the route table</option> : allowNone ? <option value="">None</option> : null}
+        {value && !GROUPS.includes(value) ? <option value={value}>{`${value} (not a defined group)`}</option> : null}
         {GROUPS.map((g) => (
           <option key={g} value={g}>
             {g}
@@ -435,20 +439,19 @@ function DefinitionView({ v, catalog }: { v: RuleVersion; catalog: readonly Cata
       </Panel>
       <Panel title="Policy">
         <dl className="space-y-200 text-300">
-          <Fact label="Routing">{ROUTING_TEXT[v.routingMode]}</Fact>
-          <Fact label="Resolution group">{orBlank(v.resolutionGroup)}</Fact>
-          <Fact label="Editor group">{v.editorGroup}</Fact>
-          <Fact label="Responsible / accountable">{v.responsibleGroup || v.accountableGroup ? `${orBlank(v.responsibleGroup)} / ${orBlank(v.accountableGroup)}` : 'From the route table'}</Fact>
-          <Fact label="Fields it may change">{v.allowedTargets.length ? v.allowedTargets.map(label).join(', ') : 'None (reports only)'}</Fact>
-          <Fact label="Applies to">{v.applicability.join(', ') || BLANK}</Fact>
-          <Fact label="In force">{v.effectiveFromUtc ? `${formatUtc(v.effectiveFromUtc)} → ${v.effectiveToUtc ? formatUtc(v.effectiveToUtc) : 'open-ended'}` : 'Not yet'}</Fact>
-          <Fact label="Reason">{v.changeReason || BLANK}</Fact>
+          <Fact label="Query language">{v.queryLanguage}</Fact>
+          <Fact label="Execution target">
+            <span className="font-mono">{v.executionTarget || BLANK}</span>
+          </Fact>
+          <Fact label="Routing mode">{v.routingMode === 'AUTO_ROUTE' ? 'Auto-route' : 'Manual'}</Fact>
+          <Fact label="Rule editor role">{v.editorGroup}</Fact>
+          <Fact label="Responsible role">{v.responsibleGroup ?? 'From the route table'}</Fact>
+          <Fact label="Accountable role">{v.accountableGroup ?? 'From the route table'}</Fact>
+          <Fact label="Effective from → to (UTC)">{v.effectiveFromUtc ? `${formatUtc(v.effectiveFromUtc)} → ${v.effectiveToUtc ? formatUtc(v.effectiveToUtc) : 'open-ended'}` : 'Not yet'}</Fact>
+          <Fact label="Version change reason">{v.changeReason || BLANK}</Fact>
+          <Fact label="Fields it may change (ATLAS)">{v.allowedTargets.length ? v.allowedTargets.map(label).join(', ') : 'None (reports only)'}</Fact>
+          <Fact label="Applies to classes (ATLAS)">{v.applicability.join(', ') || BLANK}</Fact>
           {v.publishedBy ? <Fact label="Published">{`${v.publishedBy}, ${formatUtc(v.publishedAtUtc)}`}</Fact> : null}
-          {v.queryHash ? (
-            <Fact label="Fingerprint">
-              <span className="font-mono">{v.queryHash}</span>
-            </Fact>
-          ) : null}
         </dl>
       </Panel>
     </div>
@@ -623,7 +626,6 @@ function VersionsTable({ versions }: { versions: readonly RuleVersion[] }) {
             <th scope="col" className={TH}>In force</th>
             <th scope="col" className={TH}>Published by</th>
             <th scope="col" className={TH}>Reason</th>
-            <th scope="col" className={TH}>Fingerprint</th>
           </tr>
         </thead>
         <tbody>
@@ -636,9 +638,6 @@ function VersionsTable({ versions }: { versions: readonly RuleVersion[] }) {
               <td className={TD}>{v.effectiveFromUtc ? `${formatUtc(v.effectiveFromUtc)} → ${v.effectiveToUtc ? formatUtc(v.effectiveToUtc) : 'now'}` : BLANK}</td>
               <td className={TD}>{v.publishedBy ? `${v.publishedBy} · ${formatUtc(v.publishedAtUtc)}` : BLANK}</td>
               <td className={`${TD} max-w-xs whitespace-normal`}>{v.changeReason || BLANK}</td>
-              <td className={`${TD} font-mono text-200`} title={v.queryHash ?? undefined}>
-                {shortHash(v.queryHash)}
-              </td>
             </tr>
           ))}
         </tbody>
@@ -731,13 +730,13 @@ function PublishDialog({ v, onClose, onPublish }: { v: RuleVersion; onClose: () 
       <div className="space-y-300 text-300">
         <p>This exact definition goes into force. The previous version's period ends now, and the next run (tonight, or Run rules now) uses it.</p>
         <dl className="grid gap-200 sm:grid-cols-2">
-          <Fact label="Routing">{ROUTING_TEXT[v.routingMode]}</Fact>
-          <Fact label="Editor group">{v.editorGroup}</Fact>
-          <Fact label="Approval groups">{v.responsibleGroup || v.accountableGroup ? `${orBlank(v.responsibleGroup)} / ${orBlank(v.accountableGroup)}` : 'From the route table'}</Fact>
-          <Fact label="In force">{v.effectiveFromUtc ? formatUtc(v.effectiveFromUtc) : 'From now'} → {v.effectiveToUtc ? formatUtc(v.effectiveToUtc) : 'open-ended'}</Fact>
+          <Fact label="Routing mode">{v.routingMode === 'AUTO_ROUTE' ? 'Auto-route' : 'Manual'}</Fact>
+          <Fact label="Rule editor role">{v.editorGroup}</Fact>
+          <Fact label="Responsible / accountable role">{v.responsibleGroup || v.accountableGroup ? `${orBlank(v.responsibleGroup)} / ${orBlank(v.accountableGroup)}` : 'From the route table'}</Fact>
+          <Fact label="Effective (UTC)">{v.effectiveFromUtc ? formatUtc(v.effectiveFromUtc) : 'From now'} → {v.effectiveToUtc ? formatUtc(v.effectiveToUtc) : 'open-ended'}</Fact>
         </dl>
         <SqlEditor id={`${ids}-sql`} label="SQL to publish" value={v.queryText} readOnly rows={8} />
-        <FormField label="Why this version" htmlFor={`${ids}-reason`} error={reason.trim() ? null : 'A reason is required.'}>
+        <FormField label="Version change reason" htmlFor={`${ids}-reason`} error={reason.trim() ? null : 'A reason is required.'}>
           <textarea id={`${ids}-reason`} className={input} rows={2} value={reason} onChange={(e) => setReason(e.target.value)} />
         </FormField>
         {error ? <ErrorState message={error} /> : null}

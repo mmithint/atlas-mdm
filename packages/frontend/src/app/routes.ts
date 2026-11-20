@@ -53,7 +53,7 @@ export const ROUTES: readonly RouteDef[] = [
     id: 'home',
     screen: 'S-1',
     title: 'Home',
-    summary: 'Your queue counts, your open requests and your latest notifications.',
+    summary: 'Requests waiting for you; for approvers and admins, data quality and the request pipeline.',
     pattern: '/',
     inMenu: true,
     needsAdmin: false,

@@ -129,11 +129,11 @@ function Heater({ detail }: { detail: HeaterDetail }) {
         <EmptyState title="No catalogue fields to show" hint="The field catalogue is empty. Run the seed 0106 (field catalogue) in the database." />
       ) : null}
 
-      <p className="text-200 text-muted-foreground">
+      {/* <p className="text-200 text-muted-foreground">
         Golden record version {orBlank(heater.goldenVersionId)}. Last approved change:{' '}
         {heater.lastChangedAtUtc ? formatUtc(heater.lastChangedAtUtc) : 'none yet (the values are the SAP baseline)'}.
         SAP baseline taken {formatUtc(heater.baselineAsOfUtc)}.
-      </p>
+      </p> */}
 
       <EquipmentRequests equipmentId={heater.equipmentId} reloadKey={requestsReload} />
 

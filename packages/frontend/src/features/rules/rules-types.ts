@@ -16,11 +16,17 @@ export interface RuleVersion {
   status: RuleState;
   ruleName: string;
   description: string;
-  queryLanguage: 'T-SQL';
+  /** `query_language` in REF-46 Business Rule Drafts (L0264): `TSQL`. */
+  queryLanguage: 'TSQL';
+  /** `execution_target`: the client's source tables, as the workbook writes them (L0265-L0274). */
   executionTarget: string;
   queryText: string;
   routingMode: RoutingMode;
-  /** Who fixes what a MANUAL rule finds (REF-46 hidden column `resolution_role`). */
+  /**
+   * Not a column of the Business Rule Drafts sheet (only of the hidden Rule Example sheet, L0280), so the
+   * screens do not show it; it follows `rule_editor_role`. Kept because `app.business_rules.resolution_group`
+   * is NOT NULL (FINAL PLAN/09).
+   */
   resolutionGroup: string | null;
   editorGroup: string;
   /** Null = the approval route table decides (`app.approval_route`). */
@@ -38,8 +44,6 @@ export interface RuleVersion {
   testedBy: string | null;
   publishedBy: string | null;
   publishedAtUtc: string | null;
-  /** Fingerprint of the exact published text (SHA-256 on the server, REF-52 L0026). */
-  queryHash: string | null;
   createdBy: string;
   updatedAtUtc: string;
 }
@@ -51,6 +55,7 @@ export type RuleDraftInput = Pick<
   | 'version'
   | 'ruleName'
   | 'description'
+  | 'executionTarget'
   | 'queryText'
   | 'routingMode'
   | 'resolutionGroup'

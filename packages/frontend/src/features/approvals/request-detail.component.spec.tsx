@@ -11,6 +11,7 @@ vi.mock('./request-api', () => ({ fetchRequest, refreshChecks, decide, withdraw 
 
 import { RequestDetail } from './request-detail.component';
 import { checkRows, detailRow, eventRow, goldRow, relatedRow, requestView, viewer } from './request-fixtures';
+import { AuditPanel } from './request-tabs.component';
 
 const panel = () => screen.getByRole('tabpanel');
 const openTab = (name: string) => fireEvent.click(screen.getByRole('tab', { name }));
@@ -31,13 +32,16 @@ describe('the page', () => {
     expect(fetchRequest).toHaveBeenCalledWith(12);
     expect(screen.getByRole('heading', { level: 1, name: 'Manufacturer on SYN-TAG-0007' })).toBeInTheDocument();
     expect(screen.getByText('CR-000012')).toBeInTheDocument();
-    expect(screen.getByText('Waiting for responsible approval')).toBeInTheDocument();
+    // The status badge and the SAP field name are not in the header any more (taken out for the 20 Nov demo);
+    // the stage still says where the request waits, and the SAP field is on the Request tab.
+    expect(screen.queryByText('Waiting for responsible approval')).toBeNull();
     expect(screen.getByText('Responsible (first stage)')).toBeInTheDocument();
     expect(screen.getByText('open for 5 hours')).toBeInTheDocument();
     // The equipment number is itself the link to the heater (there is no separate "Open the heater" button).
     expect(screen.getByRole('link', { name: 'SYN-EQ-0007' })).toHaveAttribute('href', '#/equipment/7');
     expect(screen.getByTitle('Functional location')).toHaveTextContent('SYN-FL-0007');
-    expect(screen.getByTitle('SAP field this changes')).toHaveTextContent('HERST');
+    expect(screen.queryByTitle('SAP field this changes')).toBeNull();
+    expect(screen.getByTitle('The SAP field this changes')).toHaveTextContent('HERST');
     expect(screen.getByRole('link', { name: 'Approvals' })).toHaveAttribute('href', '#/approvals');
     expect(screen.queryByRole('button', { name: 'Open the heater' })).toBeNull();
   });
@@ -48,10 +52,12 @@ describe('the page', () => {
     expect(screen.queryByText(/open for/)).toBeNull();
   });
 
-  it('shows the decision panel above the tabs, and the four tabs by their names', async () => {
+  // The "Audit & routing" tab is not on the page at the moment (taken out for the 20 Nov demo); its panel is kept and tested below.
+  it('shows the decision panel above the tabs, and the three tabs by their names', async () => {
     await show();
     expect(screen.getByRole('region', { name: 'Decision' })).toBeInTheDocument();
-    expect(screen.getAllByRole('tab').map((t) => t.textContent)).toEqual(['Request & related', 'Equipment & FLOC', 'Evidence', 'Audit & routing']);
+    expect(screen.getAllByRole('tab').map((t) => t.textContent)).toEqual(['Request & related', 'Equipment & FLOC', 'Evidence']);
+    expect(screen.queryByRole('tab', { name: 'Audit & routing' })).toBeNull();
     expect(screen.getByRole('tab', { name: 'Request & related' })).toHaveAttribute('aria-selected', 'true');
   });
 
@@ -62,11 +68,13 @@ describe('the page', () => {
     fireEvent.keyDown(first, { key: 'ArrowRight' });
     expect(screen.getByRole('tab', { name: 'Equipment & FLOC' })).toHaveAttribute('aria-selected', 'true');
     fireEvent.keyDown(screen.getByRole('tab', { name: 'Equipment & FLOC' }), { key: 'End' });
-    expect(screen.getByRole('tab', { name: 'Audit & routing' })).toHaveAttribute('aria-selected', 'true');
-    fireEvent.keyDown(screen.getByRole('tab', { name: 'Audit & routing' }), { key: 'ArrowRight' });
+    expect(screen.getByRole('tab', { name: 'Evidence' })).toHaveAttribute('aria-selected', 'true');
+    fireEvent.keyDown(screen.getByRole('tab', { name: 'Evidence' }), { key: 'ArrowRight' });
     expect(screen.getByRole('tab', { name: 'Request & related' })).toHaveAttribute('aria-selected', 'true');
     fireEvent.keyDown(screen.getByRole('tab', { name: 'Request & related' }), { key: 'ArrowLeft' });
-    expect(screen.getByRole('tab', { name: 'Audit & routing' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('tab', { name: 'Evidence' })).toHaveAttribute('aria-selected', 'true');
+    fireEvent.keyDown(screen.getByRole('tab', { name: 'Evidence' }), { key: 'Home' });
+    expect(screen.getByRole('tab', { name: 'Request & related' })).toHaveAttribute('aria-selected', 'true');
   });
 });
 
@@ -78,40 +86,24 @@ describe('tab "Request & related"', () => {
     expect(tab.getByText('SYNTHETIC MFR B')).toBeInTheDocument();
     expect(tab.getByText('Nameplate photo shows a different maker')).toBeInTheDocument();
     expect(tab.getByText('TBD')).toBeInTheDocument();
-    expect(tab.getByText('Rule HEATER_CLASS_FIRED v1')).toBeInTheDocument();
+    // the source label ("Rule ... v1") is not shown any more, only who raised it
+    expect(tab.queryByText('Rule HEATER_CLASS_FIRED v1')).toBeNull();
     expect(tab.getByText(/by Rule run \(system\)/)).toBeInTheDocument();
-    // the submission time is shown twice on purpose: on the request and as the time of the evidence snapshot
-    expect(tab.getAllByText('17 Nov 2026, 09:30 UTC')).toHaveLength(2);
-    expect(tab.getByText('17 Nov 2026, 06:00 UTC')).toBeInTheDocument();
+    expect(tab.getByText('17 Nov 2026, 09:30 UTC')).toBeInTheDocument(); // submitted
+    expect(tab.getByText('17 Nov 2026, 06:00 UTC')).toBeInTheDocument(); // detected by the rule
     expect(tab.getByText('Checked on site')).toBeInTheDocument();
   });
 
-  it('shows the evidence snapshot with its watermark facts and what was attached', async () => {
+  // The "Evidence snapshot" box is not on the page at the moment (taken out for the 20 Nov demo).
+  it('does not show the evidence snapshot, whatever it holds', async () => {
     await show();
-    const tab = within(panel());
-    expect(tab.getByText('Snapshot taken')).toBeInTheDocument();
-    expect(tab.getByText('FIELD')).toBeInTheDocument(); // route used
-    expect(tab.getByText('1 Nov 2026, 00:00 UTC')).toBeInTheDocument(); // SAP baseline
-    expect(tab.getByText('seen on')).toBeInTheDocument();
-    expect(tab.getByText('nameplate')).toBeInTheDocument();
-    expect(tab.getByText('photo taken')).toBeInTheDocument();
-    expect(tab.getByText('true')).toBeInTheDocument();
+    expect(within(panel()).queryByText('Snapshot taken')).toBeNull();
+    expect(within(panel()).queryByText('What was attached')).toBeNull();
   });
 
-  it('shows evidence that is not JSON as it was stored, and says when there is none', async () => {
-    await show(requestView({ evidence: { createdAtUtc: null, createdBy: null, detailsJson: '{not json at all' } }));
-    expect(within(panel()).getByText('{not json at all')).toBeInTheDocument();
-    expect(within(panel()).getByText(/not in the usual shape/)).toBeInTheDocument();
-  });
-
-  it('says no snapshot was kept when there is none', async () => {
-    await show(requestView({ evidence: null }));
-    expect(within(panel()).getByText('No evidence snapshot was kept for this request.')).toBeInTheDocument();
-  });
-
-  it('does not break the page when only the evidence could not be read', async () => {
+  it('does not break the page, or mention the evidence, when the evidence could not be read', async () => {
     await show(requestView({ evidence: null, evidenceError: 'The evidence is not available.' }));
-    expect(within(panel()).getByText(/The evidence snapshot could not be read \(The evidence is not available\.\)/)).toBeInTheDocument();
+    expect(within(panel()).queryByText(/The evidence snapshot could not be read/)).toBeNull();
     // the rest still works
     expect(within(panel()).getByText('SYNTHETIC MFR B')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Approve' })).toBeEnabled();
@@ -134,33 +126,33 @@ describe('tab "Request & related"', () => {
 });
 
 describe('tab "Equipment & FLOC"', () => {
-  it('shows the golden values now and the value the requester saw beside the golden value of the field', async () => {
+  it('shows the golden values now', async () => {
     await show(requestView({ gold: goldRow({ fieldCurrentValue: '2.5', fieldUnit: 'MMBTU/hr' }), request: detailRow({ oldValue: '2.5', newValue: '3' }) }));
     openTab('Equipment & FLOC');
     const tab = within(panel());
     expect(tab.getByText('SYNTHETIC HEATER 0007')).toBeInTheDocument();
     expect(tab.getByText('SYN-SN-0007')).toBeInTheDocument();
     expect(tab.getByText('none yet (SAP baseline)')).toBeInTheDocument();
-    expect(tab.getByText('Value the requester saw')).toBeInTheDocument();
-    expect(tab.getByText('Value in the golden record now')).toBeInTheDocument();
-    expect(tab.getAllByText('2.5 MMBTU/hr')).toHaveLength(2);
     expect(tab.queryByRole('alert')).toBeNull();
   });
 
-  it('warns, in the server\'s words, when the golden value moved on since the request was raised', async () => {
+  // The "field being changed" box (the requester's value beside the golden value, and its warning) is not on the page at the
+  // moment (taken out for the 20 Nov demo). A changed golden value still shows in the approval checks, in the server's words.
+  it('shows a golden value that moved on since the request was raised in the checks table only', async () => {
     const message = 'the current value is "SYNTHETIC MFR C", the request expected "SYNTHETIC MFR A"';
     await show(requestView({ checks: checkRows({ OLD_VALUE_CURRENT: { checkStatus: 'FAIL', message } }), gold: goldRow({ fieldCurrentValue: 'SYNTHETIC MFR C' }) }));
     openTab('Equipment & FLOC');
-    const alert = within(panel()).getByRole('alert');
-    expect(alert).toHaveTextContent('The golden value changed after this request was raised');
-    expect(alert).toHaveTextContent(message);
-    expect(within(panel()).getByText('SYNTHETIC MFR C')).toBeInTheDocument();
+    expect(within(panel()).queryByRole('alert')).toBeNull();
+    expect(within(panel()).queryByText('The golden value changed after this request was raised', { exact: false })).toBeNull();
+    expect(within(panel()).queryByText('Value in the golden record now')).toBeNull();
+    const table = within(panel()).getByRole('table', { name: 'Approval checks' });
+    expect(within(table).getByText(message)).toBeInTheDocument();
   });
 
-  it('says the values are not compared once the request is closed', async () => {
+  it('does not say anything about comparing values once the request is closed', async () => {
     await show(requestView({ request: detailRow({ requestStatus: 'APPROVED', approvalStage: null }), checks: checkRows({ ASSOCIATION_MATCH: { checkStatus: 'NOT_CHECKED' } }) }));
     openTab('Equipment & FLOC');
-    expect(within(panel()).getByText(/The request is closed, so the values are not compared/)).toBeInTheDocument();
+    expect(within(panel()).queryByText(/The request is closed, so the values are not compared/)).toBeNull();
     expect(within(panel()).queryByRole('alert')).toBeNull();
   });
 
@@ -209,12 +201,12 @@ describe('tab "Equipment & FLOC"', () => {
 });
 
 describe('tab "Evidence"', () => {
-  it('says evidence is missing when no photo is attached, and what is built later', async () => {
+  it('says no photo is attached, and what is built later (the "Evidence missing" label is not shown any more)', async () => {
     await show();
     openTab('Evidence');
-    expect(within(panel()).getByText('Evidence missing')).toBeInTheDocument();
+    expect(within(panel()).getByText('No photo is attached to this request.')).toBeInTheDocument();
+    expect(within(panel()).queryByText('Evidence missing')).toBeNull();
     expect(within(panel()).getByText(/APP-7/)).toBeInTheDocument();
-    expect(within(panel()).getByText(/APP-9/)).toBeInTheDocument();
   });
 
   it('counts the photos linked to the request', async () => {
@@ -225,16 +217,19 @@ describe('tab "Evidence"', () => {
   });
 });
 
-describe('tab "Audit & routing"', () => {
+// The "Audit & routing" tab is not on the page at the moment (taken out for the 20 Nov demo). Its panel is kept in the code,
+// so it is tested on its own here; put the tab back in `request-tabs.component.tsx` and these tests apply to the page again.
+describe('panel "Audit & routing" (not shown on the page now)', () => {
+  const showAudit = (view = requestView()) => render(<AuditPanel view={view} />);
+
   it('lists the history oldest first, with who, when, the comment and the status change', async () => {
     const events = [
       eventRow(3, { eventType: 'ACCOUNTABLE_APPROVED', approvalStage: 'ACCOUNTABLE', actor: 't3.accountable@example.test', actorGroup: 'SYN-ACCOUNTABLE-GROUP', comments: null, statusFrom: 'PENDING_ACCOUNTABLE', statusTo: 'APPROVED', occurredAtUtc: '2026-11-17T11:00:00.000Z' }),
       eventRow(1),
       eventRow(2, { eventType: 'RESPONSIBLE_APPROVED', approvalStage: 'RESPONSIBLE', actor: 't3.responsible@example.test', actorGroup: 'SYN-RESPONSIBLE-GROUP', comments: 'looks right', statusFrom: 'PENDING_RESPONSIBLE', statusTo: 'PENDING_ACCOUNTABLE', occurredAtUtc: '2026-11-17T10:00:00.000Z' }),
     ];
-    await show(requestView({ events }));
-    openTab('Audit & routing');
-    const items = within(screen.getByRole('list', { name: 'Request history' })).getAllByRole('listitem');
+    showAudit(requestView({ events }));
+    const items =within(screen.getByRole('list', { name: 'Request history' })).getAllByRole('listitem');
     expect(items).toHaveLength(3);
     expect(items[0]).toHaveTextContent('Request created');
     expect(items[1]).toHaveTextContent('Approved by the responsible stage');
@@ -247,9 +242,8 @@ describe('tab "Audit & routing"', () => {
   });
 
   it('shows the route applied and both groups', async () => {
-    await show();
-    openTab('Audit & routing');
-    const tab = within(panel());
+    showAudit();
+    const tab = screen;
     expect(tab.getByText('SYN-RESPONSIBLE-GROUP')).toBeInTheDocument();
     expect(tab.getByText('SYN-ACCOUNTABLE-GROUP')).toBeInTheDocument();
     expect(tab.getByText(/Route 3: equipment update, any field, any class/)).toBeInTheDocument();
@@ -259,15 +253,13 @@ describe('tab "Audit & routing"', () => {
   });
 
   it('says so when no route was recorded or its details are missing', async () => {
-    await show(requestView({ request: detailRow({ routeId: null }), route: null }));
-    openTab('Audit & routing');
-    expect(within(panel()).getByText('No route was recorded for this request.')).toBeInTheDocument();
+    showAudit(requestView({ request: detailRow({ routeId: null }), route: null }));
+    expect(screen.getByText('No route was recorded for this request.')).toBeInTheDocument();
   });
 
   it('says the route details are not available when only its number is known', async () => {
-    await show(requestView({ route: null }));
-    openTab('Audit & routing');
-    expect(within(panel()).getByText('Route 3 (its details are not available).')).toBeInTheDocument();
+    showAudit(requestView({ route: null }));
+    expect(screen.getByText('Route 3 (its details are not available).')).toBeInTheDocument();
   });
 
   it('shows the last decision, the merge outcome, the golden version and the export when they exist', async () => {
@@ -283,9 +275,8 @@ describe('tab "Audit & routing"', () => {
       evolveBatchId: 9,
       evolveRowNumber: 2,
     });
-    await show(requestView({ request }));
-    openTab('Audit & routing');
-    const tab = within(panel());
+    showAudit(requestView({ request }));
+    const tab = screen;
     expect(tab.getByText(/t3\.accountable@example\.test, 17 Nov 2026, 11:00 UTC/)).toBeInTheDocument();
     expect(tab.getByText('In the golden record.')).toBeInTheDocument();
     expect(tab.getByText(/Applied 17 Nov 2026, 11:01 UTC/)).toBeInTheDocument();
@@ -295,9 +286,8 @@ describe('tab "Audit & routing"', () => {
   });
 
   it('says the update is pending when the merge failed, and that the approval stands', async () => {
-    await show(requestView({ request: detailRow({ requestStatus: 'APPROVED', approvalStage: null, mergeOutcome: 'ERROR' }) }));
-    openTab('Audit & routing');
-    expect(within(panel()).getByText('Golden record update pending. The approval stands.')).toBeInTheDocument();
+    showAudit(requestView({ request: detailRow({ requestStatus: 'APPROVED', approvalStage: null, mergeOutcome: 'ERROR' }) }));
+    expect(screen.getByText('Golden record update pending. The approval stands.')).toBeInTheDocument();
   });
 });
 
@@ -327,8 +317,8 @@ describe('the decision panel on the page', () => {
     expect(banner).toHaveTextContent('CR-000012: Approved at the responsible stage. It now waits for the accountable stage.');
     await waitFor(() => expect(fetchRequest).toHaveBeenCalledTimes(2));
     expect(fetchRequest).toHaveBeenLastCalledWith(12);
-    // the new status is on the page, and the person can no longer decide at that stage
-    expect(await screen.findByText('Waiting for accountable approval')).toBeInTheDocument();
+    // the new stage is on the page (the status badge is not shown any more), and the person can no longer decide at that stage
+    expect(await screen.findByText('Accountable (second stage)')).toBeInTheDocument();
     await waitFor(() => expect(screen.getByRole('button', { name: 'Approve' })).toBeDisabled());
     // the banner is still there after the reload
     expect(screen.getByRole('status')).toHaveTextContent('Approved at the responsible stage');
@@ -380,8 +370,10 @@ describe('the decision panel on the page', () => {
     fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Withdraw request' }));
     expect(await screen.findByRole('status')).toHaveTextContent('CR-000012 was withdrawn');
     expect(withdraw).toHaveBeenCalledWith(12, '');
-    expect(await screen.findByText('Withdrawn')).toBeInTheDocument();
+    // the status badge is not shown any more; a closed request has no stage and no age, and no Withdraw button
     await waitFor(() => expect(screen.queryByRole('button', { name: 'Withdraw request' })).toBeNull());
+    expect(screen.queryByText(/open for/)).toBeNull();
+    expect(screen.queryByText('Responsible (first stage)')).toBeNull();
   });
 
   it('keeps the result banner and offers a retry when the refresh after a decision fails', async () => {

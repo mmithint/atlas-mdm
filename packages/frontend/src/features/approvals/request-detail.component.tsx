@@ -9,8 +9,8 @@ import { errorText } from '@/lib/act-answer';
 
 import { DecisionPanel } from './decision-panel.component';
 import { fetchRequest, refreshChecks, type CheckRow, type RequestView } from './request-api';
-import { ageText, isClosed, requestTitle, stageLabel, type ResultBanner } from './request-model';
-import { RequestTabs, StatusBadge } from './request-tabs.component';
+import { ageText, isClosed, requestTitle, type ResultBanner } from './request-model';
+import { RequestTabs } from './request-tabs.component';
 
 /**
  * S-3 Request detail (POC-APP-09, 11, 12): one change request in full, the live approval checks, the history,
@@ -126,7 +126,6 @@ function Loaded({ initial, requestId }: { initial: RequestView; requestId: numbe
             {/* {request.sapField ? <span className="id-plate" title="SAP field this changes">{request.sapField}</span> : null} */}
             {/* <p className="flex flex-wrap items-center gap-200"> */}
             {/* <StatusBadge status={request.requestStatus} /> */}
-            {request.approvalStage ? <span className="text-200 text-muted-foreground">{stageLabel(request.approvalStage)}</span> : null}
             {age !== null ? <span className="text-200 text-muted-foreground">open for {age}</span> : null}
             {/* </p> */}
           </p>

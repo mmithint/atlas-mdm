@@ -6,8 +6,8 @@
 import type { DrawingRow, Evidence, FieldEntry, HeaterVerification, NameplateReading, PhotoRow, PhotoType, SubmitResult } from '@/features/field/field-types';
 import type { Scorecard, ScoreTotals } from '@/features/measures/measures-types';
 
-import { ALLOWED_VALUES, CATALOG, fieldOf, fieldValueOf } from './catalog';
-import { createRequest, demo, me, nowIso, PROFIT_CENTRES, refreshHeater, verificationOf } from './demo-store';
+import { CATALOG, fieldOf, fieldValueOf } from './catalog';
+import { activeValues, createRequest, demo, me, nowIso, PROFIT_CENTRES, refreshHeater, verificationOf } from './demo-store';
 import { Refusal } from './refusal';
 
 /** The goal of the client's programme: 75% of heaters fully verified by 2027 (not a POC pass mark). */
@@ -128,7 +128,7 @@ function entryProblem(e: FieldEntry, current: string | null, photoCount: number)
   if (value === (current ?? '').trim()) return `${field.label}: the new value is the same as the current one.`;
   if (field.dataType === 'DECIMAL' && !Number.isFinite(Number(value))) return `${field.label}: must be a number (${field.unit ?? ''}).`;
   if (field.maxLength !== null && value.length > field.maxLength) return `${field.label}: at most ${field.maxLength} characters.`;
-  if (field.allowedValuesSource === 'LIST' && !ALLOWED_VALUES.some((a) => a.fieldCode === field.fieldCode && a.value === value)) {
+  if (field.allowedValuesSource === 'LIST' && !activeValues(field.fieldCode).includes(value)) {
     return `${field.label}: pick one of the allowed values.`;
   }
   return null;

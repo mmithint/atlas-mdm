@@ -1,7 +1,8 @@
-import { Flame, Menu, Moon, Sun, X } from 'lucide-react';
+import { Menu, Moon, Sun, X } from 'lucide-react';
 import clsx from 'clsx';
 import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
 
+import oxyLogo from '@/assets/oxy-logo.png';
 import { badge } from '@/components/ui';
 import { NotificationBell } from '@/features/notifications/notification-bell.component';
 import { useAuth } from '@/hooks/auth.context';
@@ -90,7 +91,7 @@ export function AppShell() {
         )}
       >
         <div className="flex items-center gap-300 border-b border-sidebar-border px-400 py-400">
-          <Flame aria-hidden="true" className="icon-size-500 text-sidebar-active" />
+          <img src={oxyLogo} alt="Oxy" className="icon-size-700 shrink-0 object-contain" />
           <div className="min-w-0 flex-1">
             <p className="text-500 font-bold leading-none tracking-wide">ATLAS</p>
             <p className="mt-200 text-200 text-sidebar-muted">Heater master data</p>

@@ -30,8 +30,15 @@ export interface SampleRule {
   ruleId: string;
   ruleName: string;
   description: string;
+  /** Business Rule Drafts columns E, H, I, J, M (REF-46 L0264), as the workbook gives them. */
+  executionTarget: string;
+  editorGroup: string;
+  responsibleGroup: string | null;
+  accountableGroup: string | null;
+  changeReason: string;
   queryText: string;
   routingMode: RoutingMode;
+  /** ATLAS additions, not columns of the Drafts sheet: fields a rule may propose, and classes it applies to. */
   allowedTargets: string[];
   applicability: string[];
   /** How the demo starts: published, a draft with SQL, or a draft without SQL. */
@@ -114,10 +121,25 @@ JOIN gold.vw_equipment_current AS b
 
 const none = () => [] as Violation[];
 
-const classDraft = (ruleId: string, ruleName: string, description: string, classes: string[]): SampleRule => ({
+/** Execution targets as the workbook writes them (REF-46 L0265-L0273). */
+const ODS_THREE = 'OXYODS.OPSODS.Functional_Location; OXYODS.OPSODS.Equipment; OXYODS.OPSODS.Equipment_Classifications';
+const ODS_FLOC = 'OXYODS.OPSODS.Functional_Location';
+const ODS_CLASSIFICATIONS = 'OXYODS.OPSODS.Equipment_Classifications';
+
+/** Columns every workbook row shares: rule_editor_role DataQualityOwner, no responsible/accountable role, no reason. */
+const workbook = (executionTarget: string) => ({
+  executionTarget,
+  editorGroup: 'DataQualityOwner',
+  responsibleGroup: null,
+  accountableGroup: null,
+  changeReason: '',
+});
+
+const classDraft = (ruleId: string, ruleName: string, description: string, classes: string[], executionTarget: string): SampleRule => ({
   ruleId,
   ruleName,
   description,
+  ...workbook(executionTarget),
   queryText: '',
   routingMode: 'MANUAL',
   allowedTargets: [],
@@ -132,6 +154,7 @@ export const SAMPLE_RULES: readonly SampleRule[] = [
     ruleName: 'Fired heater classification',
     description:
       'Heater Classifications; equipment designed solely to heat process material utilizing natural gas; Floc_Class == HEATER, Equip_Class == HEATER, Class_Type == HEATER, HB_TYPE == FIRED',
+    ...workbook(ODS_THREE),
     queryText: SQL_FIRED,
     routingMode: 'AUTO_ROUTE',
     allowedTargets: ['FIRED_UNFIRED'],
@@ -154,6 +177,7 @@ export const SAMPLE_RULES: readonly SampleRule[] = [
     ruleId: 'HEATER_DUTY',
     ruleName: 'Heater heat duty',
     description: 'Heater heat duty; heaters must have an associated heat duty; units are MMBTU/hr; F.when(Floc_Class == HEATER), HB_DUTY.isNotNull()',
+    ...workbook(ODS_CLASSIFICATIONS),
     queryText: SQL_DUTY,
     routingMode: 'MANUAL',
     allowedTargets: ['HEAT_DUTY'],
@@ -177,6 +201,13 @@ export const SAMPLE_RULES: readonly SampleRule[] = [
     ruleName: 'Engineering tag unique within Parent FLOC',
     description:
       'Current/proposed tags must be unique within Parent FLOC across classes; compare case-insensitively, trim outer whitespace, remove hyphens and slashes.',
+    // The only workbook row with responsible/accountable roles and a reason (L0265). FEXUS_AXON and
+    // SAP_BusinessSupport are not in the Group Definitions sheet (which has SAPBusinessSupport) [VERIFY].
+    executionTarget: 'OXYODS',
+    editorGroup: 'DataQualityOwner',
+    responsibleGroup: 'FEXUS_AXON',
+    accountableGroup: 'SAP_BusinessSupport',
+    changeReason: 'Initial draft; SQL must be developed and tested against approved parent-FLOC mapping.',
     queryText: SQL_TAG,
     routingMode: 'MANUAL',
     allowedTargets: ['EQUIPMENT_TAG_NUMBER'],
@@ -210,43 +241,52 @@ export const SAMPLE_RULES: readonly SampleRule[] = [
     'HEATER_CLASS_ELECTRIC',
     'Electric heater classification',
     'Heater Classifications; equipment designed solely to heat process material utilizing electricity; Floc_Class == HEATER, Equip_Class == HEATER, Class_Type == HEATER, HB_TYPE == ELECTRIC',
-    ['HEATER']
+    ['HEATER'],
+    ODS_THREE
   ),
   classDraft(
     'HEATER_CLASS_STEAM',
     'Steam heater classification',
     'Heater Classifications; equipment designed solely to heat process material utilizing steam - effectively functioning as a heat exchanger; Floc_Class == HEATER, Equip_Class == HEAT_EXCHANGER, Class_Type == HEAT_EXCHANGER, HE_TYPE == STEAM or HE_FLUID_TUBE_SIDE == STEAM',
-    ['HEATER', 'HEAT_EXCHANGER']
+    ['HEATER', 'HEAT_EXCHANGER'],
+    ODS_THREE
   ),
   classDraft(
     'ASSOCIATED_BOILER_HEATER',
     'Associated boiler for steam heaters',
     'Heater/Boiler relationship; if a heater follows HEATER_CLASS_STEAM - there must be an associated boiler within the same parent FLOC',
-    ['HEATER', 'BOILER']
+    ['HEATER', 'BOILER'],
+    ODS_FLOC
   ),
   classDraft(
     'BOILER_CLASS_FIRED',
     'Fired boiler classification',
     'Boiler Classifications; equipment designed solely to heat water to produce steam to be used as a heating medium; Floc_Class == BOILER, Equip_Class == BOILER, Class_Type == BOILER, HB_TYPE == FIRED',
-    ['BOILER']
+    ['BOILER'],
+    ODS_THREE
   ),
   classDraft(
     'BOILER_CLASS_ELECTRIC',
     'Electric boiler classification',
     'Boiler Classifications; equipment designed solely to heat water to produce steam to be used as a heating medium; Floc_Class == BOILER, Equip_Class == BOILER, Class_Type == BOILER, HB_TYPE == ELECTRIC',
-    ['BOILER']
+    ['BOILER'],
+    ODS_THREE
   ),
   classDraft(
     'BOILER_DUTY',
     'Boiler heat duty',
     'Boiler heat duty; boilers must have an associated heat duty; units are MMBTU/hr; F.when(Floc_Class == BOILER), HB_DUTY.isNotNull()',
-    ['BOILER']
+    ['BOILER'],
+    ODS_CLASSIFICATIONS
   ),
   classDraft(
     'REBOILER_CLASS_FIRED',
     'Fired reboiler classification',
     'Reboiler Classifications; equipment designed solely to heat process material utilizing natural gas; Floc_Class == REBOILER, Equip_Class == REBOILER, Class_Type == REBOILER_FIRED, HB_TYPE == FIRED',
-    ['REBOILER']
+    ['REBOILER'],
+    // The workbook row (L0274) stops after the description: no query language, target, routing or editor role.
+    // The demo keeps the defaults (TSQL, MANUAL, DataQualityOwner) [INFERRED] and leaves the target empty.
+    ''
   ),
 ];
 

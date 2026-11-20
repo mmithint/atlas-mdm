@@ -18,12 +18,15 @@ import type { SearchRow } from '../features/equipment/equipment-api';
 import { searchRow } from '../features/equipment/test-fixtures';
 
 import type { RuleStatusRow } from '../features/equipment/rule-status-types';
-import type { Mark, PhotoRow } from '../features/field/field-types';
+import type { FieldFormSubmit, Mark, PhotoRow } from '../features/field/field-types';
 import type { RuleRun, RuleTestResult, RuleVersion } from '../features/rules/rules-types';
 
-import { CATALOG, fieldOf, fieldValueOf, labelOf, setFieldValue } from './catalog';
+import type { DropdownRow, Member, RouteRow } from '../features/admin/admin-types';
+
+import { ROUTES } from './admin-seed';
+import { ALLOWED_VALUES, CATALOG, fieldOf, fieldValueOf, labelOf, setFieldValue } from './catalog';
 import { currentPersona, DEFAULT_PERSONA, PERSONAS, setPersona, type Persona } from './personas';
-import { fingerprint, hasGroupBy, SAMPLE_RULES, sampleRule, type Violation } from './rule-samples';
+import { hasGroupBy, SAMPLE_RULES, sampleRule, type Violation } from './rule-samples';
 import { sampleImage } from './sample-images';
 
 // ---------------------------------------------------------------- places, groups, people
@@ -257,6 +260,10 @@ export interface DemoState {
   /** Latest mark per heater, then per field. */
   marks: Map<number, Map<string, DemoMark>>;
   photos: PhotoRow[];
+  /** Field forms sent from S-6, newest last (TrueContext order; includes the recorded-only corrections). */
+  fieldForms: (FieldFormSubmit & { referenceNumber: string; by: string; atUtc: string })[];
+  /** S-13 Admin: the page's own copy (user decision of 20 Nov: member edits do not change routing or queues). */
+  admin: { members: Record<string, Member[]>; routes: RouteRow[]; dropdowns: DropdownRow[]; mandatory: string[] };
   nextRequestId: number;
   nextEventId: number;
   nextNotificationId: number;
@@ -281,6 +288,25 @@ export function resetDemoAndPersona(): void {
   resetDemo();
 }
 
+function initialAdmin(): DemoState['admin'] {
+  const members: Record<string, Member[]> = {};
+  for (const p of people()) for (const g of p.groups) (members[g] ??= []).push({ email: p.email, displayName: p.displayName });
+  return {
+    members,
+    routes: ROUTES.map((r) => ({ ...r, classes: [...r.classes] })),
+    dropdowns: ALLOWED_VALUES.map((a) => ({ ...a, active: true })),
+    mandatory: [],
+  };
+}
+
+/** The drop-down values of a field that are switched on (S-13 can add values and switch them off). */
+export function activeValues(fieldCode: string, s: DemoState = state): string[] {
+  return s.admin.dropdowns
+    .filter((d) => d.fieldCode === fieldCode && d.active)
+    .sort((a, b) => a.order - b.order)
+    .map((d) => d.value);
+}
+
 function initialState(): DemoState {
   const heaters = buildHeaters();
   const requests = buildRequests(heaters);
@@ -295,6 +321,8 @@ function initialState(): DemoState {
     tests: new Map(),
     marks: new Map(),
     photos: [],
+    fieldForms: [],
+    admin: initialAdmin(),
     nextRequestId: 100,
     nextEventId: 1,
     nextNotificationId: 1,
@@ -369,25 +397,25 @@ function seedRules(s: DemoState): void {
       status: isPublished ? 'PUBLISHED' : 'DRAFT',
       ruleName: rule.ruleName,
       description: rule.description,
-      queryLanguage: 'T-SQL',
-      executionTarget: 'ATLAS_DB · gold views',
+      queryLanguage: 'TSQL',
+      executionTarget: rule.executionTarget,
       queryText: rule.queryText,
       routingMode: rule.routingMode,
-      resolutionGroup: 'DataQualityOwner',
-      editorGroup: 'DataQualityOwner',
-      responsibleGroup: null,
-      accountableGroup: null,
+      resolutionGroup: rule.editorGroup,
+      editorGroup: rule.editorGroup,
+      responsibleGroup: rule.responsibleGroup,
+      accountableGroup: rule.accountableGroup,
       allowedTargets: rule.allowedTargets,
       applicability: rule.applicability,
       effectiveFromUtc: isPublished ? published : null,
       effectiveToUtc: null,
-      changeReason: isPublished ? 'First version, agreed with the data owner (sample).' : 'Initial draft from the client workbook (REF-46).',
+      // The workbook's version_change_reason; the two rules the demo starts as published need one to have been published.
+      changeReason: rule.changeReason || (isPublished ? 'First version, agreed with the data owner (sample).' : ''),
       testStatus: isPublished ? 'PASSED' : 'NOT_TESTED',
       testedAtUtc: isPublished ? published : null,
       testedBy: isPublished ? 'morgan.diaz@example.test' : null,
       publishedBy: isPublished ? 'jordan.lee@example.test' : null,
       publishedAtUtc: isPublished ? published : null,
-      queryHash: isPublished ? fingerprint(rule.queryText) : null,
       createdBy: 'morgan.diaz@example.test',
       updatedAtUtc: isPublished ? published : created,
     });

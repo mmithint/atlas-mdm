@@ -43,11 +43,6 @@ export const STATE_DISPLAY: Record<RuleState, { text: string; tone: Tone }> = {
   RETIRED: { text: 'Retired', tone: 'neutral' },
 };
 
-export const ROUTING_TEXT: Record<RuleVersion['routingMode'], string> = {
-  MANUAL: 'Reports only: marks heaters Invalid, raises no request',
-  AUTO_ROUTE: 'Raises a request for each result, approved in two stages',
-};
-
 export interface Person {
   canEditRules: boolean;
   canPublishRules: boolean;
@@ -68,6 +63,7 @@ export function draftFrom(v: RuleVersion): RuleDraftInput {
     version: v.version,
     ruleName: v.ruleName,
     description: v.description,
+    executionTarget: v.executionTarget,
     queryText: v.queryText,
     routingMode: v.routingMode,
     resolutionGroup: v.resolutionGroup,
@@ -129,9 +125,6 @@ export function rowsLine(t: RuleTestResult): string {
   const shown = t.rows.length;
   return `${shown} of ${t.rowCount} row${t.rowCount === 1 ? '' : 's'} shown · limit ${t.rowLimit} · ${t.elapsedMs} ms`;
 }
-
-/** A short, readable fingerprint. */
-export const shortHash = (hash: string | null): string => (hash ? `${hash.slice(0, 8)}…` : '—');
 
 /** `2026-11-19T…` as `2026-11-19` for a date input, and back. */
 export const toDateInput = (iso: string | null): string => (iso ? iso.slice(0, 10) : '');

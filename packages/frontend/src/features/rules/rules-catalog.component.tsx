@@ -103,8 +103,8 @@ function CatalogTable({ data, text, filter }: { data: CatalogData; text: string;
           <tr className={HEAD_ROW}>
             <th scope="col" className={TH}>Rule</th>
             <th scope="col" className={TH}>State</th>
-            <th scope="col" className={TH}>Routing</th>
-            <th scope="col" className={TH}>Editor group</th>
+            <th scope="col" className={TH}>Routing mode</th>
+            <th scope="col" className={TH}>Rule editor role</th>
             <th scope="col" className={TH}>Last test</th>
             <th scope="col" className={TH}>Last run</th>
           </tr>
@@ -307,7 +307,7 @@ function NewRuleDialog({ onClose }: { onClose: () => void }) {
         </div>
         <div className="space-y-100">
           <label htmlFor={nameField} className="block text-300 font-medium">
-            Name
+            Rule name
           </label>
           <input id={nameField} className={input} value={name} onChange={(e) => setName(e.target.value)} placeholder="Serial number unique per manufacturer" maxLength={120} />
         </div>

@@ -1,4 +1,4 @@
-import { ArrowRight, RefreshCw, TriangleAlert } from 'lucide-react';
+import { ArrowRight, RefreshCw } from 'lucide-react';
 import { useId, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 
 import { hrefFor } from '@/app/router';
@@ -13,11 +13,7 @@ import {
   checkLabel,
   describeRoute,
   eventLabel,
-  isClosed,
   mergeWording,
-  oldValueMismatch,
-  parseEvidence,
-  stageLabel,
   statusDisplay,
   summarizeChecks,
   valueText,
@@ -154,9 +150,8 @@ const TH = 'px-300 py-200 font-semibold';
 // ---- tab 1: Request & related -----------------------------------------------------
 
 function RequestPanel({ view }: { view: RequestView }) {
-  const { request, gold, related, evidence, evidenceError } = view;
+  const { request, gold, related } = view;
   const unit = gold?.fieldUnit ?? null;
-  const parsed = parseEvidence(evidence?.detailsJson);
 
   return (
     <div className="space-y-400">
@@ -297,10 +292,7 @@ function RelatedTable({ rows }: { rows: readonly RelatedRow[] }) {
 // ---- tab 2: Equipment & FLOC ------------------------------------------------------
 
 function EquipmentPanel({ view, checks, onRecheck }: { view: RequestView; checks: readonly CheckRow[]; onRecheck: () => Promise<void> }) {
-  const { request, gold } = view;
-  const unit = gold?.fieldUnit ?? null;
-  const mismatch = oldValueMismatch(checks);
-  const closed = isClosed(request.requestStatus);
+  const { gold } = view;
   const isFloc = gold?.entityType === 'FLOC';
 
   return (
@@ -448,7 +440,8 @@ function EvidencePanel({ view }: { view: RequestView }) {
 
 // ---- tab 4: Audit & routing --------------------------------------------------------
 
-function AuditPanel({ view }: { view: RequestView }) {
+// Not shown at the moment (the Audit & routing tab was taken out of the page); exported so the code is kept and the build stays clean.
+export function AuditPanel({ view }: { view: RequestView }) {
   const { request, route } = view;
   const events = [...view.events].sort((a, b) => a.eventId - b.eventId);
   const merge = mergeWording(request.mergeOutcome);
@@ -517,7 +510,6 @@ function Timeline({ events }: { events: readonly EventRow[] }) {
         <li key={event.eventId} className="border-l-2 border-border pl-300">
           <p className="flex flex-wrap items-baseline gap-x-300 gap-y-100">
             <span className="text-300 font-semibold">{eventLabel(event.eventType)}</span>
-            {event.approvalStage ? <span className="text-200 text-muted-foreground">{stageLabel(event.approvalStage)}</span> : null}
           </p>
           <p className="mt-100 text-200 text-muted-foreground">
             {actorText(event.actor)}

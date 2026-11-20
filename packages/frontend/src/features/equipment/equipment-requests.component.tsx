@@ -42,9 +42,9 @@ export function EquipmentRequests({ equipmentId, reloadKey }: { equipmentId: num
         <h2 id="requests-title" className="text-400 font-semibold">
           Requests on this heater
         </h2>
-        <p className="mt-100 text-200 text-muted-foreground">
+        {/* <p className="mt-100 text-200 text-muted-foreground">
           Every change proposed to this heater or to its functional location, open requests first. Open one to see who approved what.
-        </p>
+        </p> */}
       </div>
 
       <div className="p-400">

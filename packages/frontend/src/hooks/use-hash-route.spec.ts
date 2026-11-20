@@ -56,10 +56,11 @@ describe('matchRoute', () => {
     expect(matchRoute('/equipment/12/extra')).toBeNull();
   });
 
-  it('knows every screen S-1 to S-13 exactly once', () => {
+  it('has the screens of the demo menu, each once; S-8, S-10 and S-12 are left out of the menu on purpose (20 Nov demo)', () => {
     const screens = menuRoutes(true).map((r) => r.screen);
-    const all = ['S-1', 'S-2', 'S-4', 'S-6', 'S-8', 'S-9', 'S-10', 'S-11', 'S-12', 'S-13'];
-    expect(screens).toEqual(expect.arrayContaining(all));
+    const all = ['S-1', 'S-2', 'S-4', 'S-6', 'S-9', 'S-11', 'S-13'];
+    expect([...screens].sort()).toEqual([...all].sort());
+    for (const left of ['S-8', 'S-10', 'S-12']) expect(screens).not.toContain(left);
   });
 });
 

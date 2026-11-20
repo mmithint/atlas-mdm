@@ -17,7 +17,6 @@ import {
   parseEvidence,
   requestTitle,
   returnTarget,
-  stageLabel,
   statusDisplay,
   summarizeChecks,
   valueText,
@@ -43,10 +42,7 @@ describe('statuses, stages and events', () => {
     for (const s of ['DRAFT', 'PENDING_RESPONSIBLE', 'PENDING_ACCOUNTABLE', 'RETURNED']) expect(isClosed(s)).toBe(false);
   });
 
-  it('words the stages and every event type, and falls back to the type itself', () => {
-    expect(stageLabel('RESPONSIBLE')).toBe('Responsible (first stage)');
-    expect(stageLabel('ACCOUNTABLE')).toBe('Accountable (second stage)');
-    expect(stageLabel(null)).toBe('—');
+  it('words every event type, and falls back to the type itself', () => {
     expect(eventLabel('MERGED')).toBe('Applied to the golden record');
     expect(eventLabel('MERGE_STALE')).toBe('Not applied: the value had changed');
     expect(eventLabel('SOMETHING_NEW')).toBe('something new');

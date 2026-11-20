@@ -1,4 +1,4 @@
-import { ArrowRight, Camera, ChevronLeft, ChevronRight, ListFilter } from 'lucide-react';
+import { ArrowRight, ChevronLeft, ChevronRight, ListFilter } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 
 import { hrefFor, navigate } from '@/app/router';
@@ -27,7 +27,6 @@ import {
   queryFromCriteria,
   selectableIds,
   sourceView,
-  statusView,
   switchTab,
   tabById,
   timeView,
@@ -412,7 +411,6 @@ function Line({
   checked: boolean;
   onToggle: (id: number) => void;
 }) {
-  const status = statusView(row.requestStatus);
   const note = noteView(row.note);
   const source = sourceView(row);
   const time = timeView(row);
