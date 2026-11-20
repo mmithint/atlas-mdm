@@ -166,8 +166,11 @@ export function queryFromCriteria(c: QueueCriteria): Record<string, string | und
 export const criteriaKey = (c: QueueCriteria): string =>
   [c.tab, c.profitCenter, c.fieldCode, c.ruleId, c.minAgeHours, c.noteOnly ? 1 : 0, c.pageSize].join('|');
 
-export const hasFilters = (c: QueueCriteria): boolean =>
-  c.profitCenter !== '' || c.fieldCode !== '' || c.ruleId !== '' || c.minAgeHours > 0 || c.noteOnly;
+export const hasFilters = (c: QueueCriteria): boolean => filterCount(c) > 0;
+
+/** How many of the filters are in use (shown on the filter button). */
+export const filterCount = (c: QueueCriteria): number =>
+  [c.profitCenter !== '', c.fieldCode !== '', c.ruleId !== '', c.minAgeHours > 0, c.noteOnly].filter(Boolean).length;
 
 /** The same tab and page size with no filter. */
 export const withoutFilters = (c: QueueCriteria): QueueCriteria => ({

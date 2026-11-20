@@ -11,6 +11,7 @@ import { bulkAnswer, queuePage, queueRow } from './queue-fixtures';
 const mixedRows = () => [queueRow(1), queueRow(2, { canApprove: false }), queueRow(3)];
 
 const checkbox = (ref: string) => screen.getByRole('checkbox', { name: `Select ${ref}` });
+const openFilters = () => fireEvent.click(screen.getByRole('button', { name: /^Filters/ }));
 
 describe('S-2 Approvals', () => {
   beforeEach(() => {
@@ -212,16 +213,37 @@ describe('S-2 Approvals', () => {
     render(<Approvals />);
     expect(await screen.findByText('No requests match these filters')).toBeInTheDocument();
 
-    const clear = screen.getAllByRole('button', { name: 'Clear filters' });
-    expect(clear).toHaveLength(2); // the filter bar's and the empty state's
-    fireEvent.click(clear[1]!);
+    // The filter menu is closed, so the empty state's button is the only one; the menu's own button shows the count.
+    expect(screen.getByRole('button', { name: /^Filters/ })).toHaveTextContent('1');
+    fireEvent.click(screen.getByRole('button', { name: 'Clear filters' }));
     await waitFor(() => expect(window.location.hash).toBe('#/approvals'));
+  });
+
+  it('keeps the filters in a menu that opens from the Filters button and closes with Escape', async () => {
+    fetchQueue.mockResolvedValue(queuePage());
+    render(<Approvals />);
+    await screen.findByRole('link', { name: 'CR-000001' });
+    expect(screen.queryByLabelText('Profit centre')).toBeNull();
+
+    const toggle = screen.getByRole('button', { name: /^Filters/ });
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByLabelText('Profit centre')).toBeInTheDocument();
+
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(screen.queryByLabelText('Profit centre')).toBeNull();
+    expect(toggle).toHaveFocus();
+
+    fireEvent.click(toggle);
+    fireEvent.mouseDown(document.body);
+    expect(screen.queryByLabelText('Profit centre')).toBeNull();
   });
 
   it('puts every filter in the address and sends it with the next read', async () => {
     fetchQueue.mockResolvedValue(queuePage());
     render(<Approvals />);
     await screen.findByRole('link', { name: 'CR-000001' });
+    openFilters();
     expect(screen.queryByRole('button', { name: 'Clear filters' })).toBeNull();
 
     fireEvent.change(screen.getByLabelText('Profit centre'), { target: { value: 'ROCKIES-DJ BASIN' } });
@@ -268,6 +290,7 @@ describe('S-2 Approvals', () => {
     render(<Approvals />);
     await screen.findByRole('link', { name: 'CR-000001' });
 
+    openFilters();
     const age = screen.getByLabelText('Age');
     expect(age).toBeDisabled();
     expect(age).toHaveAttribute('title', expect.stringContaining('open requests only'));
@@ -280,32 +303,8 @@ describe('S-2 Approvals', () => {
     fetchQueue.mockResolvedValue(queuePage());
     render(<Approvals />);
     await screen.findByRole('link', { name: 'CR-000001' });
+    openFilters();
     expect(screen.getByLabelText('Age')).toBeEnabled();
-  });
-
-  it('changes the page size and starts again at the first page', async () => {
-    fetchQueue.mockResolvedValue(queuePage([queueRow(1)], { totalMatches: 90, hasMore: true }));
-    render(<Approvals />);
-    await screen.findByRole('link', { name: 'CR-000001' });
-    fireEvent.change(screen.getByLabelText('Rows per page'), { target: { value: '50' } });
-    await waitFor(() => expect(fetchQueue).toHaveBeenLastCalledWith(expect.objectContaining({ pageSize: 50 }), 0));
-    await waitFor(() => expect(window.location.hash).toBe('#/approvals?size=50'));
-  });
-
-  it('pages forward and back with the row offset, which is not in the address', async () => {
-    fetchQueue.mockResolvedValue(queuePage([queueRow(1)], { totalMatches: 60, hasMore: true }));
-    render(<Approvals />);
-    await screen.findByRole('link', { name: 'CR-000001' });
-    expect(screen.getByRole('button', { name: 'Previous' })).toBeDisabled();
-    expect(screen.getByText('Showing 1 to 1 of 60')).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
-    await waitFor(() => expect(fetchQueue).toHaveBeenLastCalledWith(expect.anything(), 25));
-    await screen.findByText('Showing 26 to 26 of 60');
-    expect(window.location.hash).toBe('#/approvals');
-
-    fireEvent.click(await screen.findByRole('button', { name: 'Previous' }));
-    await waitFor(() => expect(fetchQueue).toHaveBeenLastCalledWith(expect.anything(), 0));
   });
 
   it('shows the request in the client\'s terms: blanks as dashes, TBD as a badge, rule requests with the time they were detected', async () => {

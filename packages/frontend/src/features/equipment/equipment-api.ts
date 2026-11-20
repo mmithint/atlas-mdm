@@ -140,16 +140,19 @@ export interface HeaterDetail {
  * Two reads run side by side: the function (the heater, its location, its field values and
  * the field owners, on one database connection) and the catalogue (a table, via the connector).
  */
+/** The active catalogue fields in display order: the connector's one table (D-17). */
+export async function fetchCatalog(): Promise<CatalogRow[]> {
+  const client = await getRayfinClient();
+  return client.connectors.atlas_sql_db.FieldCatalog.select(CATALOG_SELECT)
+    .where({ isActive: { eq: true } })
+    .orderBy({ displayOrder: 'asc' })
+    .execute();
+}
+
 export async function fetchHeater(equipmentId: number): Promise<HeaterDetail | null> {
   const client = await getRayfinClient();
 
-  const [detail, catalog] = await Promise.all([
-    client.functions.getEquipmentDetail.invoke({ equipmentId }).then(unwrapRead),
-    client.connectors.atlas_sql_db.FieldCatalog.select(CATALOG_SELECT)
-      .where({ isActive: { eq: true } })
-      .orderBy({ displayOrder: 'asc' })
-      .execute(),
-  ]);
+  const [detail, catalog] = await Promise.all([client.functions.getEquipmentDetail.invoke({ equipmentId }).then(unwrapRead), fetchCatalog()]);
 
   if (!detail.found || detail.heater === null) return null;
   return {

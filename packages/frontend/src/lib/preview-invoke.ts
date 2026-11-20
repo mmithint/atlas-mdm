@@ -1,3 +1,4 @@
+import { unwrapAct } from './act-answer';
 import type { PreviewFunctionName, PreviewFunctions } from './preview-functions';
 
 /** A page asked for a function no phase has built yet, outside `npm run dev:mock`. */
@@ -13,6 +14,9 @@ export class NotBuiltError extends Error {
  * never goes through the Rayfin client: under `npm run dev:mock` the sample-data handler answers
  * (`dev-mock/preview-handlers.ts`); anywhere else it refuses. The condition is written out so a production
  * build drops the import and the dev-mock folder with it.
+ *
+ * Like the built functions' callers, an answer that is not `ok` becomes an `ActError` carrying the server's
+ * own sentence (`act-answer.ts`), so the pages handle a refusal the same way in the demo and for real.
  */
 export async function previewInvoke<K extends PreviewFunctionName>(
   name: K,
@@ -20,5 +24,5 @@ export async function previewInvoke<K extends PreviewFunctionName>(
 ): Promise<PreviewFunctions[K]['output']> {
   if (!(import.meta.env.DEV && import.meta.env.MODE === 'mock')) throw new NotBuiltError(name);
   const { invokePreview } = await import('@/dev-mock/preview-handlers');
-  return invokePreview(name, input);
+  return unwrapAct(await invokePreview(name, input));
 }

@@ -1,7 +1,8 @@
-import { ArrowRight, Camera, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ArrowRight, Camera, ChevronLeft, ChevronRight, ListFilter } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 
 import { hrefFor, navigate } from '@/app/router';
+import { Popover } from '@/components/popover.component';
 import { EmptyState, ErrorState, LoadingState } from '@/components/states';
 import { badge, button, card, input } from '@/components/ui';
 import { useHashRoute } from '@/hooks/use-hash-route';
@@ -12,19 +13,18 @@ import { BulkConfirmDialog, BulkResultDialog } from './bulk-dialogs.component';
 import { bulkApproveRequests, fetchQueue, type BulkAnswer, type QueuePage, type QueueRow } from './queue-api';
 import {
   AGE_OPTIONS,
-  PAGE_SIZES,
   QUEUE_TABS,
   ageText,
   allSelected,
   criteriaFromQuery,
   criteriaKey,
   facetOptions,
+  filterCount,
   hasFilters,
   noteView,
   orderedSelection,
   pruneSelection,
   queryFromCriteria,
-  rangeText,
   selectableIds,
   sourceView,
   statusView,
@@ -98,7 +98,7 @@ export function Approvals() {
   };
 
   return (
-    <div className="space-y-400">
+    <div className="space-y-300">
       <header>
         <h1 className="text-600 font-semibold">Approvals</h1>
         <p className="mt-100 text-300 text-muted-foreground">
@@ -108,49 +108,24 @@ export function Approvals() {
       </header>
 
       <section aria-label="Requests" className={card}>
-        <TabStrip active={tab} counts={known?.counts ?? null} onSelect={select} />
+        {/* The tabs and the actions share one row; the row owns the rule under them. */}
+        <div className="flex flex-wrap items-end gap-x-300 border-b border-border pr-400">
+          <TabStrip active={tab} counts={known?.counts ?? null} onSelect={select} />
+          <div className="pb-100">
+            <QueueActions
+              criteria={criteria}
+              facets={known?.facets ?? []}
+              onChange={go}
+              bulk={
+                tab.pending
+                  ? { selectedCount: selected.size, onApprove: () => setDialog({ kind: 'confirm', ids: orderedSelection(selected, rows) }) }
+                  : null
+              }
+            />
+          </div>
+        </div>
 
         <div role="tabpanel" id={PANEL_ID} aria-labelledby={`tab-${tab.id}`}>
-          <Filters criteria={criteria} facets={known?.facets ?? []} onChange={go} />
-
-          <div className="flex flex-wrap items-center justify-between gap-300 border-b border-border px-400 py-300">
-            <p className="text-300" aria-live="polite">
-              {state.status === 'loading' ? 'Loading…' : null}
-              {state.status === 'ready'
-                ? `Showing ${rangeText(pageIndex * criteria.pageSize, state.data.rows.length, state.data.totalMatches)}`
-                : null}
-            </p>
-            <div className="flex flex-wrap items-center gap-300">
-              {tab.pending ? (
-                <>
-                  {selected.size > 0 ? <span className="text-200 text-muted-foreground">{selected.size} selected</span> : null}
-                  <button
-                    type="button"
-                    className={button.primary}
-                    disabled={selected.size === 0}
-                    onClick={() => setDialog({ kind: 'confirm', ids: orderedSelection(selected, rows) })}
-                  >
-                    Bulk approve ({selected.size})
-                  </button>
-                </>
-              ) : null}
-              <label className="flex items-center gap-200 whitespace-nowrap text-200 text-muted-foreground">
-                Rows per page
-                <select
-                  className={`${input} w-auto py-100`}
-                  value={criteria.pageSize}
-                  onChange={(event) => go({ ...criteria, pageSize: Number(event.target.value) })}
-                >
-                  {PAGE_SIZES.map((n) => (
-                    <option key={n} value={n}>
-                      {n}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </div>
-          </div>
-
           <div className="p-400">
             {state.status === 'loading' ? <LoadingState rows={8} label="Loading requests" /> : null}
             {state.status === 'error' ? (
@@ -222,7 +197,7 @@ function TabStrip({
   };
 
   return (
-    <div role="tablist" aria-label="Request queues" onKeyDown={onKeyDown} className="flex flex-wrap gap-100 border-b border-border px-300 pt-200">
+    <div role="tablist" aria-label="Request queues" onKeyDown={onKeyDown} className="flex flex-1 flex-wrap gap-100 px-300 pt-200">
       {QUEUE_TABS.map((t) => {
         const isActive = t.id === active.id;
         const count = counts ? counts[t.countKey] : null;
@@ -251,7 +226,38 @@ function TabStrip({
   );
 }
 
-// ---- filters ----------------------------------------------------------------------------
+// ---- actions and filters ----------------------------------------------------------------
+
+/** The Filters button and, on the tabs where a person acts, the bulk approval, side by side in one row. */
+function QueueActions({
+  criteria,
+  facets,
+  onChange,
+  bulk,
+}: {
+  criteria: QueueCriteria;
+  facets: QueuePage['facets'];
+  onChange: (next: QueueCriteria) => void;
+  /** Null on a tab with nothing to approve. */
+  bulk: { selectedCount: number; onApprove: () => void } | null;
+}) {
+  return (
+    <div className="flex flex-row flex-wrap items-center gap-300">
+      <Filters criteria={criteria} facets={facets} onChange={onChange} />
+      {bulk ? (
+        <>
+          {bulk.selectedCount > 0 ? <span className="text-200 text-muted-foreground">{bulk.selectedCount} selected</span> : null}
+          <button type="button" className={button.primary} disabled={bulk.selectedCount === 0} onClick={bulk.onApprove}>
+            Bulk approve ({bulk.selectedCount})
+          </button>
+        </>
+      ) : null}
+    </div>
+  );
+}
+
+/** The filter selects are one step tighter than a form field: they sit in a small panel. */
+const selectClass = `${input} py-100`;
 
 function Filters({
   criteria,
@@ -263,9 +269,9 @@ function Filters({
   onChange: (next: QueueCriteria) => void;
 }) {
   const choose = (label: string, value: string, kind: string, apply: (v: string) => QueueCriteria, none: string) => (
-    <label className="flex min-w-40 flex-col gap-100 text-200 font-medium text-muted-foreground">
+    <label className="flex flex-col gap-50 text-200 font-medium text-muted-foreground">
       {label}
-      <select className={input} value={value} onChange={(event) => onChange(apply(event.target.value))}>
+      <select className={selectClass} value={value} onChange={(event) => onChange(apply(event.target.value))}>
         <option value="">{none}</option>
         {facetOptions(facets, kind, value).map((o) => (
           <option key={o.value} value={o.value}>
@@ -277,36 +283,38 @@ function Filters({
   );
 
   return (
-    <div role="group" aria-label="Filters" className="flex flex-wrap items-end gap-300 border-b border-border px-400 py-300">
-      {choose('Profit centre', criteria.profitCenter, 'PROFIT_CENTER', (v) => ({ ...criteria, profitCenter: v }), 'All profit centres')}
-      {choose('Field', criteria.fieldCode, 'FIELD', (v) => ({ ...criteria, fieldCode: v }), 'All fields')}
-      {choose('Rule', criteria.ruleId, 'RULE', (v) => ({ ...criteria, ruleId: v }), 'All rules')}
-      <label className="flex min-w-36 flex-col gap-100 text-200 font-medium text-muted-foreground">
-        Age
-        <select
-          className={input}
-          value={criteria.minAgeHours}
-          disabled={!tabById(criteria.tab).ageApplies}
-          title={tabById(criteria.tab).ageApplies ? undefined : AGE_NOT_APPLICABLE}
-          onChange={(event) => onChange({ ...criteria, minAgeHours: Number(event.target.value) })}
-        >
-          {AGE_OPTIONS.map((o) => (
-            <option key={o.hours} value={o.hours}>
-              {o.label}
-            </option>
-          ))}
-        </select>
-      </label>
-      <label className="flex items-center gap-200 pb-200 text-300">
-        <input type="checkbox" checked={criteria.noteOnly} onChange={(event) => onChange({ ...criteria, noteOnly: event.target.checked })} />
-        Has a note (TBD)
-      </label>
-      {hasFilters(criteria) ? (
-        <button type="button" className={button.small} onClick={() => onChange(withoutFilters(criteria))}>
-          Clear filters
-        </button>
-      ) : null}
-    </div>
+    <Popover label="Filters" icon={<ListFilter aria-hidden="true" className="icon-size-200" />} count={filterCount(criteria)}>
+      <div className="space-y-200">
+        {choose('Profit centre', criteria.profitCenter, 'PROFIT_CENTER', (v) => ({ ...criteria, profitCenter: v }), 'All profit centres')}
+        {choose('Field', criteria.fieldCode, 'FIELD', (v) => ({ ...criteria, fieldCode: v }), 'All fields')}
+        {choose('Rule', criteria.ruleId, 'RULE', (v) => ({ ...criteria, ruleId: v }), 'All rules')}
+        <label className="flex flex-col gap-100 text-200 font-medium text-muted-foreground">
+          Age
+          <select
+            className={selectClass}
+            value={criteria.minAgeHours}
+            disabled={!tabById(criteria.tab).ageApplies}
+            title={tabById(criteria.tab).ageApplies ? undefined : AGE_NOT_APPLICABLE}
+            onChange={(event) => onChange({ ...criteria, minAgeHours: Number(event.target.value) })}
+          >
+            {AGE_OPTIONS.map((o) => (
+              <option key={o.hours} value={o.hours}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="flex items-center gap-200 text-300">
+          <input type="checkbox" checked={criteria.noteOnly} onChange={(event) => onChange({ ...criteria, noteOnly: event.target.checked })} />
+          Has a note (TBD)
+        </label>
+        {hasFilters(criteria) ? (
+          <button type="button" className={`${button.small} w-full`} onClick={() => onChange(withoutFilters(criteria))}>
+            Clear filters
+          </button>
+        ) : null}
+      </div>
+    </Popover>
   );
 }
 

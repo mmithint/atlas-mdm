@@ -17,15 +17,15 @@
  */
 import type { AppFunctionsSchema as S } from '@rayfin-app/functions/types';
 
-import { queueRow } from '../features/approvals/queue-fixtures';
 import type { QueueRow } from '../features/approvals/queue-api';
 import type { DetailRow } from '../features/approvals/request-api';
 import { checkRows, detailRow, goldRow, relatedRow, routeRow, viewer } from '../features/approvals/request-fixtures';
 
-import { ALLOWED_VALUES, CATALOG, fieldOf, fieldValueOf, labelOf, setFieldValue } from './catalog';
+import { ALLOWED_VALUES, CATALOG, fieldOf, fieldValueOf, setFieldValue } from './catalog';
 import {
   ACCOUNTABLE_GROUP,
   addEvent,
+  createRequest,
   demo,
   displayNameOf,
   eligibility,
@@ -37,9 +37,7 @@ import {
   membersOf,
   notify,
   nowIso,
-  refOf,
   resetDemoAndPersona,
-  responsibleGroupFor,
 } from './demo-store';
 import { currentPersona, profileOf } from './personas';
 
@@ -130,7 +128,11 @@ function applyDecision(r: QueueRow, decision: string, comment: string, returnTo:
     r.approvalStage = null;
     addEvent(r.requestId, { ...base, eventType: 'ACCOUNTABLE_APPROVED', statusTo: 'APPROVED', samePersonBothStages: stage1?.actor === me() });
     const h = findHeater(r.equipmentId);
-    if (h && r.fieldCode) setFieldValue(h, r.fieldCode, r.newValue);
+    if (h && r.fieldCode) {
+      setFieldValue(h, r.fieldCode, r.newValue);
+      h.goldenVersionId = (h.goldenVersionId ?? 1) + 1;
+      h.lastChangedAtUtc = nowIso();
+    }
     addEvent(r.requestId, { eventType: 'MERGED', actor: 'system:merge', comments: 'The golden record was updated.', statusFrom: 'APPROVED', statusTo: 'APPROVED' });
     notify(r, r.requestedBy, 'REQUEST_APPROVED', 'Your request was approved');
   } else if (decision === 'REJECT') {
@@ -274,41 +276,17 @@ export const mockHandlers: Handlers = {
   createChangeRequest: (input) => {
     const h = findHeater(input.equipmentId);
     if (!h) return refused('There is no such heater (sample data).', 50201);
-    const open = demo().requests.find((r) => r.equipmentId === h.equipmentId && r.fieldCode === input.fieldCode && isOpen(r));
-    const groups = { responsibleGroup: responsibleGroupFor(h.profitCenterName), accountableGroup: ACCOUNTABLE_GROUP };
-    if (open) {
-      const outcome = open.newValue === input.newValue ? 'DUPLICATE_SUPPRESSED' : 'BLOCKED_INCOMPATIBLE';
-      return { ...ok(), requestId: open.requestId, requestRef: open.requestRef, outcome, ...groups };
-    }
-    const n = demo().nextRequestId++;
-    const fromField = input.source === 'FIELD';
-    const row = queueRow(n, {
-      requestStatus: 'PENDING_RESPONSIBLE',
-      approvalStage: 'RESPONSIBLE',
-      equipmentId: h.equipmentId,
-      equipmentNumber: h.equipmentNumber,
-      functionalLocation: h.functionalLocation,
-      equipmentTagNumber: h.equipmentTagNumber,
-      profitCenterName: h.profitCenterName,
+    if (!currentPersona().canSubmitRequests) return refused('You may not submit requests.', 50120);
+    const { outcome, row } = createRequest({
+      heater: h,
       fieldCode: input.fieldCode,
-      fieldLabel: labelOf(input.fieldCode),
-      sapField: fieldOf(input.fieldCode)?.sapField ?? null,
-      oldValue: input.oldValue,
+      oldValue: input.oldValue || null,
       newValue: input.newValue,
       reason: input.reason || null,
-      sourceType: fromField ? 'FIELD' : 'MANUAL',
-      sourceLabel: fromField ? 'Field submission' : 'Manual request',
+      sourceType: input.source === 'FIELD' ? 'FIELD' : 'MANUAL',
       requestedBy: me(),
-      requestedAtUtc: nowIso(),
-      ...groups,
-      ageHours: 0,
-      updatedAtUtc: nowIso(),
-      canApprove: true,
     });
-    demo().requests.unshift(row);
-    addEvent(n, { eventType: 'CREATED', actor: me(), comments: input.reason || null, statusTo: 'PENDING_RESPONSIBLE' });
-    notify(row, `group:${groups.responsibleGroup}`, 'REQUEST_PENDING_RESPONSIBLE', 'A request is waiting for you');
-    return { ...ok(), requestId: n, requestRef: refOf(n), outcome: 'CREATED', ...groups };
+    return { ...ok(), requestId: row.requestId, requestRef: row.requestRef, outcome, responsibleGroup: row.responsibleGroup, accountableGroup: row.accountableGroup };
   },
 
   getRequestQueue: (input) => {

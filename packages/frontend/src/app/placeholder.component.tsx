@@ -18,7 +18,10 @@ export function Placeholder({ route }: { route: RouteDef }) {
         <p className="mt-300 text-300 text-muted-foreground">
           This screen is not built yet. It arrives in <strong>{route.builtIn}</strong>.
         </p>
-        <a className={`${button.secondary} mt-400`} href={hrefFor('/equipment')}>
+        <a
+          className={`${button.secondary} mt-400 !border-pink-500 !bg-pink-500 !text-white hover:!bg-pink-600`}
+          href={hrefFor('/equipment')}
+        >
           Find a heater meanwhile
         </a>
       </section>

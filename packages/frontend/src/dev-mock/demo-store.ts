@@ -17,8 +17,14 @@ import type { EventRow } from '../features/approvals/request-api';
 import type { SearchRow } from '../features/equipment/equipment-api';
 import { searchRow } from '../features/equipment/test-fixtures';
 
-import { fieldOf, fieldValueOf, labelOf } from './catalog';
+import type { RuleStatusRow } from '../features/equipment/rule-status-types';
+import type { Mark, PhotoRow } from '../features/field/field-types';
+import type { RuleRun, RuleTestResult, RuleVersion } from '../features/rules/rules-types';
+
+import { CATALOG, fieldOf, fieldValueOf, labelOf, setFieldValue } from './catalog';
 import { currentPersona, DEFAULT_PERSONA, PERSONAS, setPersona, type Persona } from './personas';
+import { fingerprint, hasGroupBy, SAMPLE_RULES, sampleRule, type Violation } from './rule-samples';
+import { sampleImage } from './sample-images';
 
 // ---------------------------------------------------------------- places, groups, people
 
@@ -103,6 +109,12 @@ export const nowIso = (): string => new Date().toISOString();
 const MAKERS = ['Example Heater Co.', 'Sample Burner Works', 'Demo Thermal Inc.'];
 const HEATER_COUNT = 60;
 
+/**
+ * Tags written twice (or three times) under the same parent FLOC, spelt differently, for the rule
+ * ENGINEERING_TAG_UNIQUE: its normalisation (no hyphens or slashes, any case) must see them as one.
+ */
+const DUPLICATE_TAGS: Record<number, string> = { 22: 'SYN-TAG-0021', 23: 'syn-tag/0021', 41: 'SYN-TAG-0040' };
+
 function buildHeaters(): SearchRow[] {
   const others = PROFIT_CENTRES.slice(1);
   return Array.from({ length: HEATER_COUNT }, (_, i) => {
@@ -115,8 +127,11 @@ function buildHeaters(): SearchRow[] {
       profitCenterName: n % 3 === 0 ? 'OP RES DB NM' : others[(n - Math.floor(n / 3) - 1) % others.length],
       firedUnfired: n % 5 === 0 ? 'UNFIRED' : 'FIRED',
       heatDutyMmbtuHr: n % 7 === 0 ? null : 1 + (n % 9) * 0.75,
-      verificationPct: 20 + ((n * 7) % 80),
-      invalidRuleCount: n % 4 === 0 ? 2 : 0,
+      heatDutySource: n % 7 === 0 ? 'MISSING' : 'STATED',
+      ...(DUPLICATE_TAGS[n] ? { equipmentTagNumber: DUPLICATE_TAGS[n] } : {}),
+      // Both are recomputed from the store (verification marks, rule results) once it is built.
+      verificationPct: 0,
+      invalidRuleCount: 0,
     });
   });
 }
@@ -218,14 +233,35 @@ export interface DemoNotification {
 
 // ---------------------------------------------------------------- the state
 
+/** The latest mark of one field of one heater (`app.vw_field_verification_latest`). */
+export interface DemoMark {
+  mark: Mark;
+  by: string;
+  atUtc: string;
+  comment: string | null;
+}
+
 export interface DemoState {
   heaters: SearchRow[];
   requests: QueueRow[];
   events: Map<number, EventRow[]>;
   notifications: DemoNotification[];
+  /** Every version of every rule. */
+  ruleVersions: RuleVersion[];
+  /** Newest first. */
+  runs: RuleRun[];
+  /** Latest result per heater × published rule (`app.vw_equipment_rule_status`). */
+  ruleResults: Map<number, RuleStatusRow[]>;
+  /** The last test of each draft, by `ruleId|version`, with the fingerprint of what was tested. */
+  tests: Map<string, { result: RuleTestResult; hash: string }>;
+  /** Latest mark per heater, then per field. */
+  marks: Map<number, Map<string, DemoMark>>;
+  photos: PhotoRow[];
   nextRequestId: number;
   nextEventId: number;
   nextNotificationId: number;
+  nextRunId: number;
+  nextPhotoId: number;
 }
 
 let state: DemoState = initialState();
@@ -248,10 +284,235 @@ export function resetDemoAndPersona(): void {
 function initialState(): DemoState {
   const heaters = buildHeaters();
   const requests = buildRequests(heaters);
-  const s: DemoState = { heaters, requests, events: new Map(), notifications: [], nextRequestId: 100, nextEventId: 1, nextNotificationId: 1 };
+  const s: DemoState = {
+    heaters,
+    requests,
+    events: new Map(),
+    notifications: [],
+    ruleVersions: [],
+    runs: [],
+    ruleResults: new Map(),
+    tests: new Map(),
+    marks: new Map(),
+    photos: [],
+    nextRequestId: 100,
+    nextEventId: 1,
+    nextNotificationId: 1,
+    nextRunId: 1,
+    nextPhotoId: 1,
+  };
   for (const r of requests) seedHistory(s, r);
   s.notifications.sort((a, b) => a.createdAtUtc.localeCompare(b.createdAtUtc));
+  // The golden record already holds the changes approved before the demo starts.
+  for (const r of requests) {
+    const h = heaters.find((x) => x.equipmentId === r.equipmentId);
+    if (r.requestStatus === 'APPROVED' && h && r.fieldCode) {
+      setFieldValue(h, r.fieldCode, r.newValue);
+      h.goldenVersionId = (h.goldenVersionId ?? 1) + 1;
+      h.lastChangedAtUtc = r.updatedAtUtc;
+    }
+  }
+  seedPhotos(s);
+  seedMarks(s);
+  seedRules(s);
+  for (const h of heaters) refreshHeater(s, h);
   return s;
+}
+
+/** Photos for the field requests that say they have some (sample images, Q-418). */
+function seedPhotos(s: DemoState): void {
+  for (const r of s.requests) {
+    const types = (['NAMEPLATE', 'OVERALL'] as const).slice(0, r.photoCount ?? 0);
+    for (const photoType of types) {
+      const image = sampleImage(photoType);
+      s.photos.push({
+        fileId: s.nextPhotoId++,
+        equipmentId: r.equipmentId ?? 0,
+        requestIds: [r.requestId],
+        photoType,
+        fileName: image.fileName,
+        uploadedBy: r.requestedBy,
+        uploadedAtUtc: r.requestedAtUtc ?? nowIso(),
+        url: image.url,
+        isSample: true,
+      });
+    }
+  }
+}
+
+/** Earlier field visits: heater n has its first (n mod 6) key fields verified, so the % spreads from 0 to 100. */
+function seedMarks(s: DemoState): void {
+  const keys = CATALOG.filter((c) => c.isKey).map((c) => c.fieldCode);
+  for (const h of s.heaters) {
+    const n = h.equipmentId;
+    const verified = n % 6;
+    const byField = new Map<string, DemoMark>();
+    const by = n % 2 === 0 ? FIELD_EMAIL : 'casey.morgan@example.test';
+    const at = hoursAgo(24 * ((n % 20) + 2));
+    keys.slice(0, verified).forEach((code) => byField.set(code, { mark: 'VERIFIED_CORRECT', by, atUtc: at, comment: null }));
+    if (verified < keys.length && n % 4 === 0) {
+      byField.set(keys[verified], { mark: 'DID_NOT_VERIFY', by, atUtc: at, comment: 'Nameplate painted over' });
+    }
+    if (byField.size > 0) s.marks.set(n, byField);
+  }
+}
+
+/** The ten client rules as versions, two earlier scheduled runs, and the results of the latest one. */
+function seedRules(s: DemoState): void {
+  const created = hoursAgo(24 * 12);
+  const published = hoursAgo(24 * 10);
+  for (const rule of SAMPLE_RULES) {
+    const isPublished = rule.start === 'PUBLISHED';
+    s.ruleVersions.push({
+      ruleId: rule.ruleId,
+      version: 1,
+      status: isPublished ? 'PUBLISHED' : 'DRAFT',
+      ruleName: rule.ruleName,
+      description: rule.description,
+      queryLanguage: 'T-SQL',
+      executionTarget: 'ATLAS_DB · gold views',
+      queryText: rule.queryText,
+      routingMode: rule.routingMode,
+      resolutionGroup: 'DataQualityOwner',
+      editorGroup: 'DataQualityOwner',
+      responsibleGroup: null,
+      accountableGroup: null,
+      allowedTargets: rule.allowedTargets,
+      applicability: rule.applicability,
+      effectiveFromUtc: isPublished ? published : null,
+      effectiveToUtc: null,
+      changeReason: isPublished ? 'First version, agreed with the data owner (sample).' : 'Initial draft from the client workbook (REF-46).',
+      testStatus: isPublished ? 'PASSED' : 'NOT_TESTED',
+      testedAtUtc: isPublished ? published : null,
+      testedBy: isPublished ? 'morgan.diaz@example.test' : null,
+      publishedBy: isPublished ? 'jordan.lee@example.test' : null,
+      publishedAtUtc: isPublished ? published : null,
+      queryHash: isPublished ? fingerprint(rule.queryText) : null,
+      createdBy: 'morgan.diaz@example.test',
+      updatedAtUtc: isPublished ? published : created,
+    });
+  }
+  // Two nightly runs: the first raised the rule requests the demo starts with; the second found them open.
+  const openRuleRequests = s.requests.filter((r) => r.sourceRuleId && isOpen(r)).length;
+  const raised = s.requests.filter((r) => r.sourceRuleId).length;
+  const at = (days: number) => hoursAgo(24 * days);
+  const lines = (created: number, suppressed: number) =>
+    publishedVersions(s).map((v) => {
+      const found = sampleRule(v.ruleId)?.evaluate(s.heaters, false).length ?? 0;
+      const auto = v.routingMode === 'AUTO_ROUTE';
+      return { ruleId: v.ruleId, version: v.version, status: 'SUCCEEDED' as const, checked: s.heaters.length, invalid: found, requestsCreated: auto ? created : 0, requestsSuppressed: auto ? suppressed : 0, message: null };
+    });
+  s.runs.push({ runId: s.nextRunId++, trigger: 'SCHEDULED', startedAtUtc: at(2), finishedAtUtc: at(2), startedBy: 'system:nightly', status: 'SUCCEEDED', lines: lines(raised, 0) });
+  s.runs.unshift({ runId: s.nextRunId++, trigger: 'SCHEDULED', startedAtUtc: at(1), finishedAtUtc: at(1), startedBy: 'system:nightly', status: 'SUCCEEDED', lines: lines(0, openRuleRequests) });
+  storeResults(s, at(1));
+}
+
+/** A function declaration on purpose: it runs while the starting state is built, before later constants exist. */
+export function publishedVersions(s: DemoState = state): RuleVersion[] {
+  return s.ruleVersions.filter((v) => v.status === 'PUBLISHED');
+}
+
+/** Replaces every heater's rule results with what the published rules find now. */
+export function storeResults(s: DemoState, atUtc: string): void {
+  s.ruleResults = new Map();
+  for (const v of publishedVersions(s)) {
+    const rule = sampleRule(v.ruleId);
+    if (!rule) continue;
+    const found = new Map<number, Violation>();
+    for (const x of rule.evaluate(s.heaters, hasGroupBy(v.queryText))) if (!found.has(x.equipmentId)) found.set(x.equipmentId, x);
+    for (const h of s.heaters) {
+      if (!v.applicability.includes(h.equipClass ?? '')) continue;
+      const hit = found.get(h.equipmentId);
+      const row: RuleStatusRow = {
+        ruleId: v.ruleId,
+        ruleName: v.ruleName,
+        version: v.version,
+        routingMode: v.routingMode,
+        result: hit ? 'INVALID' : 'VALID',
+        message: hit?.violation ?? null,
+        fieldCode: hit ? (hit.fieldCode ?? v.allowedTargets[0] ?? null) : null,
+        proposedValue: hit?.proposedValue ?? null,
+        detectedAtUtc: atUtc,
+      };
+      s.ruleResults.set(h.equipmentId, [...(s.ruleResults.get(h.equipmentId) ?? []), row]);
+    }
+  }
+  for (const h of s.heaters) refreshHeater(s, h);
+}
+
+/** Verified key fields of a heater, out of the key fields (WA-07). */
+export function verificationOf(equipmentId: number, s: DemoState = state): { verified: number; keys: number; pct: number } {
+  const keys = CATALOG.filter((c) => c.isKey);
+  const marks = s.marks.get(equipmentId);
+  const verified = keys.filter((k) => marks?.get(k.fieldCode)?.mark === 'VERIFIED_CORRECT').length;
+  return { verified, keys: keys.length, pct: keys.length === 0 ? 0 : Math.round((verified / keys.length) * 1000) / 10 };
+}
+
+/** Keeps the numbers the search list shows (verification %, Invalid count) in step with the store. */
+export function refreshHeater(s: DemoState, h: SearchRow): void {
+  const row = h as unknown as Record<string, unknown>;
+  row['verificationPct'] = verificationOf(h.equipmentId, s).pct;
+  row['invalidRuleCount'] = (s.ruleResults.get(h.equipmentId) ?? []).filter((r) => r.result === 'INVALID').length;
+}
+
+export interface NewRequest {
+  heater: SearchRow;
+  fieldCode: string;
+  oldValue: string | null;
+  newValue: string;
+  reason: string | null;
+  sourceType: 'MANUAL' | 'FIELD' | 'BUSINESS_RULE';
+  requestedBy: string;
+  ruleId?: string;
+  ruleVersion?: number;
+  note?: string | null;
+  photoCount?: number;
+}
+
+/**
+ * The one door into the workflow, as `app.usp_request_create` (contract `01` §6.3): an open request with the
+ * same value suppresses the new one, a different value on the same field blocks it; otherwise it is routed,
+ * gets its CREATED event and tells the responsible group.
+ */
+export function createRequest(input: NewRequest): { outcome: 'CREATED' | 'DUPLICATE_SUPPRESSED' | 'BLOCKED_INCOMPATIBLE'; row: QueueRow } {
+  const h = input.heater;
+  const open = state.requests.find((r) => r.equipmentId === h.equipmentId && r.fieldCode === input.fieldCode && isOpen(r));
+  if (open) return { outcome: open.newValue === input.newValue ? 'DUPLICATE_SUPPRESSED' : 'BLOCKED_INCOMPATIBLE', row: open };
+  const n = state.nextRequestId++;
+  const fromRule = input.sourceType === 'BUSINESS_RULE';
+  const row = queueRow(n, {
+    requestStatus: 'PENDING_RESPONSIBLE',
+    approvalStage: 'RESPONSIBLE',
+    equipmentId: h.equipmentId,
+    equipmentNumber: h.equipmentNumber,
+    functionalLocation: h.functionalLocation,
+    equipmentTagNumber: h.equipmentTagNumber,
+    profitCenterName: h.profitCenterName,
+    fieldCode: input.fieldCode,
+    fieldLabel: labelOf(input.fieldCode),
+    sapField: fieldOf(input.fieldCode)?.sapField ?? null,
+    oldValue: input.oldValue,
+    newValue: input.newValue,
+    reason: input.reason,
+    note: input.note ?? null,
+    sourceType: input.sourceType,
+    sourceRuleId: input.ruleId ?? null,
+    sourceRuleVersion: input.ruleVersion ?? null,
+    sourceLabel: fromRule ? `Rule ${input.ruleId ?? ''} v${input.ruleVersion ?? 1}` : input.sourceType === 'FIELD' ? 'Field submission' : 'Manual request',
+    requestedBy: input.requestedBy,
+    requestedAtUtc: nowIso(),
+    detectedAtUtc: fromRule ? nowIso() : null,
+    responsibleGroup: responsibleGroupFor(h.profitCenterName),
+    accountableGroup: ACCOUNTABLE_GROUP,
+    ageHours: 0,
+    photoCount: input.photoCount ?? 0,
+    updatedAtUtc: nowIso(),
+    canApprove: true,
+  });
+  state.requests.unshift(row);
+  addEvent(n, { eventType: 'CREATED', actor: input.requestedBy, comments: input.reason, statusTo: 'PENDING_RESPONSIBLE' });
+  notify(row, `group:${row.responsibleGroup}`, 'REQUEST_PENDING_RESPONSIBLE', 'A request is waiting for you');
+  return { outcome: 'CREATED', row };
 }
 
 /** A plausible history and the notifications it would have sent, for a starting request. */
