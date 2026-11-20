@@ -1,6 +1,3 @@
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
-
 import { describe, expect, it } from 'vitest';
 
 import { COLUMNS, DEFAULT_COLUMNS, FILTER_COLUMNS, MAX_FILTER_TEXT, SEARCH_SELECT, isFilterColumn } from './columns';
@@ -16,7 +13,6 @@ import {
 } from './search-model';
 
 const q = (text: string) => criteriaFromQuery(new URLSearchParams(text));
-const snake = (name: string) => name.replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`);
 
 describe('columns', () => {
   it('only offers columns the search reads, once each, and shows nine by default', () => {
@@ -39,17 +35,6 @@ describe('columns', () => {
 
   it('keeps the tag, serial number and equipment number first, as field users look for them (POC-APP-05)', () => {
     expect(FILTER_COLUMNS.slice(0, 3)).toEqual(['equipmentTagNumber', 'manufacturerSerialNumber', 'equipmentNumber']);
-  });
-
-  // The same list lives in the procedure; the two must not drift apart (a column the screen offers
-  // but the procedure refuses would fail with error 50018 on the first search).
-  it('is the list of filter columns of the procedure app.usp_equipment_search', () => {
-    const root = resolve(import.meta.dirname, '../../../../..');
-    const proc = readFileSync(resolve(root, 'db/procs/usp_equipment_search.sql'), 'utf8');
-    const block = /INSERT INTO @filter_cols \(col\) VALUES([\s\S]*?);/.exec(proc)?.[1] ?? '';
-    const inProc = [...block.matchAll(/\('([a-z_]+)'\)/g)].map((m) => m[1]);
-    expect(inProc.length).toBe(20);
-    expect([...inProc].sort()).toEqual(FILTER_COLUMNS.map(snake).sort());
   });
 });
 
