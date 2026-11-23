@@ -90,6 +90,7 @@
   --spacing-700: 28px;
   --spacing-800: 32px;
   --spacing-sidebar: 248px; /* width of the navigation rail */
+  --spacing-sidebar-rail: 64px; /* width of the collapsed navigation rail (icons only) */
 
   /* Font Sizes — 100-based scale 
      Usage: text-* (e.g. text-300, text-hero-900) */

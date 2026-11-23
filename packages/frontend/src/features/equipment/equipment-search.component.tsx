@@ -58,8 +58,9 @@ export function EquipmentSearch() {
       direction: criteria.sort === column && criteria.direction === 'asc' ? 'desc' : 'asc',
     });
 
+  // On a wide screen the page fills the area under the app header and only the table scrolls (the toolbar and pager stay in view).
   return (
-    <div className="space-y-400">
+    <div className="space-y-400 md:flex md:min-h-0 md:flex-1 md:flex-col md:space-y-0 md:gap-400">
       {/*<header>
         <h1 className="text-600 font-semibold">Equipment</h1>
          <p className="mt-100 text-300 text-muted-foreground">
@@ -68,7 +69,7 @@ export function EquipmentSearch() {
       </header>*/}
 
       {criteria.facility ? (
-        <div className="flex flex-wrap items-center gap-300 rounded-md border border-border bg-info px-400 py-200 text-300 text-info-foreground">
+        <div className="flex shrink-0 flex-wrap items-center gap-300 rounded-md border border-border bg-info px-400 py-200 text-300 text-info-foreground">
           <span>
             Facility <span className="id-plate">{criteria.facility}</span>: every heater under this parent FLOC.
           </span>
@@ -82,8 +83,8 @@ export function EquipmentSearch() {
         </div>
       ) : null}
 
-      <section aria-label="Search results" className={card}>
-        <div className="flex flex-wrap items-center justify-between gap-300 border-b border-border px-400 py-300">
+      <section aria-label="Search results" className={`${card} md:flex md:min-h-0 md:flex-1 md:flex-col`}>
+        <div className="flex shrink-0 flex-wrap items-center justify-between gap-300 border-b border-border px-400 py-300">
           <h1 className="text-600 font-semibold">Equipment</h1>
           {/* <Summary view={view} filtered={criteria.filters.length > 0} /> */}
           <div className="flex flex-wrap items-center gap-300">
@@ -97,24 +98,10 @@ export function EquipmentSearch() {
               <Search aria-hidden="true" className="icon-size-200" />
             </button>
             <ColumnChooser visible={visible} onChange={setVisible} values={values} onValue={setValue} applied={filtered} onApply={search} />
-            <label className="flex items-center gap-200 whitespace-nowrap text-200 text-muted-foreground">
-              Rows per page
-              <select
-                className={`${input} w-auto py-100`}
-                value={criteria.pageSize}
-                onChange={(e) => go({ pageSize: Number(e.target.value) })}
-              >
-                {PAGE_SIZES.map((n) => (
-                  <option key={n} value={n}>
-                    {n}
-                  </option>
-                ))}
-              </select>
-            </label>
           </div>
         </div>
 
-        <div className="p-400">
+        <div className="p-400 md:flex md:min-h-0 md:flex-1 md:flex-col">
           {/* The header and the filter boxes stay on screen while loading, on an error and when nothing matches, so a filter can always be changed. */}
           <ResultTable
             rows={view.status === 'ready' ? view.rows : []}
@@ -125,17 +112,17 @@ export function EquipmentSearch() {
             onValue={setValue}
           />
           {view.status === 'loading' ? (
-            <div className="mt-400">
+            <div className="mt-400 shrink-0">
               <LoadingState rows={6} label="Searching" />
             </div>
           ) : null}
           {view.status === 'error' ? (
-            <div className="mt-400">
+            <div className="mt-400 shrink-0">
               <ErrorState title="The search failed" message={view.message} onRetry={view.retry} />
             </div>
           ) : null}
           {view.status === 'ready' && view.rows.length === 0 ? (
-            <div className="mt-400">
+            <div className="mt-400 shrink-0">
               <NothingFound criteria={criteria} />
             </div>
           ) : null}
@@ -147,6 +134,8 @@ export function EquipmentSearch() {
               hasNext={view.hasNext}
               onPrevious={view.previous}
               onNext={view.next}
+              pageSize={criteria.pageSize}
+              onPageSize={(pageSize) => go({ pageSize })}
             />
           ) : null}
         </div>
@@ -291,10 +280,10 @@ function ResultTable({
   onValue: (column: SearchColumn, text: string) => void;
 }) {
   return (
-    <div className="overflow-x-auto">
+    <div className="overflow-x-auto md:min-h-0 md:overflow-y-auto">
       <table className="w-full min-w-max border-collapse text-300">
         <caption className="sr-only">Heaters that match the search</caption>
-        <thead>
+        <thead className="sticky top-0 z-[1] bg-card">
           <tr className="bg-muted text-left text-200 uppercase tracking-wide text-muted-foreground">
             {columns.map((c) => {
               const active = criteria.sort === c.column;
@@ -391,6 +380,8 @@ function Pager({
   hasNext,
   onPrevious,
   onNext,
+  pageSize,
+  onPageSize,
 }: {
   page: number;
   pageCount: number | null;
@@ -398,21 +389,36 @@ function Pager({
   hasNext: boolean;
   onPrevious: () => void;
   onNext: () => void;
+  pageSize: number;
+  onPageSize: (pageSize: number) => void;
 }) {
+  // Rows per page on the left, the page controls on the right.
   return (
-    <nav aria-label="Pages" className="mt-400 flex items-center justify-between gap-300">
-      <button type="button" className={button.secondary} onClick={onPrevious} disabled={!hasPrevious}>
-        <ChevronLeft aria-hidden="true" className="icon-size-200" />
-        Previous
-      </button>
-      <span className="text-300 text-muted-foreground">
-        Page {page}
-        {pageCount !== null ? ` of ${pageCount}` : ''}
-      </span>
-      <button type="button" className={button.secondary} onClick={onNext} disabled={!hasNext}>
-        Next
-        <ChevronRight aria-hidden="true" className="icon-size-200" />
-      </button>
+    <nav aria-label="Pages" className="mt-400 flex shrink-0 flex-wrap items-center justify-between gap-300">
+      <label className="flex items-center gap-200 whitespace-nowrap text-200 text-muted-foreground">
+        Rows per page
+        <select className={`${input} w-auto py-100`} value={pageSize} onChange={(e) => onPageSize(Number(e.target.value))}>
+          {PAGE_SIZES.map((n) => (
+            <option key={n} value={n}>
+              {n}
+            </option>
+          ))}
+        </select>
+      </label>
+      <div className="flex items-center gap-300">
+        <button type="button" className={button.secondary} onClick={onPrevious} disabled={!hasPrevious}>
+          <ChevronLeft aria-hidden="true" className="icon-size-200" />
+          Previous
+        </button>
+        <span className="text-300 text-muted-foreground">
+          Page {page}
+          {pageCount !== null ? ` of ${pageCount}` : ''}
+        </span>
+        <button type="button" className={button.secondary} onClick={onNext} disabled={!hasNext}>
+          Next
+          <ChevronRight aria-hidden="true" className="icon-size-200" />
+        </button>
+      </div>
     </nav>
   );
 }

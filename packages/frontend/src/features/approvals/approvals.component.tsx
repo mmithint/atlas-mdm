@@ -96,15 +96,16 @@ export function Approvals() {
     setReload((n) => n + 1);
   };
 
+  // On a wide screen the page fills the area under the app header and only the table scrolls (the tabs and pager stay in view).
   return (
-    <div className="space-y-300">
-      <header>
+    <div className="space-y-300 md:flex md:min-h-0 md:flex-1 md:flex-col md:space-y-0 md:gap-300">
+      <header className="shrink-0">
         <h1 className="text-600 font-semibold">Approvals</h1>
       </header>
 
-      <section aria-label="Requests" className={card}>
+      <section aria-label="Requests" className={`${card} md:flex md:min-h-0 md:flex-1 md:flex-col`}>
         {/* The tabs and the actions share one row; the row owns the rule under them. */}
-        <div className="flex flex-wrap items-end gap-x-300 border-b border-border pr-400">
+        <div className="flex shrink-0 flex-wrap items-end gap-x-300 border-b border-border pr-400">
           <TabStrip active={tab} counts={known?.counts ?? null} onSelect={select} />
           <div className="pb-100">
             <QueueActions
@@ -120,8 +121,8 @@ export function Approvals() {
           </div>
         </div>
 
-        <div role="tabpanel" id={PANEL_ID} aria-labelledby={`tab-${tab.id}`}>
-          <div className="p-400">
+        <div role="tabpanel" id={PANEL_ID} aria-labelledby={`tab-${tab.id}`} className="md:flex md:min-h-0 md:flex-1 md:flex-col">
+          <div className="p-400 md:flex md:min-h-0 md:flex-1 md:flex-col">
             {state.status === 'loading' ? <LoadingState rows={8} label="Loading requests" /> : null}
             {state.status === 'error' ? (
               <ErrorState title="The requests could not be loaded" message={state.message} onRetry={state.retry} />
@@ -347,10 +348,10 @@ function RequestTable({
 }) {
   const approvable = selectableIds(rows).length;
   return (
-    <div className="overflow-x-auto">
+    <div className="overflow-x-auto md:min-h-0 md:overflow-y-auto">
       <table className="w-full min-w-max border-collapse text-300">
         <caption className="sr-only">Change requests in this tab</caption>
-        <thead>
+        <thead className="sticky top-0 z-[1] bg-card">
           <tr className="bg-muted text-left text-200 uppercase tracking-wide text-muted-foreground">
             {selectable ? (
               <th scope="col" className="w-0 px-300 py-200">
@@ -519,7 +520,7 @@ function Pager({
   onNext: () => void;
 }) {
   return (
-    <nav aria-label="Pages" className="mt-400 flex items-center justify-between gap-300">
+    <nav aria-label="Pages" className="mt-400 flex shrink-0 items-center justify-between gap-300">
       <button type="button" className={button.secondary} onClick={onPrevious} disabled={!hasPrevious}>
         <ChevronLeft aria-hidden="true" className="icon-size-200" />
         Previous

@@ -64,7 +64,6 @@ const MOCK_SESSION = {
 
 /** Signs in as the mock user, with no network. */
 export function createMockAuthService(): IAuthService {
-  installBanner();
   return {
     config: { kind: 'ready' },
     canSignIn: false,
@@ -73,14 +72,3 @@ export function createMockAuthService(): IAuthService {
   };
 }
 
-/** A fixed label on every screen: nobody should mistake this for the real app. */
-function installBanner(): void {
-  const banner = document.createElement('div');
-  // FINAL PLAN/11 §3 F4: the wording the client sees during the demo.
-  banner.textContent = 'DEMO · sample data · nothing is saved';
-  banner.setAttribute('role', 'status');
-  banner.style.cssText =
-    'position:fixed;left:8px;bottom:8px;z-index:2147483647;padding:4px 10px;border-radius:6px;' +
-    'background:#b45309;color:#fff;font:600 12px system-ui,sans-serif;pointer-events:none;opacity:.92';
-  document.body.appendChild(banner);
-}
