@@ -5,7 +5,7 @@ import { useMemo, useState } from 'react';
 import { hrefFor } from '@/app/router';
 import { PageHeader, Panel, Pill } from '@/components/layout';
 import { EmptyState, ErrorState, LoadingState } from '@/components/states';
-import { button, input } from '@/components/ui';
+import { button, identifierBadge, input } from '@/components/ui';
 import { useLoad } from '@/hooks/use-load';
 import { errorText } from '@/lib/act-answer';
 import { formatPercent } from '@/lib/format';
@@ -320,8 +320,11 @@ function EquipmentStep(props: {
                         <span className="font-mono text-300 font-semibold">{h.equipmentNumber}</span>
                         <Pill tone={h.verificationPct >= 100 ? 'success' : 'neutral'}>{formatPercent(h.verificationPct)} verified</Pill>
                       </span>
-                      <span className="block text-200 text-muted-foreground">
-                        Tag {h.tag ?? '—'} · FLOC {h.functionalLocation ?? '—'} · {h.manufacturer ?? '—'}
+                      <span className="flex flex-wrap items-center gap-100 text-200 text-muted-foreground">
+                        <span>Tag</span>
+                        {h.tag ? <span className={identifierBadge}>{h.tag}</span> : '—'}
+                        <span aria-hidden="true">·</span>
+                        <span>FLOC {h.functionalLocation ?? '—'} · {h.manufacturer ?? '—'}</span>
                       </span>
                     </button>
                   </li>
@@ -392,8 +395,11 @@ function HeaterCard({ form }: { form: FieldForm }) {
   return (
     <div className="rounded-md border border-border bg-muted p-300">
       <p className="font-mono text-400 font-semibold">{form.equipmentNumber}</p>
-      <p className="text-200 text-muted-foreground">
-        Tag {form.tag ?? '—'} · FLOC {form.functionalLocation ?? '—'} · {form.profitCenter ?? '—'}
+      <p className="flex flex-wrap items-center gap-100 text-200 text-muted-foreground">
+        <span>Tag</span>
+        {form.tag ? <span className={identifierBadge}>{form.tag}</span> : '—'}
+        <span aria-hidden="true">·</span>
+        <span>FLOC {form.functionalLocation ?? '—'} · {form.profitCenter ?? '—'}</span>
       </p>
       <div className="mt-200 flex items-center gap-200">
         <div className="h-2 flex-1 overflow-hidden rounded-full bg-card" aria-hidden="true">

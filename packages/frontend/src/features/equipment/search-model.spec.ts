@@ -40,11 +40,12 @@ describe('columns', () => {
 
 describe('criteriaFromQuery', () => {
   it('uses defaults for an empty address', () => {
-    expect(q('')).toEqual<SearchCriteria>({ filters: [], facility: '', sort: null, direction: 'asc', pageSize: 50 });
+    expect(q('')).toEqual<SearchCriteria>({ searchText: '', filters: [], facility: '', sort: null, direction: 'asc', pageSize: 50 });
   });
 
   it('reads a full address, filters in the order of the columns, not of the address', () => {
-    expect(q('f.manufacturer=%20heat%20&f.equipmentTagNumber=SYN-TAG&facility=AREA-01&sort=manufacturer&dir=desc&size=25')).toEqual<SearchCriteria>({
+    expect(q('q=%20TAG-7%20&f.manufacturer=%20heat%20&f.equipmentTagNumber=SYN-TAG&facility=AREA-01&sort=manufacturer&dir=desc&size=25')).toEqual<SearchCriteria>({
+      searchText: 'TAG-7',
       filters: [
         { column: 'equipmentTagNumber', text: 'SYN-TAG' },
         { column: 'manufacturer', text: 'heat' },
@@ -57,20 +58,21 @@ describe('criteriaFromQuery', () => {
   });
 
   it('falls back to a default for values it does not know, and drops filters it cannot use', () => {
-    const c = q('sort=dropTable&dir=sideways&size=7&f.openRequestCount=3&f.nonsense=x&f.manufacturer=%20%20&q=old&field=serial');
+    const c = q('sort=dropTable&dir=sideways&size=7&f.openRequestCount=3&f.nonsense=x&f.manufacturer=%20%20&field=serial');
     expect(c.sort).toBeNull();
     expect(c.direction).toBe('asc');
     expect(c.pageSize).toBe(50);
-    expect(c.filters).toEqual([]); // not a filter column, unknown column, blank box; the old ?q= and ?field= are ignored
+    expect(c.filters).toEqual([]); // not a filter column, unknown column and blank box are ignored
   });
 
-  it('cuts a filter text to the longest the backend accepts', () => {
+  it('cuts search and filter text to the longest the backend accepts', () => {
     expect(q(`f.manufacturer=${'x'.repeat(150)}`).filters[0]?.text).toHaveLength(MAX_FILTER_TEXT);
+    expect(q(`q=${'x'.repeat(150)}`).searchText).toHaveLength(MAX_FILTER_TEXT);
   });
 
   it('round-trips through the address, leaving defaults out', () => {
-    expect(queryFromCriteria(q(''))).toEqual({ facility: undefined, sort: undefined, dir: undefined, size: undefined });
-    const c = q('f.equipClass=fired&f.manufacturer=A%26B&facility=X&sort=equipClass&dir=desc&size=100');
+    expect(queryFromCriteria(q(''))).toEqual({ q: undefined, facility: undefined, sort: undefined, dir: undefined, size: undefined });
+    const c = q('q=TAG-7&f.equipClass=fired&f.manufacturer=A%26B&facility=X&sort=equipClass&dir=desc&size=100');
     const query = Object.entries(queryFromCriteria(c)).filter(([, v]) => v !== undefined) as [string, string][];
     expect(criteriaFromQuery(new URLSearchParams(query))).toEqual(c);
     expect(new URLSearchParams(query).get('f.manufacturer')).toBe('A&B');
@@ -102,7 +104,7 @@ describe('order and key', () => {
   it('gives a different key for anything that changes the list', () => {
     const base = criteriaKey(q('f.manufacturer=a'));
     expect(criteriaKey(q('f.manufacturer=a'))).toBe(base);
-    for (const other of ['f.manufacturer=b', 'f.equipClass=a', 'f.manufacturer=a&f.equipClass=a', 'f.manufacturer=a&facility=X', 'f.manufacturer=a&sort=manufacturer', 'f.manufacturer=a&size=25']) {
+    for (const other of ['q=TAG-7&f.manufacturer=a', 'f.manufacturer=b', 'f.equipClass=a', 'f.manufacturer=a&f.equipClass=a', 'f.manufacturer=a&facility=X', 'f.manufacturer=a&sort=manufacturer', 'f.manufacturer=a&size=25']) {
       expect(criteriaKey(q(other)), other).not.toBe(base);
     }
   });

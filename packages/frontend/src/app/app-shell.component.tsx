@@ -157,7 +157,7 @@ export function AppShell() {
           aria-label={railCollapsed ? 'Expand the menu' : 'Collapse the menu'}
           aria-expanded={!railCollapsed}
           title={railCollapsed ? 'Expand the menu' : 'Collapse the menu'}
-          className="absolute -right-300 top-[73px] z-10 hidden rounded-md border border-border bg-card p-100 text-muted-foreground shadow-sm hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:inline-flex"
+          className="absolute -right-300 top-[73px] z-10 hidden cursor-pointer rounded-md border border-border bg-card p-100 text-muted-foreground shadow-sm hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:inline-flex"
         >
           {railCollapsed ? <PanelLeftOpen aria-hidden="true" className="icon-size-200" /> : <PanelLeftClose aria-hidden="true" className="icon-size-200" />}
         </button>

@@ -3,7 +3,7 @@ import { useId, useMemo, useRef, useState, type FormEvent, type ReactNode } from
 
 import { hrefFor, navigate } from '@/app/router';
 import { EmptyState, ErrorState, LoadingState } from '@/components/states';
-import { badge, button, card, input, inputCompact } from '@/components/ui';
+import { badge, button, card, identifierBadge, input, inputCompact } from '@/components/ui';
 import { useHashRoute } from '@/hooks/use-hash-route';
 import { useMediaQuery } from '@/hooks/use-media-query';
 import { BLANK, formatDecimal, formatPercent, formatUtc, isBlank, orBlank } from '@/lib/format';
@@ -80,17 +80,25 @@ export function EquipmentSearch() {
   const [typed, setTyped] = useState<{ key: string; values: FilterValues }>({ key: appliedKey, values: valuesFromFilters(criteria.filters) });
   const values = typed.key === appliedKey ? typed.values : valuesFromFilters(criteria.filters);
   const setValue = (column: SearchColumn, text: string) => setTyped({ key: appliedKey, values: { ...values, [column]: text } });
-  const anyFilter = criteria.filters.length > 0 || Object.values(values).some((text) => (text ?? '').trim() !== '');
+
+  const [searchOpen, setSearchOpen] = useState(criteria.searchText !== '');
+  const [quickSearch, setQuickSearch] = useState({ key: criteria.searchText, text: criteria.searchText });
+  const quickSearchText = quickSearch.key === criteria.searchText ? quickSearch.text : criteria.searchText;
+  const setQuickSearchText = (text: string) => setQuickSearch({ key: criteria.searchText, text });
 
   const go = (change: Partial<SearchCriteria>) =>
     navigate('/equipment', queryFromCriteria({ ...criteria, ...change }));
 
   const search = () => go({ filters: filtersFromValues(values) });
-  const clear = () => {
-    setTyped({ key: appliedKey, values: {} });
-    go({ filters: [] });
+  const submitQuickSearch = (event: FormEvent) => {
+    event.preventDefault();
+    go({ searchText: quickSearchText.trim(), filters: filtersFromValues(values) });
   };
-
+  const closeQuickSearch = () => {
+    setQuickSearch({ key: '', text: '' });
+    setSearchOpen(false);
+    if (criteria.searchText !== '') go({ searchText: '' });
+  };
   const onSort = (column: SearchColumn) =>
     go({
       sort: column,
@@ -129,15 +137,57 @@ export function EquipmentSearch() {
         <h1 className="text-600 font-semibold">Equipment</h1>
         {/* <Summary view={view} filtered={criteria.filters.length > 0} /> */}
         <div className="flex flex-wrap items-center gap-300">
-          {anyFilter ? (
-            <button type="button" className={button.small} onClick={clear}>
-              <X aria-hidden="true" className="icon-size-200" />
-              Clear filters
+          {searchOpen || criteria.searchText !== '' ? (
+            <form className="relative w-64" role="search" onSubmit={submitQuickSearch}>
+              <button
+                type="submit"
+                aria-label="Run equipment search"
+                title="Run equipment search"
+                className="absolute inset-y-0 left-100 flex cursor-pointer items-center rounded-md px-100 text-muted-foreground hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+              >
+                <Search aria-hidden="true" className="icon-size-200" />
+              </button>
+              <input
+                autoFocus
+                type="text"
+                role="searchbox"
+                aria-label="Search equipment tags"
+                className={`${inputCompact} pl-800 pr-800`}
+                value={quickSearchText}
+                maxLength={MAX_FILTER_TEXT}
+                placeholder="Search equipment tags"
+                autoComplete="off"
+                onChange={(event) => setQuickSearchText(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key !== 'Escape') return;
+                  event.preventDefault();
+                  closeQuickSearch();
+                }}
+              />
+              <button
+                type="button"
+                aria-label="Clear and close equipment search"
+                title="Clear and close"
+                className="absolute inset-y-0 right-100 flex cursor-pointer items-center rounded-md px-100 text-muted-foreground hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                onClick={closeQuickSearch}
+              >
+                <X aria-hidden="true" className="icon-size-200" />
+              </button>
+            </form>
+          ) : (
+            <button
+              type="button"
+              className={button.small}
+              onClick={() => {
+                setSearchOpen(true);
+                search();
+              }}
+              aria-label="Open equipment search"
+              title="Search equipment tags"
+            >
+              <Search aria-hidden="true" className="icon-size-200" />
             </button>
-          ) : null}
-          <button type="button" className={button.small} onClick={search} aria-label="Search with the column filters" title="Search with the column filters">
-            <Search aria-hidden="true" className="icon-size-200" />
-          </button>
+          )}
           <ColumnChooser visible={visible} onChange={setVisible} values={values} onValue={setValue} applied={filtered} onApply={search} />
           <button
             ref={filterButton}
@@ -273,6 +323,14 @@ export function Summary({ view, filtered }: { view: ReturnType<typeof useEquipme
 }
 
 function NothingFound({ criteria }: { criteria: SearchCriteria }) {
+  if (criteria.searchText !== '') {
+    return (
+      <EmptyState
+        title="No heater found"
+        hint={`No equipment tag matches "${criteria.searchText}"${criteria.facility ? ` under facility ${criteria.facility}` : ''}. Try fewer characters, or clear the search.`}
+      />
+    );
+  }
   if (criteria.filters.length > 0) {
     const said = criteria.filters.map((f) => `${labelOf(f.column)} contains "${f.text}"`).join(' and ');
     return (
@@ -313,11 +371,14 @@ function ColumnChooser({
   onApply: () => void;
 }) {
   const detailsRef = useRef<HTMLDetailsElement>(null);
+  const allSelected = visible.length === COLUMNS.length;
 
   const toggle = (column: SearchColumn, on: boolean) => {
     const next = COLUMNS.map((c) => c.column).filter((c) => (c === column ? on : visible.includes(c)));
     if (next.length > 0) onChange(next);
   };
+
+  const selectAll = () => onChange(COLUMNS.map((c) => c.column));
 
   const apply = (event: FormEvent) => {
     event.preventDefault();
@@ -335,22 +396,36 @@ function ColumnChooser({
         onSubmit={apply}
         className="absolute right-0 z-10 mt-100 w-96 rounded-md border border-border bg-popover text-popover-foreground shadow-elevated"
       >
-        <fieldset className="max-h-96 overflow-auto p-300">
+        <div className="flex items-center justify-between gap-300 border-b border-border px-300 py-200">
+          <div>
+            <p className="text-300 font-semibold">Choose columns</p>
+            <p className="text-200 text-muted-foreground">
+              {visible.length} of {COLUMNS.length} shown
+            </p>
+          </div>
+          <button type="button" className={button.small} onClick={selectAll} disabled={allSelected}>
+            Select all
+          </button>
+        </div>
+        <fieldset className="max-h-96 space-y-100 overflow-auto p-200">
           <legend className="sr-only">Columns to show and filter</legend>
           {COLUMNS.map((c) => (
-            <div key={c.column} className="flex items-center justify-between gap-200 py-100">
-              <label className="flex min-w-0 items-center gap-200 text-300">
+            <div key={c.column} className="flex min-h-1000 items-center gap-200 rounded-lg hover:bg-hover focus-within:bg-hover">
+              <label className="flex min-h-1000 min-w-0 flex-1 cursor-pointer items-center gap-200 rounded-lg px-200 py-100 text-300">
                 <input
                   type="checkbox"
+                  className="icon-size-200 shrink-0 accent-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
                   checked={visible.includes(c.column)}
                   disabled={visible.length === 1 && visible.includes(c.column)}
                   onChange={(e) => toggle(c.column, e.target.checked)}
                 />
-                {c.label}
-                {applied.has(c.column) ? <span className="text-200 text-muted-foreground"> (filtered)</span> : null}
+                <span className="min-w-0 flex-1 truncate">
+                  {c.label}
+                  {applied.has(c.column) ? <span className="text-200 text-muted-foreground"> (filtered)</span> : null}
+                </span>
               </label>
               {isFilterColumn(c.column) ? (
-                <div className="w-40 shrink-0">
+                <div className="w-40 shrink-0 pr-100">
                   <input
                     type="text"
                     aria-label={`${c.label} filter value`}
@@ -366,7 +441,7 @@ function ColumnChooser({
             </div>
           ))}
         </fieldset>
-        <div className="flex justify-end border-t border-border px-300 py-200">
+        <div className="flex justify-end border-t border-border bg-muted/50 px-300 py-200">
           <button type="submit" className={button.primary}>
             Apply filters
           </button>
@@ -416,7 +491,7 @@ function ResultTable({
               );
             })}
           </tr>
-          <tr className="bg-muted/50">
+          <tr className="bg-muted">
             {columns.map((c) => (
               <td key={c.column} className="px-200 pb-200 align-middle">
                 {isFilterColumn(c.column) ? (
@@ -458,7 +533,10 @@ function Cell({ column, row }: { column: ColumnDef; row: SearchRow }): ReactNode
       return isBlank(value) ? (
         <span className="text-muted-foreground">{BLANK}</span>
       ) : (
-        <a className="id-plate font-medium text-brand-foreground underline-offset-2 hover:underline" href={hrefFor(`/equipment/${row.equipmentId}`)}>
+        <a
+          className={`${identifierBadge} underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring`}
+          href={hrefFor(`/equipment/${row.equipmentId}`)}
+        >
           {String(value)}
         </a>
       );

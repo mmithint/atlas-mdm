@@ -3,7 +3,7 @@ import { useCallback, useState } from 'react';
 
 import { hrefFor } from '@/app/router';
 import { EmptyState, ErrorState, LoadingState } from '@/components/states';
-import { button } from '@/components/ui';
+import { button, identifierBadge } from '@/components/ui';
 import { useLoad } from '@/hooks/use-load';
 import { errorText } from '@/lib/act-answer';
 
@@ -121,7 +121,7 @@ function Loaded({ initial, requestId }: { initial: RequestView; requestId: numbe
                 <span className="id-plate" title="Equipment number">{request.equipmentNumber}</span>
               )
             ) : null}
-            {request.equipmentTagNumber ? <span className="id-plate" title="Engineering tag">{request.equipmentTagNumber}</span> : null}
+            {request.equipmentTagNumber ? <span className={identifierBadge} title="Engineering tag">{request.equipmentTagNumber}</span> : null}
             {request.functionalLocation ? <span className="id-plate" title="Functional location">{request.functionalLocation}</span> : null}
             {/* {request.sapField ? <span className="id-plate" title="SAP field this changes">{request.sapField}</span> : null} */}
             {/* <p className="flex flex-wrap items-center gap-200"> */}

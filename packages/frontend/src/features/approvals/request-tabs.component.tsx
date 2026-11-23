@@ -2,7 +2,7 @@ import { ArrowRight, RefreshCw } from 'lucide-react';
 import { useId, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 
 import { hrefFor } from '@/app/router';
-import { badge, button, card } from '@/components/ui';
+import { badge, button, card, identifierBadge } from '@/components/ui';
 import { BLANK, formatUtc, isBlank, orBlank } from '@/lib/format';
 import { errorText } from '@/lib/act-answer';
 
@@ -129,6 +129,10 @@ function Item({ label, children }: { label: string; children: ReactNode }) {
 
 function Plate({ value }: { value: string | null | undefined }) {
   return isBlank(value) ? <span className="text-muted-foreground">{BLANK}</span> : <span className="id-plate">{value}</span>;
+}
+
+function TagBadge({ value }: { value: string | null | undefined }) {
+  return isBlank(value) ? <span className="text-muted-foreground">{BLANK}</span> : <span className={identifierBadge}>{value}</span>;
 }
 
 function ValueBox({ label, value }: { label: string; value: string }) {
@@ -300,7 +304,7 @@ function EquipmentPanel({ view, checks, onRecheck }: { view: RequestView; checks
         ) : (
           <dl className="grid gap-300 md:grid-cols-2 xl:grid-cols-4">
             <Item label="Equipment number"><Plate value={gold.equipmentNumber} /></Item>
-            <Item label="Engineering tag"><Plate value={gold.equipmentTagNumber} /></Item>
+            <Item label="Engineering tag"><TagBadge value={gold.equipmentTagNumber} /></Item>
             <Item label="Description">{orBlank(gold.equipmentDescription)}</Item>
             <Item label="Functional location (FLOC)"><Plate value={gold.functionalLocation} /></Item>
             <Item label="FLOC description">{orBlank(gold.flocDescription)}</Item>

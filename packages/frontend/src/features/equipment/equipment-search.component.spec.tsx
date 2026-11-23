@@ -22,7 +22,7 @@ const page = (rows = [searchRow(1), searchRow(2, { equipmentTagNumber: null, sup
   total,
 });
 
-const SEARCH = { name: 'Search with the column filters' };
+const SEARCH = { name: 'Open equipment search' };
 
 /**
  * The table's own page reads. The metric cards also read every row of the search, 100 at a time
@@ -46,6 +46,7 @@ describe('S-4 Equipment search', () => {
 
     const tag = await screen.findByRole('link', { name: 'SYN-TAG-0001' });
     expect(tag).toHaveAttribute('href', '#/equipment/1');
+    expect(tag).toHaveClass('rounded-lg', 'border-info-border', 'bg-info');
     const facility = screen.getAllByRole('link', { name: 'SYN-FL-AREA-01' })[0];
     expect(facility).toHaveAttribute('href', '#/equipment?facility=SYN-FL-AREA-01');
   });
@@ -121,6 +122,29 @@ describe('S-4 Equipment search', () => {
     expect(screen.getByRole('columnheader', { name: /^FLOC/ })).toBeInTheDocument();
   });
 
+  it('turns the search icon into a working tag search input', async () => {
+    fetchSortedPage.mockResolvedValue(page());
+    render(<EquipmentSearch />);
+    await screen.findByRole('link', { name: 'SYN-TAG-0001' });
+
+    fireEvent.click(screen.getByRole('button', SEARCH));
+    const field = screen.getByRole('searchbox', { name: 'Search equipment tags' });
+    expect(field).toHaveFocus();
+    expect(field).toHaveAttribute('type', 'text');
+    expect(screen.queryByRole('button', { name: 'Clear filters' })).toBeNull();
+    expect(screen.getAllByRole('button', { name: 'Clear and close equipment search' })).toHaveLength(1);
+    fireEvent.change(field, { target: { value: ' SYN-TAG-0007 ' } });
+    fireEvent.submit(screen.getByRole('search'));
+
+    expect(window.location.hash).toBe('#/equipment?q=SYN-TAG-0007');
+    await waitFor(() => expect(pageCalls()).toHaveLength(2));
+    expect(pageCalls()[1]?.[0].searchText).toBe('SYN-TAG-0007');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Clear and close equipment search' }));
+    expect(window.location.hash).toBe('#/equipment');
+    await waitFor(() => expect(screen.getByRole('button', SEARCH)).toBeInTheDocument());
+  });
+
   it('searches only when the search icon is pressed, with every filled box, and puts the search in the address', async () => {
     fetchSortedPage.mockResolvedValue(page());
     render(<EquipmentSearch />);
@@ -174,33 +198,6 @@ describe('S-4 Equipment search', () => {
     expect(screen.queryByRole('columnheader', { name: /^FLOC/ })).toBeNull();
   });
 
-  it('clears all the filters, the boxes and the address', async () => {
-    window.location.hash = '#/equipment?f.manufacturer=heat&f.equipClass=fired&sort=manufacturer';
-    fetchSortedPage.mockResolvedValue(page());
-    render(<EquipmentSearch />);
-    await screen.findByRole('link', { name: 'SYN-TAG-0001' });
-    expect(screen.getByLabelText('Filter Manufacturer')).toHaveValue('heat');
-
-    fireEvent.click(screen.getByRole('button', { name: 'Clear filters' }));
-    expect(window.location.hash).toBe('#/equipment?sort=manufacturer');
-    await waitFor(() => expect(screen.getByLabelText('Filter Manufacturer')).toHaveValue(''));
-    expect(screen.getByLabelText('Filter Class')).toHaveValue('');
-    expect(screen.queryByRole('button', { name: 'Clear filters' })).toBeNull();
-  });
-
-  it('offers to clear text that was typed but not searched yet, and empties the boxes', async () => {
-    fetchSortedPage.mockResolvedValue(page());
-    render(<EquipmentSearch />);
-    await screen.findByRole('link', { name: 'SYN-TAG-0001' });
-    expect(screen.queryByRole('button', { name: 'Clear filters' })).toBeNull();
-
-    type('Filter Manufacturer', 'heat');
-    fireEvent.click(screen.getByRole('button', { name: 'Clear filters' }));
-    expect(screen.getByLabelText('Filter Manufacturer')).toHaveValue('');
-    expect(window.location.hash).toBe('#/equipment');
-    expect(pageCalls()).toHaveLength(1);
-  });
-
   it('lists every heater of a facility and offers a way back to all of them, keeping the filters', async () => {
     window.location.hash = '#/equipment?facility=SYN-FL-AREA-01';
     fetchSortedPage.mockResolvedValue(page());
@@ -237,6 +234,22 @@ describe('S-4 Equipment search', () => {
     expect(screen.getByLabelText('Filter Model')).toBeInTheDocument(); // a newly shown text column gets its box
     fireEvent.click(screen.getByLabelText('Model'));
     expect(screen.queryByRole('columnheader', { name: /Model/ })).toBeNull();
+  });
+
+  it('lets the person select every column at once', async () => {
+    fetchSortedPage.mockResolvedValue(page());
+    render(<EquipmentSearch />);
+    await screen.findByRole('link', { name: 'SYN-TAG-0001' });
+
+    const selectAll = screen.getByRole('button', { name: 'Select all' });
+    expect(selectAll).toBeEnabled();
+    fireEvent.click(selectAll);
+
+    expect(screen.getByLabelText('FLOC')).toBeChecked();
+    expect(screen.getByLabelText('Model')).toBeChecked();
+    expect(screen.getByLabelText('Last changed')).toBeChecked();
+    expect(selectAll).toBeDisabled();
+    expect(screen.getByText('25 of 25 shown')).toBeInTheDocument();
   });
 
   it('keeps the filter boxes while it searches, so a filter can be changed at once', async () => {

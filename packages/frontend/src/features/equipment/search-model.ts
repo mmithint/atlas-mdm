@@ -2,11 +2,9 @@
  * The search rules of screen S-4, as plain functions (no React, no network), so they can
  * be tested on their own.
  *
- * Since CR-1 (19 Nov) the person searches with the boxes under the column headers: every box with
- * text is one "contains" condition, and all of them must hold (AND). The ordering, the paging and
- * the AND live in the procedure `app.usp_equipment_search` (read path C, D-17): the screen makes
- * one call per page and receives the rows already in order. The closest-match mode of the
- * procedure is no longer used by the screen.
+ * The toolbar search uses the procedure's closest-match mode for engineering tags. The boxes under
+ * the column headers remain "contains" conditions, and all of them must hold (AND). Both travel in
+ * the address so a result can be shared.
  */
 import { DEFAULT_PAGE_SIZE, DEFAULT_SORT, FILTER_COLUMNS, MAX_FILTER_TEXT, PAGE_SIZES, SEARCH_SELECT, isFilterColumn, type SearchColumn } from './columns';
 
@@ -20,6 +18,8 @@ export interface ColumnFilter {
 
 /** What the person asked for; this is what the address bar holds. */
 export interface SearchCriteria {
+  /** Closest-match search over the engineering tag; empty = no quick search. */
+  searchText: string;
   /** One entry per box that holds text, in the order of `FILTER_COLUMNS`; empty = no filter. */
   filters: readonly ColumnFilter[];
   /** Only heaters under this parent FLOC (the facility drill-down); empty = all. */
@@ -62,6 +62,7 @@ export function criteriaFromQuery(query: URLSearchParams): SearchCriteria {
     if (isFilterColumn(column)) values[column] = value;
   }
   return {
+    searchText: (query.get('q') ?? '').trim().slice(0, MAX_FILTER_TEXT),
     filters: filtersFromValues(values),
     facility: (query.get('facility') ?? '').trim(),
     sort: isSearchColumn(sort) ? sort : null,
@@ -73,6 +74,7 @@ export function criteriaFromQuery(query: URLSearchParams): SearchCriteria {
 /** The address query for the criteria; values that equal the default are left out. */
 export function queryFromCriteria(c: SearchCriteria): Record<string, string | undefined> {
   return {
+    q: c.searchText || undefined,
     ...Object.fromEntries(c.filters.map((f) => [FILTER_PREFIX + f.column, f.text])),
     facility: c.facility || undefined,
     sort: c.sort ?? undefined,

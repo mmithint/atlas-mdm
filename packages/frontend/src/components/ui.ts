@@ -62,6 +62,9 @@ export const badge = {
   danger: `${badgeBase} border-danger-border bg-danger-bg text-danger-text`,
 } as const;
 
+/** Engineering tags and other primary equipment identifiers, wherever they appear in the app. */
+export const identifierBadge = `${badge.info} font-monospace`;
+
 /**
  * Categorical badges (Oxy category 1-8): a tinted fill, a matching border and text. For telling
  * groups apart (equipment classes, tags), never for status. The label always stays visible: colour

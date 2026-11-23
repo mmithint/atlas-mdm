@@ -111,11 +111,10 @@ export const MAX_FILTER_TEXT = 100;
 export const labelOf = (column: SearchColumn): string => COLUMNS.find((c) => c.column === column)?.label ?? column;
 
 /**
- * The function `searchEquipment` still names ONE search column and ONE text (the closest-match mode,
- * which the screen no longer uses). The screen sends this column with an empty text, and the boxes
- * travel in `filtersJson`.
+ * The toolbar's quick search uses the procedure's closest-match mode on the engineering tag. The
+ * per-column boxes remain separate and travel together in `filtersJson`.
  */
-export const UNUSED_SEARCH_COLUMN: SearchColumn = 'equipmentTagNumber';
+export const QUICK_SEARCH_COLUMN: SearchColumn = 'equipmentTagNumber';
 
 /** Rows per page offered on the screen. */
 export const PAGE_SIZES: readonly number[] = [25, 50, 100];

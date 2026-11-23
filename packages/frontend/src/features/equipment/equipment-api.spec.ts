@@ -61,6 +61,16 @@ describe('fetchSortedPage', () => {
     expect(searchInvoke.mock.calls[0]?.[0]).toMatchObject({ sortColumn: 'equipmentNumber', sortDirection: 'asc', searchColumn: 'equipmentTagNumber', filtersJson: '' });
   });
 
+  it('uses closest-match mode for the toolbar tag search', async () => {
+    searchInvoke.mockResolvedValue({ rows: [searchRow(7)], totalMatches: 1, hasMore: false, truncated: false, timing: TIMING, error: null });
+    await fetchSortedPage(criteria('q=SYN-TAG-0007'), null);
+    expect(searchInvoke).toHaveBeenCalledWith(expect.objectContaining({
+      mode: 'MATCH',
+      searchColumn: 'equipmentTagNumber',
+      searchText: 'SYN-TAG-0007',
+    }));
+  });
+
   it('turns "more pages" into a cursor that is the next row offset, and the last page into no cursor', async () => {
     const rows = [searchRow(1), searchRow(2), searchRow(3)];
     searchInvoke.mockResolvedValueOnce({ rows, totalMatches: 9, hasMore: true, truncated: false, timing: TIMING, error: null });

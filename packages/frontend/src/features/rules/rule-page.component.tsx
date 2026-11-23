@@ -6,7 +6,7 @@ import { useProfile } from '@/app/profile.context';
 import { FormField, HEAD_ROW, PageHeader, Panel, Pill, ROW, TABLE, TD, Tabs, TH } from '@/components/layout';
 import { Modal } from '@/components/modal.component';
 import { EmptyState, ErrorState, LoadingState } from '@/components/states';
-import { button, input } from '@/components/ui';
+import { button, identifierBadge, input } from '@/components/ui';
 import { fetchCatalog, type CatalogRow } from '@/features/equipment/equipment-api';
 import { useLoad } from '@/hooks/use-load';
 import { errorText } from '@/lib/act-answer';
@@ -588,11 +588,11 @@ function PreviewPanel({ data, blockedBecause }: { data: PreviewData | null; bloc
                 <tr key={`${r.entityKey}-${i}`} className={ROW}>
                   <td className={TD}>
                     {r.equipmentId !== null ? (
-                      <a className="id-plate hover:underline" href={hrefFor(`/equipment/${r.equipmentId}`)}>
+                      <a className={`${identifierBadge} hover:underline`} href={hrefFor(`/equipment/${r.equipmentId}`)}>
                         {r.tag ?? r.entityKey}
                       </a>
                     ) : (
-                      <span className="id-plate">{r.entityKey}</span>
+                      <span className={identifierBadge}>{r.entityKey}</span>
                     )}
                   </td>
                   <td className={TD}>{orBlank(r.profitCenter)}</td>

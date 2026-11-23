@@ -4,7 +4,7 @@ import { useMemo, useState, type ReactNode } from 'react';
 import { useProfile } from '@/app/profile.context';
 import { hrefFor } from '@/app/router';
 import { EmptyState, ErrorState, LoadingState } from '@/components/states';
-import { badge, button, card } from '@/components/ui';
+import { badge, button, card, identifierBadge } from '@/components/ui';
 import { useLoad } from '@/hooks/use-load';
 import { BLANK, formatUtc, orBlank } from '@/lib/format';
 
@@ -176,6 +176,7 @@ interface DetailGroup {
 }
 
 const plate = (value: string | null | undefined): ReactNode => (value ? <span className="id-plate">{value}</span> : BLANK);
+const tag = (value: string | null | undefined): ReactNode => (value ? <span className={identifierBadge}>{value}</span> : BLANK);
 
 function summaryGroups(heater: HeaterDetail['heater'], levels: readonly string[]) {
   const facility = heater.superiorFunctionalLocation;
@@ -183,7 +184,7 @@ function summaryGroups(heater: HeaterDetail['heater'], levels: readonly string[]
     title: 'Identity',
     rows: [
       { label: 'Equipment number', value: plate(heater.equipmentNumber) },
-      { label: 'Engineering tag', value: plate(heater.equipmentTagNumber) },
+      { label: 'Engineering tag', value: tag(heater.equipmentTagNumber) },
       { label: 'Serial number', value: plate(heater.manufacturerSerialNumber) },
       { label: 'Description', value: orBlank(heater.equipmentDescription) },
     ],

@@ -235,7 +235,7 @@ export const mockHandlers: Handlers = {
   searchEquipment: (input) => {
     const text = (input.searchText ?? '').trim().toLowerCase();
     let rows = demo().heaters.filter((h) => !input.facility || h.profitCenterName === input.facility);
-    if (input.mode === 'match' && text) {
+    if (String(input.mode).toLowerCase() === 'match' && text) {
       rows = rows.filter((h) =>
         [h.equipmentNumber, h.equipmentDescription, h.functionalLocation, h.equipmentTagNumber, h.manufacturer, h.modelNumber, h.manufacturerSerialNumber]
           .some((v) => (v ?? '').toLowerCase().includes(text))

@@ -18,7 +18,7 @@ import { getRayfinClient } from '@/lib/rayfin-client';
 
 import type { FieldCatalog } from '../../../../../rayfin/connectors/atlas_sql_db/schema';
 
-import { UNUSED_SEARCH_COLUMN } from './columns';
+import { QUICK_SEARCH_COLUMN } from './columns';
 import { sortOf, type ColumnFilter, type SearchCriteria } from './search-model';
 
 type Detail = AppFunctionsSchema['getEquipmentDetail']['output'];
@@ -71,17 +71,17 @@ export const filtersJsonOf = (filters: readonly ColumnFilter[]): string =>
 
 /**
  * One page of the list, ordered by a column; `cursor` is the previous page's `endCursor`.
- * Every box that holds text is one "contains" condition and all must hold (CR-1). The older
- * single column and text of the function are not used by the screen: an empty text.
+ * A quick-search value uses the procedure's closest-match mode over the engineering tag. Every
+ * column box is also sent as a "contains" condition, and all of those filters must hold (CR-1).
  */
 export async function fetchSortedPage(c: SearchCriteria, cursor: string | null): Promise<SortedPage> {
   const { column, direction } = sortOf(c);
   const parsed = cursor === null ? 0 : Number(cursor);
   const offset = Number.isInteger(parsed) && parsed >= 0 ? parsed : 0;
   const answer = await search({
-    mode: 'SORTED',
-    searchColumn: UNUSED_SEARCH_COLUMN,
-    searchText: '',
+    mode: c.searchText === '' ? 'SORTED' : 'MATCH',
+    searchColumn: QUICK_SEARCH_COLUMN,
+    searchText: c.searchText,
     facility: c.facility,
     sortColumn: column,
     sortDirection: direction,
