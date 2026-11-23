@@ -133,7 +133,8 @@ export function AppShell() {
         )}
       >
         <div className={clsx('flex h-header shrink-0 items-center gap-300 border-b border-sidebar-border', collapsed ? 'justify-center px-200' : 'px-400')}>
-          <img src={oxyLogo} alt="Oxy" className="icon-size-600 shrink-0 object-contain" />
+          {/* The mark is drawn for a white ground, so it sits on a white disc; on the dark menu that keeps its colours. */}
+          <img src={oxyLogo} alt="Oxy" className="icon-size-600 shrink-0 rounded-full bg-sidebar-logo object-contain" />
           {collapsed ? null : (
             <div className="min-w-0 flex-1">
               <p className="text-500 font-bold leading-400 tracking-wide">ATLAS</p>

@@ -225,7 +225,7 @@ function ColumnChooser({
       </summary>
       <form
         onSubmit={apply}
-        className="absolute right-0 z-10 mt-100 w-96 rounded-md border border-border bg-popover text-popover-foreground shadow-lg"
+        className="absolute right-0 z-10 mt-100 w-96 rounded-md border border-border bg-popover text-popover-foreground shadow-elevated"
       >
         <fieldset className="max-h-96 overflow-auto p-300">
           <legend className="sr-only">Columns to show and filter</legend>
@@ -329,7 +329,7 @@ function ResultTable({
         </thead>
         <tbody>
           {rows.map((row) => (
-            <tr key={row.equipmentId} className="border-t border-border hover:bg-hover">
+            <tr key={row.equipmentId} className="border-t border-divider hover:bg-hover">
               {columns.map((c) => (
                 <td key={c.column} className="whitespace-nowrap px-200 py-200 align-middle">
                   <Cell column={c} row={row} />

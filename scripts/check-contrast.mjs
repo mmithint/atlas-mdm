@@ -110,6 +110,8 @@ const PAIRS = [
   ['text-on-primary', 'primary-active', TEXT, 'primary button, pressed'],
   ['secondary-foreground', 'secondary', TEXT, 'secondary button'],
   ['secondary-hover-text', 'secondary-bg', TEXT, 'secondary button, hovered'],
+  ['text-link', 'bg-hover-overlay>card', TEXT, 'ghost button, hovered'],
+  ['secondary-hover-text', 'card', UI, 'secondary button outline, hovered'],
   ['destructive', 'card', TEXT, 'error text on cards'],
   ['destructive', 'background', TEXT, 'error text on the page'],
   ['text-on-danger', 'danger-solid', TEXT, 'danger button and pill'],

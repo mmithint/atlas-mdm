@@ -85,7 +85,7 @@ export function Modal({ title, onClose, children, footer, busy = false, size = '
         aria-labelledby={titleId}
         tabIndex={-1}
         className={clsx(
-          'relative flex max-h-full w-full flex-col rounded-lg border border-border bg-card text-card-foreground shadow-lg focus-visible:outline-none',
+          'relative flex max-h-full w-full flex-col rounded-lg border border-border bg-card text-card-foreground shadow-elevated focus-visible:outline-none',
           size === 'lg' ? 'max-w-3xl' : 'max-w-lg'
         )}
       >

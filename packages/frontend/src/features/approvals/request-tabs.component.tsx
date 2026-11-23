@@ -20,12 +20,9 @@ import {
   type BadgeKind,
 } from './request-model';
 
-const DANGER_BADGE =
-  'inline-flex items-center rounded-lg bg-danger-solid px-200-nudge py-100-nudge text-200 leading-200 font-medium text-on-danger';
-
 /** A small coloured label; `danger` is red, the rest are the shared badges. */
 export function Badge({ kind, children }: { kind: BadgeKind; children: ReactNode }) {
-  return <span className={kind === 'danger' ? DANGER_BADGE : badge[kind]}>{children}</span>;
+  return <span className={badge[kind]}>{children}</span>;
 }
 
 export function StatusBadge({ status }: { status: string }) {
@@ -258,7 +255,7 @@ function RelatedTable({ rows }: { rows: readonly RelatedRow[] }) {
             </thead>
             <tbody>
               {rows.map((row) => (
-                <tr key={row.requestId} className="border-t border-border align-top">
+                <tr key={row.requestId} className="border-t border-divider align-top hover:bg-hover">
                   <th scope="row" className="px-300 py-200 text-left font-medium">
                     <a className="id-plate text-brand-foreground underline-offset-2 hover:underline" href={hrefFor(`/requests/${row.requestId}`)}>
                       {row.requestRef}
@@ -395,7 +392,7 @@ function ChecksTable({ checks, onRecheck }: { checks: readonly CheckRow[]; onRec
               {rows.map((row) => {
                 const result = checkBadge(row.checkStatus);
                 return (
-                  <tr key={row.code} className="border-t border-border align-top">
+                  <tr key={row.code} className="border-t border-divider align-top hover:bg-hover">
                     <th scope="row" className="px-300 py-200 text-left font-medium">
                       {checkLabel(row.code)}
                       <span className="mt-100 block">

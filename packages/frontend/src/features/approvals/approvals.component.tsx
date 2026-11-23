@@ -419,7 +419,7 @@ function Line({
   const isFloc = row.entityType === 'FLOC';
 
   return (
-    <tr className="border-t border-border align-top hover:bg-hover">
+    <tr className="border-t border-divider align-top hover:bg-hover">
       {selectable ? (
         <td className="px-300 py-300">
           <input

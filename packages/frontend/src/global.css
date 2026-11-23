@@ -205,6 +205,7 @@
   --color-sidebar-active: var(--oxy-blue-600); /* border-selected: the current page's edge bar */
   --color-sidebar-selected: var(--oxy-blue-100); /* bg-selected: the current page */
   --color-sidebar-selected-foreground: var(--oxy-blue-700); /* text-selected */
+  --color-sidebar-logo: var(--oxy-slate-0); /* white disc behind the logo, in both themes: the mark is drawn for white */
 
   /* ---- Oxy roles ATLAS had no token for, under their Oxy names (light) ---- */
   /* Surfaces and text */
@@ -303,11 +304,12 @@
   --color-control-hover: var(--color-border-control-hover); /* hover:border-control-hover */
   --color-divider: var(--color-border-subtle); /* border-divider: quiet separators */
 
-  /* Shadows (--shadow-sm replaces Tailwind's default) */
-  --shadow-sm: 0 1px 3px rgb(var(--oxy-slate-950-rgb) / 0.08);
-  --shadow-bar-top: 0 -2px 8px rgb(var(--oxy-slate-950-rgb) / 0.08);
-  --shadow-elevated: 0 6px 16px rgb(var(--oxy-slate-950-rgb) / 0.12);
-  --shadow-primary-hover: 0 4px 12px rgb(var(--oxy-blue-600-rgb) / 0.20);
+  /* Shadows (--shadow-sm replaces Tailwind's default). Tailwind copies a shadow's value into its
+     class, so these only point at the --elevation-* values, which change per theme (below). */
+  --shadow-sm: var(--elevation-sm);
+  --shadow-bar-top: var(--elevation-bar-top);
+  --shadow-elevated: var(--elevation-elevated);
+  --shadow-primary-hover: var(--elevation-primary-hover);
 
   --radius-none: 0;
   --radius-sm: 2px;
@@ -336,6 +338,7 @@
   --spacing-600: 24px;
   --spacing-700: 28px;
   --spacing-800: 32px;
+  --spacing-1000: 40px; /* large button height */
   --spacing-sidebar: 248px; /* width of the navigation rail */
   --spacing-sidebar-rail: 64px; /* width of the collapsed navigation rail (icons only) */
   --spacing-header: 56px; /* height of the top bar and of the menu's logo row, so the two line up */
@@ -411,6 +414,14 @@
 }
 
 @layer base {
+  /* Oxy shadows, light theme; .dark below swaps in the dark values. */
+  :root {
+    --elevation-sm: 0 1px 3px rgb(var(--oxy-slate-950-rgb) / 0.08);
+    --elevation-bar-top: 0 -2px 8px rgb(var(--oxy-slate-950-rgb) / 0.08);
+    --elevation-elevated: 0 6px 16px rgb(var(--oxy-slate-950-rgb) / 0.12);
+    --elevation-primary-hover: 0 4px 12px rgb(var(--oxy-blue-600-rgb) / 0.20);
+  }
+
   .dark {
     /* Color tokens — dark theme (Oxy palette) */
     --color-background: var(--oxy-slate-950);
@@ -543,11 +554,11 @@
     --color-category-8-border: var(--oxy-slate-600);
     --color-category-8-text: var(--oxy-slate-150);
 
-    /* Shadows (--shadow-sm replaces Tailwind's default) */
-    --shadow-sm: 0 1px 3px rgb(var(--oxy-black-rgb) / 0.40);
-    --shadow-bar-top: 0 -2px 8px rgb(var(--oxy-black-rgb) / 0.40);
-    --shadow-elevated: 0 6px 16px rgb(var(--oxy-black-rgb) / 0.45);
-    --shadow-primary-hover: 0 4px 12px rgb(var(--oxy-blue-600-rgb) / 0.20);
+    /* Shadows: the dark values of the --elevation-* tokens */
+    --elevation-sm: 0 1px 3px rgb(var(--oxy-black-rgb) / 0.40);
+    --elevation-bar-top: 0 -2px 8px rgb(var(--oxy-black-rgb) / 0.40);
+    --elevation-elevated: 0 6px 16px rgb(var(--oxy-black-rgb) / 0.45);
+    --elevation-primary-hover: 0 4px 12px rgb(var(--oxy-blue-600-rgb) / 0.20);
   }
 }
 

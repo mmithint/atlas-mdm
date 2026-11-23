@@ -7,6 +7,7 @@
 
 import { type ReactNode } from 'react';
 
+import { button } from '@/components/ui';
 import { useAuth } from '@/hooks/auth.context';
 
 interface AuthGateProps {
@@ -89,7 +90,7 @@ export function AuthGate({ children }: AuthGateProps) {
   if (error && !canSignIn) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background p-4">
-        <div className="w-full max-w-md rounded-xl border border-border bg-card p-6 text-center shadow-lg">
+        <div className="w-full max-w-md rounded-xl border border-border bg-card p-6 text-center shadow-elevated">
           <p className="mb-2 text-200 leading-200 font-semibold uppercase tracking-wider text-link">
             Fabric App
           </p>
@@ -105,7 +106,7 @@ export function AuthGate({ children }: AuthGateProps) {
   if (!isAuthenticated && canSignIn) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background p-4">
-        <div className="w-full max-w-md rounded-xl border border-border bg-card p-6 text-center shadow-lg">
+        <div className="w-full max-w-md rounded-xl border border-border bg-card p-6 text-center shadow-elevated">
           <div
             aria-hidden="true"
             className="mx-auto mb-4 grid h-10 w-10 grid-cols-2 gap-0.5"
@@ -132,7 +133,7 @@ export function AuthGate({ children }: AuthGateProps) {
           )}
           <button
             type="button"
-            className="w-full rounded-lg bg-primary px-4 py-3 text-300 leading-300 font-medium text-primary-foreground shadow-sm transition hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
+            className={`${button.large} w-full`}
             disabled={isSigningIn}
             onClick={() => void signIn()}
           >

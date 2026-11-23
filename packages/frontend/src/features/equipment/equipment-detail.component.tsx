@@ -304,7 +304,7 @@ function FieldsTable({ groups, ...request }: { groups: readonly DetailGroup[] } 
 function FieldLine({ row, requestBlock, onRequest }: { row: DetailRow } & RequestControls) {
   const { fieldCode } = row;
   return (
-    <tr className="border-t border-border align-top">
+    <tr className="border-t border-divider align-top hover:bg-hover">
       <th scope="row" className="px-400 py-300 text-left font-medium">
         {row.label}
       </th>

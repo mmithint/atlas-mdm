@@ -13,14 +13,13 @@ export const TABLE = 'w-full min-w-max border-collapse text-250 leading-250';
 export const HEAD_ROW = 'bg-muted text-left text-200 uppercase tracking-wide text-muted-foreground';
 export const TH = 'px-300 py-200 font-semibold';
 export const TD = 'px-300 py-200 align-top';
-export const ROW = 'border-t border-border';
+export const ROW = 'border-t border-divider hover:bg-hover';
 
-const DANGER_BADGE = 'inline-flex items-center rounded-lg bg-danger-solid px-200-nudge py-100-nudge text-200 leading-200 font-medium text-on-danger';
 export type Tone = 'neutral' | 'warning' | 'success' | 'info' | 'danger';
 
 export function Pill({ tone, children, title }: { tone: Tone; children: ReactNode; title?: string }) {
   return (
-    <span className={tone === 'danger' ? DANGER_BADGE : badge[tone]} title={title}>
+    <span className={badge[tone]} title={title}>
       {children}
     </span>
   );

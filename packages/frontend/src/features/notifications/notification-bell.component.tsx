@@ -95,7 +95,7 @@ export function NotificationBell({ refreshKey }: { refreshKey: string }) {
         <div
           role="region"
           aria-label="Your notifications"
-          className="absolute right-0 top-full z-40 mt-100 w-screen max-w-sm rounded-lg border border-border bg-popover text-popover-foreground shadow-lg"
+          className="absolute right-0 top-full z-40 mt-100 w-screen max-w-sm rounded-lg border border-border bg-popover text-popover-foreground shadow-elevated"
         >
           <div className="border-b border-border px-300 py-200">
             <p className="text-300 font-semibold">Notifications</p>

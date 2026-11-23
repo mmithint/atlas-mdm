@@ -14,9 +14,6 @@ const FALLBACK_REASON = 'You may not decide this request.';
 /** The longest comment the procedures accept (nvarchar(1000)). */
 const COMMENT_MAX = 1000;
 
-const DESTRUCTIVE =
-  'inline-flex items-center justify-center gap-200 rounded-md bg-danger-solid px-400 py-200 text-300 font-medium text-on-danger transition-colors hover:bg-danger-solid-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50';
-
 /** Compact (small padding, no wrapping) versions of the shared buttons, so the whole panel fits one row. */
 const COMPACT_BASE =
   'inline-flex items-center justify-center gap-100 whitespace-nowrap rounded-md px-300 py-100 text-200 font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50';
@@ -194,7 +191,7 @@ export function DecisionPanel({ request, viewer, checks, returnCandidates = [], 
               </button>
               <button
                 type="button"
-                className={action === 'REJECT' || action === 'WITHDRAW' ? DESTRUCTIVE : button.primary}
+                className={action === 'REJECT' || action === 'WITHDRAW' ? button.danger : button.primary}
                 disabled={busy || (required && trimmed === '')}
                 onClick={() => void submit()}
               >

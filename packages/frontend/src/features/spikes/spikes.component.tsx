@@ -1,5 +1,6 @@
 import { useContext, useState } from 'react';
 
+import { button } from '@/components/ui';
 import { AuthContext } from '@/hooks/auth.context';
 import { getRayfinClient } from '@/lib/rayfin-client';
 
@@ -403,7 +404,7 @@ function SpikeCard({
         type="button"
         onClick={() => void onRun()}
         disabled={state.status === 'running'}
-        className="mt-300 rounded-md bg-primary px-400 py-200 font-medium text-primary-foreground disabled:opacity-50"
+        className={`${button.primary} mt-300`}
       >
         {state.status === 'running' ? 'Running…' : buttonLabel}
       </button>

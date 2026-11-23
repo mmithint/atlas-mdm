@@ -67,7 +67,7 @@ export function Popover({
           id={panelId}
           role="group"
           aria-label={label}
-          className="absolute right-0 z-20 mt-100 w-64 rounded-md border border-border bg-card p-300 shadow-lg"
+          className="absolute right-0 z-20 mt-100 w-64 rounded-md border border-border bg-card p-300 shadow-elevated"
         >
           {children}
         </div>
