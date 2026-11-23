@@ -80,6 +80,18 @@ describe('App shell', () => {
     expect(within(menu()).getByRole('link', { name: /Approvals/ })).not.toHaveAttribute('title');
   });
 
+  it('shows where the page sits under its title: Home, the list it belongs to, then the page', async () => {
+    renderShell(async () => PROFILE);
+    await screen.findByLabelText('Signed in as');
+    const crumbs = screen.getByRole('navigation', { name: 'Breadcrumb' });
+    expect(within(crumbs).getByRole('link', { name: 'Home' })).toHaveAttribute('href', '#/');
+    expect(within(crumbs).getByText('Rules')).toHaveAttribute('aria-current', 'page');
+
+    window.location.hash = '#/rules/RULE_X';
+    expect(await within(screen.getByRole('navigation', { name: 'Breadcrumb' })).findByRole('link', { name: 'Rules' })).toHaveAttribute('href', '#/rules');
+    expect(within(screen.getByRole('navigation', { name: 'Breadcrumb' })).getByText('Rule')).toHaveAttribute('aria-current', 'page');
+  });
+
   it('shows a placeholder, with the phase, for a screen that is not built yet', async () => {
     renderShell(async () => PROFILE);
     expect(await screen.findByRole('heading', { level: 1, name: 'Rules' })).toBeInTheDocument();

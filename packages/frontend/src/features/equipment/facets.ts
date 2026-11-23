@@ -64,6 +64,13 @@ export const FACETS: readonly Facet[] = [
     labelOf: (v) => OPEN[v] ?? v,
     order: ['none', 'some', BLANK_VALUE],
   },
+  {
+    id: 'heatDutyMmbtuHr',
+    label: 'Heat duty',
+    valueOf: (row) => (typeof row.heatDutyMmbtuHr === 'number' ? 'set' : BLANK_VALUE),
+    labelOf: (v) => (v === 'set' ? 'Recorded' : 'Missing'),
+    order: ['set', BLANK_VALUE],
+  },
   text('manufacturer'),
   text('modelNumber'),
   text('profitCenterName'),

@@ -207,6 +207,13 @@
   --color-sidebar-selected-foreground: var(--oxy-blue-700); /* text-selected */
   --color-sidebar-logo: var(--oxy-slate-0); /* white disc behind the logo, in both themes: the mark is drawn for white */
 
+  /* A selected metric card (the Equipment cards): a dark shade of the primary blue, so the chosen filter
+     stands out. Light: navy (primary-hover); dark: the selected navy. Text on it is white and a light blue. */
+  --color-card-selected: var(--oxy-blue-700);
+  --color-card-selected-foreground: var(--oxy-slate-0);
+  --color-card-selected-muted: var(--oxy-blue-200);
+  --color-card-selected-border: var(--oxy-blue-700); /* the edge that marks it out (3:1 against a card) */
+
   /* Scrollbars: a thin pill on no track (Oxy border-strong, darker on hover). */
   --color-scrollbar: var(--oxy-slate-300);
   --color-scrollbar-hover: var(--oxy-slate-450);
@@ -479,6 +486,12 @@
     --color-sidebar-active: var(--oxy-blue-300);
     --color-sidebar-selected: var(--oxy-blue-800);
     --color-sidebar-selected-foreground: var(--oxy-blue-300);
+
+    --color-card-selected: var(--oxy-blue-800);
+    --color-card-selected-foreground: var(--oxy-slate-0);
+    --color-card-selected-muted: var(--oxy-blue-300);
+    /* The navy is too close to a dark card (1.4:1) to mark the choice alone, so a light blue edge does. */
+    --color-card-selected-border: var(--oxy-blue-300);
 
     --color-scrollbar: var(--oxy-slate-600);
     --color-scrollbar-hover: var(--oxy-slate-450);

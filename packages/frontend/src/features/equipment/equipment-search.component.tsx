@@ -16,6 +16,7 @@ import { FilterPanel } from './filter-panel.component';
 import { NO_SELECTION, selectedCount, type Selection } from './facets';
 import { definitionOf, type ViewState } from './saved-view-model';
 import { SavedViews } from './saved-views.component';
+import { StatCards } from './stat-cards.component';
 import {
   criteriaFromQuery,
   filtersFromValues,
@@ -47,7 +48,8 @@ export function EquipmentSearch() {
 
   // The panel sits beside the table on a large screen and over the page on a smaller one.
   const [panelOpen, setPanelOpen] = useState(false);
-  const { all, list: ruled } = useFilteredSearch(criteria, selection, panelOpen);
+  // Every row of the search is read even with the panel closed: the metric cards are worked out from it.
+  const { all, list: ruled } = useFilteredSearch(criteria, selection, true);
   const view = ruled ?? paged;
   const wide = useMediaQuery('(min-width: 1024px)');
   const panelId = useId();
@@ -104,6 +106,8 @@ export function EquipmentSearch() {
           Type in the boxes under the column headers, then press the search icon: a heater is listed only when every filled box matches. Or click a facility to list every heater there.
         </p> 
       </header>*/}
+
+      <StatCards all={all} serverTotal={paged.status === 'ready' ? paged.total : null} selection={selection} onChange={setSelection} />
 
       {criteria.facility ? (
         <div className="flex shrink-0 flex-wrap items-center gap-300 rounded-md border border-border bg-info px-400 py-200 text-300 text-info-foreground">

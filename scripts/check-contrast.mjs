@@ -128,6 +128,9 @@ const PAIRS = [
   ['sidebar-muted', 'sidebar', TEXT, 'menu secondary text'],
   ['sidebar-foreground', 'sidebar-accent', TEXT, 'menu item, hovered'],
   ['sidebar-selected-foreground', 'sidebar-selected', TEXT, 'current menu item'],
+  ['card-selected-foreground', 'card-selected', TEXT, 'selected metric card: number'],
+  ['card-selected-muted', 'card-selected', TEXT, 'selected metric card: label'],
+  ['card-selected-border', 'card', UI, 'selected metric card edge against the others'],
   // Controls and indicators (3:1)
   ['input', 'card', UI, 'input outline on cards'],
   ['input', 'background', UI, 'input outline on the page'],

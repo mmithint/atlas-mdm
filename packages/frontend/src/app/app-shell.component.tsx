@@ -9,6 +9,7 @@ import { useAuth } from '@/hooks/auth.context';
 import { useHashRoute } from '@/hooks/use-hash-route';
 import { useTheme } from '@/hooks/theme.context';
 
+import { Breadcrumb } from './breadcrumb.component';
 import { Nav } from './nav.component';
 import { PREVIEW_MODE } from './preview';
 import { ProfileNotice } from './profile-notice.component';
@@ -137,7 +138,7 @@ export function AppShell() {
           <img src={oxyLogo} alt="Oxy" className="icon-size-600 shrink-0 rounded-full bg-sidebar-logo object-contain" />
           {collapsed ? null : (
             <div className="min-w-0 flex-1">
-              <p className="text-500 font-bold leading-400 tracking-wide">ATLAS</p>
+              <p className="text-400 font-bold leading-400 tracking-wide">ATLAS</p>
               <p className="text-200 leading-200 text-sidebar-muted">Heater master data</p>
             </div>
           )}
@@ -175,15 +176,18 @@ export function AppShell() {
           >
             <Menu aria-hidden="true" className="icon-size-300" />
           </button>
-          <p className="min-w-0 flex-1 truncate text-300 text-muted-foreground">
-            {current?.screen ? <span className="id-plate mr-200">{current.screen}</span> : null}
-            {title}
-            {PREVIEW_MODE && current && !isBuilt(current) ? (
-              <span className={`${badge.info} ml-200`} title={`Shown on sample data. Built for real in ${current.builtIn}.`}>
-                Preview · {current.builtIn} · sample data
-              </span>
-            ) : null}
-          </p>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-300 leading-300 text-muted-foreground">
+              {current?.screen ? <span className="id-plate mr-200">{current.screen}</span> : null}
+              {title}
+              {PREVIEW_MODE && current && !isBuilt(current) ? (
+                <span className={`${badge.info} ml-200`} title={`Shown on sample data. Built for real in ${current.builtIn}.`}>
+                  Preview · {current.builtIn} · sample data
+                </span>
+              ) : null}
+            </p>
+            {current ? <Breadcrumb current={current.id} /> : null}
+          </div>
           {DemoControls ? (
             <Suspense fallback={null}>
               <DemoControls onChange={onDemoChange} />

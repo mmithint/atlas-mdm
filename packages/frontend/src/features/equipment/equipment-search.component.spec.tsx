@@ -23,6 +23,12 @@ const page = (rows = [searchRow(1), searchRow(2, { equipmentTagNumber: null, sup
 });
 
 const SEARCH = { name: 'Search with the column filters' };
+
+/**
+ * The table's own page reads. The metric cards also read every row of the search, 100 at a time
+ * (use-filtered-search.ts), so those calls are left out here.
+ */
+const pageCalls = () => fetchSortedPage.mock.calls.filter((c) => c[0].pageSize !== 100);
 const type = (label: string, value: string) => fireEvent.change(screen.getByLabelText(label), { target: { value } });
 
 describe('S-4 Equipment search', () => {
@@ -93,8 +99,8 @@ describe('S-4 Equipment search', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Apply filters' }));
     expect(window.location.hash).toBe('#/equipment?f.manufacturer=heat&f.modelNumber=H-100');
-    await waitFor(() => expect(fetchSortedPage).toHaveBeenCalledTimes(2));
-    expect(fetchSortedPage.mock.calls[1]?.[0].filters).toEqual([
+    await waitFor(() => expect(pageCalls()).toHaveLength(2));
+    expect(pageCalls()[1]?.[0].filters).toEqual([
       { column: 'manufacturer', text: 'heat' },
       { column: 'modelNumber', text: 'H-100' },
     ]);
@@ -119,18 +125,18 @@ describe('S-4 Equipment search', () => {
     fetchSortedPage.mockResolvedValue(page());
     render(<EquipmentSearch />);
     await screen.findByRole('link', { name: 'SYN-TAG-0001' });
-    expect(fetchSortedPage).toHaveBeenCalledTimes(1);
+    expect(pageCalls()).toHaveLength(1);
 
     type('Filter Manufacturer', ' heat ');
     type('Filter Class', 'fired');
     type('Filter Serial number', '   '); // blank: not a filter
     expect(window.location.hash).toBe('#/equipment'); // typing alone searches nothing
-    expect(fetchSortedPage).toHaveBeenCalledTimes(1);
+    expect(pageCalls()).toHaveLength(1);
 
     fireEvent.click(screen.getByRole('button', SEARCH));
     expect(window.location.hash).toBe('#/equipment?f.manufacturer=heat&f.equipClass=fired');
-    await waitFor(() => expect(fetchSortedPage).toHaveBeenCalledTimes(2));
-    expect(fetchSortedPage.mock.calls[1]?.[0].filters).toEqual([
+    await waitFor(() => expect(pageCalls()).toHaveLength(2));
+    expect(pageCalls()[1]?.[0].filters).toEqual([
       { column: 'manufacturer', text: 'heat' },
       { column: 'equipClass', text: 'fired' },
     ]);
@@ -192,7 +198,7 @@ describe('S-4 Equipment search', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Clear filters' }));
     expect(screen.getByLabelText('Filter Manufacturer')).toHaveValue('');
     expect(window.location.hash).toBe('#/equipment');
-    expect(fetchSortedPage).toHaveBeenCalledTimes(1);
+    expect(pageCalls()).toHaveLength(1);
   });
 
   it('lists every heater of a facility and offers a way back to all of them, keeping the filters', async () => {
@@ -250,7 +256,15 @@ describe('S-4 Equipment search', () => {
   });
 
   it('shows a failure with a way to try again, and keeps the boxes', async () => {
-    fetchSortedPage.mockRejectedValueOnce(new Error('connector said no')).mockResolvedValueOnce(page());
+    // Only the table's first read fails; the metric cards' read and the retry work.
+    let failed = false;
+    fetchSortedPage.mockImplementation(async (c: { pageSize: number }) => {
+      if (c.pageSize !== 100 && !failed) {
+        failed = true;
+        throw new Error('connector said no');
+      }
+      return page();
+    });
     render(<EquipmentSearch />);
     expect(await screen.findByRole('alert')).toHaveTextContent('connector said no');
     expect(screen.getByLabelText('Filter Manufacturer')).toBeInTheDocument();
@@ -266,8 +280,8 @@ describe('S-4 Equipment search', () => {
     expect(screen.getByRole('button', { name: 'Previous' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Next' })).toBeEnabled();
     fireEvent.click(screen.getByRole('button', { name: 'Next' }));
-    await waitFor(() => expect(fetchSortedPage).toHaveBeenCalledTimes(2));
-    expect(fetchSortedPage).toHaveBeenLastCalledWith(expect.anything(), 'C');
+    await waitFor(() => expect(pageCalls()).toHaveLength(2));
+    expect(pageCalls()[1]?.[1]).toBe('C');
   });
 });
 
@@ -430,5 +444,64 @@ describe('S-4 Equipment search, the Filter panel', () => {
       fireEvent.click(within(panel).getByRole('button', { name: 'Try again' }));
       expect(await within(panel).findByRole('option', { name: 'Line heaters by Demo' })).toBeInTheDocument();
     });
+  });
+});
+
+describe('S-4 Equipment search, the metric cards', () => {
+  const rows = [
+    searchRow(1, { verificationPct: 100, heatDutyMmbtuHr: null }),
+    searchRow(2, { verificationPct: 20, openRequestCount: 1 }),
+    searchRow(3, { verificationPct: 100 }),
+  ];
+
+  beforeEach(() => {
+    fetchSortedPage.mockReset();
+    fetchSortedPage.mockResolvedValue(page(rows));
+    listSavedViews.mockReset().mockResolvedValue([]);
+    window.location.hash = '#/equipment';
+  });
+  afterEach(() => {
+    window.location.hash = '';
+  });
+
+  const summary = () => screen.getByRole('region', { name: 'Equipment summary' });
+  const card = (label: RegExp) => within(summary()).getByRole('button', { name: label });
+  const tags = () => screen.queryAllByRole('link', { name: /^SYN-TAG-/ }).map((a) => a.textContent);
+
+  it('shows each figure worked out from the rows of the search', async () => {
+    render(<EquipmentSearch />);
+    await screen.findByRole('region', { name: 'Equipment summary' });
+    expect(card(/^Heaters: 3$/)).toHaveAttribute('aria-pressed', 'true');
+    expect(card(/^Fully verified: 2 of 3 \(67%\)$/)).toHaveAttribute('aria-pressed', 'false');
+    expect(card(/^Under 50% verified: 1 of 3 \(33%\)$/)).toBeInTheDocument();
+    expect(card(/^With open requests: 1 of 3 \(33%\)$/)).toBeInTheDocument();
+    expect(card(/^Missing heat duty: 1 of 3 \(33%\)$/)).toBeInTheDocument();
+  });
+
+  it('filters the table when a card is clicked, and shows every heater again on a second click', async () => {
+    render(<EquipmentSearch />);
+    await screen.findByRole('region', { name: 'Equipment summary' });
+    fireEvent.click(card(/^Fully verified/));
+    await waitFor(() => expect(tags()).toEqual(['SYN-TAG-0001', 'SYN-TAG-0003']));
+    expect(card(/^Fully verified/)).toHaveAttribute('aria-pressed', 'true');
+    expect(card(/^Heaters: 2$/)).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByRole('button', { name: 'Filter, 1 selected' })).toBeInTheDocument();
+
+    fireEvent.click(card(/^Fully verified/));
+    await waitFor(() => expect(tags()).toHaveLength(3));
+  });
+
+  it('holds the place with loading cards while the rows are read', () => {
+    fetchSortedPage.mockReturnValue(new Promise(() => undefined));
+    render(<EquipmentSearch />);
+    expect(screen.getByLabelText('Loading the equipment summary')).toHaveAttribute('aria-busy', 'true');
+  });
+
+  it('keeps the total and explains the rest when the search is too large to summarise', async () => {
+    fetchSortedPage.mockResolvedValue(page(rows, true, 5000));
+    render(<EquipmentSearch />);
+    expect(await screen.findByText(/This search is too large to summarise/)).toBeInTheDocument();
+    expect(card(/^Heaters: 5,000$/)).toBeEnabled();
+    expect(card(/^Fully verified: not available$/)).toBeDisabled();
   });
 });

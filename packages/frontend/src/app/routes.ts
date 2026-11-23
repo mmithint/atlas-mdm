@@ -243,3 +243,18 @@ export function routeById(id: ScreenId): RouteDef {
   if (!found) throw new Error(`Unknown route ${id}`);
   return found;
 }
+
+/** A page reached from a list belongs under it: the menu highlights the list, the breadcrumb shows it. */
+export const PARENT_SCREEN: Partial<Record<ScreenId, ScreenId>> = {
+  'equipment-detail': 'equipment',
+  request: 'approvals',
+  'new-heater': 'equipment',
+  rule: 'rules',
+};
+
+/** The way to a screen, from Home: Home, its list when it has one, then the screen itself. */
+export function breadcrumbOf(id: ScreenId): RouteDef[] {
+  const parent = PARENT_SCREEN[id];
+  const trail = [parent ? routeById(parent) : null, routeById(id)].filter((r): r is RouteDef => r !== null);
+  return id === 'home' ? trail : [routeById('home'), ...trail];
+}

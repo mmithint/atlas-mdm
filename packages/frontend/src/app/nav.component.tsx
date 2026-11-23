@@ -14,7 +14,7 @@ import {
 import clsx from 'clsx';
 
 import { hrefFor } from './router';
-import { isBuilt, menuRoutes, type ScreenId } from './routes';
+import { PARENT_SCREEN, isBuilt, menuRoutes, type ScreenId } from './routes';
 
 const ICONS: Partial<Record<ScreenId, LucideIcon>> = {
   home: House,
@@ -29,13 +29,6 @@ const ICONS: Partial<Record<ScreenId, LucideIcon>> = {
   admin: Settings,
 };
 
-/** A page reached from a menu entry highlights its parent entry. */
-const PARENT: Partial<Record<ScreenId, ScreenId>> = {
-  'equipment-detail': 'equipment',
-  request: 'approvals',
-  'new-heater': 'equipment',
-  rule: 'rules',
-};
 
 /**
  * The menu. Admin entries appear only for people with the admin right (a convenience:
@@ -57,7 +50,8 @@ export function Nav({
   /** Icons only (the desktop rail is folded); the titles stay for screen readers and show as a tooltip. */
   collapsed?: boolean;
 }) {
-  const active = current ? (PARENT[current] ?? current) : null;
+  // A page reached from a menu entry highlights its parent entry.
+  const active = current ? (PARENT_SCREEN[current] ?? current) : null;
   return (
     <nav aria-label="Main" className={clsx('flex-1 overflow-y-auto py-300', collapsed ? 'px-200' : 'px-300')}>
       <ul className="space-y-100">
