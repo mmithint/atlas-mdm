@@ -1,16 +1,21 @@
-import { ArrowDown, ArrowUp, ArrowUpDown, ChevronLeft, ChevronRight, Columns3, Search, X } from 'lucide-react';
-import { useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
+import { ArrowDown, ArrowUp, ArrowUpDown, ChevronLeft, ChevronRight, Columns3, ListFilter, Search, X } from 'lucide-react';
+import { useId, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
 
 import { hrefFor, navigate } from '@/app/router';
 import { EmptyState, ErrorState, LoadingState } from '@/components/states';
 import { badge, button, card, input, inputCompact } from '@/components/ui';
 import { useHashRoute } from '@/hooks/use-hash-route';
+import { useMediaQuery } from '@/hooks/use-media-query';
 import { BLANK, formatDecimal, formatPercent, formatUtc, isBlank, orBlank } from '@/lib/format';
 
 import { ClassBadge } from './class-badge.component';
 import { FiredBadge, StatusBadge, VerifiedBadge } from './value-badges.component';
 import { COLUMNS, DEFAULT_COLUMNS, MAX_FILTER_TEXT, PAGE_SIZES, isFilterColumn, labelOf, type ColumnDef, type SearchColumn } from './columns';
 import type { SearchRow } from './equipment-api';
+import { FilterPanel } from './filter-panel.component';
+import { NO_SELECTION, selectedCount, type Selection } from './facets';
+import { definitionOf, type ViewState } from './saved-view-model';
+import { SavedViews } from './saved-views.component';
 import {
   criteriaFromQuery,
   filtersFromValues,
@@ -20,6 +25,7 @@ import {
   type SearchCriteria,
 } from './search-model';
 import { useEquipmentSearch } from './use-equipment-search';
+import { MAX_FILTERED_ROWS, useFilteredSearch } from './use-filtered-search';
 
 /**
  * S-4 Equipment search (POC-APP-05, changed by CR-1 on 19 Nov): type in the boxes under the column
@@ -27,15 +33,44 @@ import { useEquipmentSearch } from './use-equipment-search';
  * holds a box for every text column, shown or not, and shares the same typed values with the header
  * boxes. Choose the columns and the rows per page; click a facility to list every heater under that
  * parent FLOC. The address holds the search, so a result can be shared.
+ *
+ * The Filter panel adds checkbox lists, as on a shop's filter. While values are ticked the list comes
+ * from useFilteredSearch, which matches them in the browser over every row the boxes, the facility and
+ * the order choose; the sort, the page size and the boxes keep working.
  */
 export function EquipmentSearch() {
   const route = useHashRoute();
   const criteria = useMemo(() => criteriaFromQuery(route.query), [route.query]);
-  const view = useEquipmentSearch(criteria);
+  const paged = useEquipmentSearch(criteria);
+  const [selection, setSelection] = useState<Selection>(NO_SELECTION);
+  const ticked = selectedCount(selection);
+
+  // The panel sits beside the table on a large screen and over the page on a smaller one.
+  const [panelOpen, setPanelOpen] = useState(false);
+  const { all, list: ruled } = useFilteredSearch(criteria, selection, panelOpen);
+  const view = ruled ?? paged;
+  const wide = useMediaQuery('(min-width: 1024px)');
+  const panelId = useId();
+  const filterButton = useRef<HTMLButtonElement>(null);
+  const closePanel = () => {
+    setPanelOpen(false);
+    filterButton.current?.focus();
+  };
+  const clearSelection = () => setSelection(NO_SELECTION);
+
   const [visible, setVisible] = useState<readonly SearchColumn[]>(DEFAULT_COLUMNS);
   // Any text column can be filtered from the column chooser, shown or not; a hidden column's filter still cuts the list.
   const filtered = useMemo(() => new Set<SearchColumn>(criteria.filters.map((f) => f.column)), [criteria.filters]);
   const columns = COLUMNS.filter((c) => visible.includes(c.column));
+
+  // A saved filter is the whole view: the address (boxes, facility, order, page size), the ticked values and the columns.
+  const currentView = definitionOf({ criteria, selection, columns: visible });
+  const applyView = (view: ViewState) => {
+    setSelection(view.selection);
+    setVisible(view.columns);
+    navigate('/equipment', queryFromCriteria(view.criteria));
+  };
+  const savedViews = <SavedViews current={currentView} onApply={applyView} />;
 
   // What is typed in the boxes counts only when the search icon is pressed. When the applied filters
   // change (a search, Clear, the Back button) the boxes show what is applied again.
@@ -100,51 +135,120 @@ export function EquipmentSearch() {
             <Search aria-hidden="true" className="icon-size-200" />
           </button>
           <ColumnChooser visible={visible} onChange={setVisible} values={values} onValue={setValue} applied={filtered} onApply={search} />
+          <button
+            ref={filterButton}
+            type="button"
+            className={button.small}
+            aria-expanded={panelOpen}
+            aria-controls={panelOpen ? panelId : undefined}
+            aria-label={ticked > 0 ? `Filter, ${ticked} selected` : undefined}
+            onClick={() => (panelOpen ? closePanel() : setPanelOpen(true))}
+          >
+            <ListFilter aria-hidden="true" className="icon-size-200" />
+            Filter
+            {ticked > 0 ? (
+              <span aria-hidden="true" className={badge.info}>
+                {ticked}
+              </span>
+            ) : null}
+          </button>
         </div>
       </div>
 
       {/* The table runs to the card's edges. The card is only as tall as its rows and pager; with more
           rows than fit, it stops at the bottom of the page and the table scrolls inside it. */}
-      <section aria-label="Search results" className={`${card} overflow-hidden md:flex md:min-h-0 md:flex-col`}>
-        <div className="md:flex md:min-h-0 md:flex-1 md:flex-col">
-          {/* The header and the filter boxes stay on screen while loading, on an error and when nothing matches, so a filter can always be changed. */}
-          <ResultTable
-            rows={view.status === 'ready' ? view.rows : []}
-            columns={columns}
-            criteria={criteria}
-            onSort={onSort}
-            values={values}
-            onValue={setValue}
-          />
-          {view.status === 'loading' ? (
-            <div className="shrink-0 border-t border-border p-400">
-              <LoadingState rows={6} label="Searching" />
-            </div>
-          ) : null}
-          {view.status === 'error' ? (
-            <div className="shrink-0 border-t border-border p-400">
-              <ErrorState title="The search failed" message={view.message} onRetry={view.retry} />
-            </div>
-          ) : null}
-          {view.status === 'ready' && view.rows.length === 0 ? (
-            <div className="shrink-0 border-t border-border p-400">
-              <NothingFound criteria={criteria} />
-            </div>
-          ) : null}
-          {view.status === 'ready' && view.rows.length > 0 ? (
-            <Pager
-              page={view.page}
-              pageCount={view.pageCount}
-              hasPrevious={view.hasPrevious}
-              hasNext={view.hasNext}
-              onPrevious={view.previous}
-              onNext={view.next}
-              pageSize={criteria.pageSize}
-              onPageSize={(pageSize) => go({ pageSize })}
+      {/* With the panel open on a large screen, the table gives up some width to sit beside it. */}
+      <div className="md:flex md:min-h-0 md:flex-1 md:items-start md:gap-400">
+        <section aria-label="Search results" className={`${card} overflow-hidden md:flex md:max-h-full md:min-h-0 md:min-w-0 md:flex-1 md:flex-col`}>
+          <div className="md:flex md:min-h-0 md:flex-1 md:flex-col">
+            {/* The header and the filter boxes stay on screen while loading, on an error and when nothing matches, so a filter can always be changed. */}
+            <ResultTable
+              rows={view.status === 'ready' ? view.rows : []}
+              columns={columns}
+              criteria={criteria}
+              onSort={onSort}
+              values={values}
+              onValue={setValue}
             />
-          ) : null}
-        </div>
-      </section>
+            {view.status === 'loading' ? (
+              <div className="shrink-0 border-t border-border p-400">
+                <LoadingState rows={6} label="Searching" />
+              </div>
+            ) : null}
+            {view.status === 'error' ? (
+              <div className="shrink-0 border-t border-border p-400">
+                <ErrorState title="The search failed" message={view.message} onRetry={view.retry} />
+              </div>
+            ) : null}
+            {view.status === 'too-many' ? (
+              <div className="shrink-0 border-t border-border p-400">
+                <EmptyState
+                  title="Too many heaters to filter"
+                  hint={`The filters work on up to ${MAX_FILTERED_ROWS.toLocaleString()} heaters at a time, and this search matches ${view.total.toLocaleString()}. Narrow it first with a box under a column header or a facility; your ticked values then apply on their own.`}
+                  action={
+                    <button type="button" className={button.secondary} onClick={clearSelection}>
+                      Clear filters
+                    </button>
+                  }
+                />
+              </div>
+            ) : null}
+            {view.status === 'ready' && view.rows.length === 0 ? (
+              <div className="shrink-0 border-t border-border p-400">
+                {ticked > 0 ? (
+                  <EmptyState
+                    title="No heater matches the ticked values"
+                    hint="Untick a value in the Filter panel, or clear the filters to see every heater again."
+                    action={
+                      <button type="button" className={button.secondary} onClick={clearSelection}>
+                        Clear filters
+                      </button>
+                    }
+                  />
+                ) : (
+                  <NothingFound criteria={criteria} />
+                )}
+              </div>
+            ) : null}
+            {view.status === 'ready' && view.rows.length > 0 ? (
+              <Pager
+                page={view.page}
+                pageCount={view.pageCount}
+                hasPrevious={view.hasPrevious}
+                hasNext={view.hasNext}
+                onPrevious={view.previous}
+                onNext={view.next}
+                pageSize={criteria.pageSize}
+                onPageSize={(pageSize) => go({ pageSize })}
+              />
+            ) : null}
+          </div>
+        </section>
+        {panelOpen && wide ? (
+          <FilterPanel
+            id={panelId}
+            overlay={false}
+            all={all}
+            selection={selection}
+            matchCount={ruled?.status === 'ready' ? ruled.total : null}
+            onChange={setSelection}
+            top={savedViews}
+            onClose={closePanel}
+          />
+        ) : null}
+      </div>
+      {panelOpen && !wide ? (
+        <FilterPanel
+          id={panelId}
+          overlay
+          all={all}
+          selection={selection}
+          matchCount={ruled?.status === 'ready' ? ruled.total : null}
+          onChange={setSelection}
+          top={savedViews}
+          onClose={closePanel}
+        />
+      ) : null}
     </div>
   );
 }

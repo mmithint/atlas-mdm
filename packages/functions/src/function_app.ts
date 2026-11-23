@@ -46,6 +46,14 @@ import {
   type SqlPingResult,
   type WhoAmIResult,
 } from './spikes.js';
+import {
+  runDeleteSavedView,
+  runListSavedViews,
+  runSaveView,
+  type DeleteSavedViewResult,
+  type ListSavedViewsResult,
+  type SaveViewResult,
+} from './saved-views.js';
 import { storageProbe, type StorageProbeResult } from './storage.js';
 import { tokenCheckReport, trustedAccessToken } from './tokenverify.js';
 
@@ -308,5 +316,37 @@ udf.func(
       () => (ctx.Secrets as Readonly<Record<string, string>>)[SECRET_API_KEY] ?? '',
       () => (ctx.Secrets as Readonly<Record<string, string>>)[SECRET_MODEL_ID] ?? ''
     ),
+  []
+);
+
+// Saved filters (saved views): one person's named filter settings per screen, in app.saved_view, so they
+// follow the person to any device (saved-views.ts). The owner is always the verified caller.
+udf.func(
+  'listSavedViews',
+  async (
+    screenCode: string,
+    ctx: RayfinContext<Record<string, any>, AudienceType.Sql>
+  ): Promise<ListSavedViewsResult> => runListSavedViews(screenCode, await trustedAccessToken(ctx), () => ctx.Tokens.Sql),
+  []
+);
+
+udf.func(
+  'saveView',
+  async (
+    screenCode: string,
+    viewName: string,
+    definitionJson: string,
+    ctx: RayfinContext<Record<string, any>, AudienceType.Sql>
+  ): Promise<SaveViewResult> =>
+    runSaveView({ screenCode, viewName, definitionJson }, await trustedAccessToken(ctx), () => ctx.Tokens.Sql),
+  []
+);
+
+udf.func(
+  'deleteSavedView',
+  async (
+    savedViewId: number,
+    ctx: RayfinContext<Record<string, any>, AudienceType.Sql>
+  ): Promise<DeleteSavedViewResult> => runDeleteSavedView(savedViewId, await trustedAccessToken(ctx), () => ctx.Tokens.Sql),
   []
 );

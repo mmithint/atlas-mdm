@@ -77,7 +77,51 @@ export function catalogRows(): Record<string, unknown>[] {
 /** Back to the starting data and the default persona (tests call it; the header's Reset demo keeps the persona). */
 export function resetMock(): void {
   resetDemoAndPersona();
+  savedViews.length = 0;
+  storeViews();
 }
+
+/*
+ * Saved filters (`app.saved_view`), every persona's.
+ *
+ * DEMO ONLY, NOT THE REAL STORE: so a demo keeps its saved filters through a refresh, they are kept in THIS
+ * BROWSER's local storage (one browser, lost when its site data is cleared, never shared). The header's Reset
+ * demo leaves them alone, like a person's own settings; resetMock (tests) clears them.
+ * The real app saves per signed-in user in the database: functions listSavedViews / saveView / deleteSavedView
+ * -> app.usp_saved_view_* -> app.saved_view (db/SAVED_FILTERS.md). Nothing in the screens changes when that
+ * is deployed; only these mock handlers stop being used.
+ */
+interface MockView {
+  savedViewId: number;
+  owner: string;
+  screenCode: string;
+  viewName: string;
+  definitionJson: string;
+  updatedAtUtc: string;
+}
+const VIEWS_KEY = 'atlas.demo.saved-views';
+
+function loadViews(): MockView[] {
+  try {
+    const parsed: unknown = JSON.parse(window.localStorage.getItem(VIEWS_KEY) ?? '[]');
+    return Array.isArray(parsed) ? (parsed as MockView[]).filter((v) => typeof v?.savedViewId === 'number' && typeof v?.viewName === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
+function storeViews(): void {
+  try {
+    window.localStorage.setItem(VIEWS_KEY, JSON.stringify(savedViews));
+  } catch {
+    // Storage blocked (private window): the filters last until the page is reloaded.
+  }
+}
+
+const savedViews: MockView[] = loadViews();
+let nextViewId = savedViews.reduce((max, v) => Math.max(max, v.savedViewId), 0) + 1;
+const viewAnswer = (v: MockView) => ({ savedViewId: v.savedViewId, viewName: v.viewName, definitionJson: v.definitionJson, isDefault: false, updatedAtUtc: v.updatedAtUtc });
+const SCREENS = ['S-2', 'S-4'];
 
 const findRequest = (id: number): QueueRow | undefined => demo().requests.find((x) => x.requestId === id);
 const findHeater = (id: number | null) => demo().heaters.find((x) => x.equipmentId === id);
@@ -504,6 +548,44 @@ export const mockHandlers: Handlers = {
     r.updatedAtUtc = nowIso();
     addEvent(r.requestId, { eventType: 'CANCELLED', comments: comment || null, statusFrom: previous, statusTo: 'CANCELLED' });
     return { ...ok(), requestId, requestRef: r.requestRef, previousStatus: previous, newStatus: r.requestStatus };
+  },
+
+  listSavedViews: ({ screenCode }) => {
+    if (!SCREENS.includes(screenCode)) return refused('Saved filters exist only for the Approvals (S-2) and Equipment (S-4) screens.', 50342);
+    const views = savedViews
+      .filter((v) => v.owner === me() && v.screenCode === screenCode)
+      .sort((a, b) => a.viewName.localeCompare(b.viewName))
+      .map(viewAnswer);
+    return { ...ok(), views };
+  },
+
+  saveView: ({ screenCode, viewName, definitionJson }) => {
+    const name = viewName.trim();
+    if (!SCREENS.includes(screenCode)) return refused('Saved filters exist only for the Approvals (S-2) and Equipment (S-4) screens.', 50342);
+    if (name === '' || name.length > 100) return refused('Give the filter a name of 1 to 100 characters.', 50343);
+    if (definitionJson.length > 4000) return refused('The filter could not be saved: its settings are too long or not readable.', 50344);
+    const same = savedViews.find((v) => v.owner === me() && v.screenCode === screenCode && v.viewName === name);
+    if (same) {
+      same.definitionJson = definitionJson;
+      same.updatedAtUtc = nowIso();
+      storeViews();
+      return { ...ok(), view: viewAnswer(same), outcome: 'REPLACED' };
+    }
+    if (savedViews.filter((v) => v.owner === me() && v.screenCode === screenCode).length >= 50) {
+      return refused('You already have 50 saved filters on this screen. Delete one to save another.', 50345);
+    }
+    const view: MockView = { savedViewId: nextViewId++, owner: me(), screenCode, viewName: name, definitionJson, updatedAtUtc: nowIso() };
+    savedViews.push(view);
+    storeViews();
+    return { ...ok(), view: viewAnswer(view), outcome: 'CREATED' };
+  },
+
+  deleteSavedView: ({ savedViewId }) => {
+    const at = savedViews.findIndex((v) => v.savedViewId === savedViewId && v.owner === me());
+    if (at < 0) return refused('That saved filter no longer exists. Refresh the list.', 50346);
+    savedViews.splice(at, 1);
+    storeViews();
+    return { ...ok(), savedViewId };
   },
 
   getMyNotifications: ({ limit }) => {

@@ -1,10 +1,18 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { fetchSortedPage } = vi.hoisted(() => ({ fetchSortedPage: vi.fn() }));
+const { fetchSortedPage, listSavedViews, saveView, deleteSavedView } = vi.hoisted(() => ({
+  fetchSortedPage: vi.fn(),
+  listSavedViews: vi.fn(),
+  saveView: vi.fn(),
+  deleteSavedView: vi.fn(),
+}));
 vi.mock('./equipment-api', () => ({ fetchSortedPage }));
+vi.mock('./saved-views-api', () => ({ listSavedViews, saveView, deleteSavedView }));
 
 import { EquipmentSearch } from './equipment-search.component';
+import { definitionOf } from './saved-view-model';
+import { criteriaFromQuery } from './search-model';
 import { searchRow } from './test-fixtures';
 
 const page = (rows = [searchRow(1), searchRow(2, { equipmentTagNumber: null, superiorFunctionalLocation: null })], hasNext = false, total = rows.length) => ({
@@ -260,5 +268,167 @@ describe('S-4 Equipment search', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Next' }));
     await waitFor(() => expect(fetchSortedPage).toHaveBeenCalledTimes(2));
     expect(fetchSortedPage).toHaveBeenLastCalledWith(expect.anything(), 'C');
+  });
+});
+
+describe('S-4 Equipment search, the Filter panel', () => {
+  const rows = [
+    searchRow(1, { manufacturer: 'Demo Thermal Inc.', equipClass: 'HEATER', verificationPct: 20 }),
+    searchRow(2, { manufacturer: 'Example Heater Co.', equipClass: 'LINE_HEATER', verificationPct: 80 }),
+    searchRow(3, { manufacturer: 'Demo Thermal Inc.', equipClass: 'LINE_HEATER', verificationPct: 100 }),
+  ];
+
+  beforeEach(() => {
+    fetchSortedPage.mockReset();
+    fetchSortedPage.mockResolvedValue(page(rows));
+    listSavedViews.mockReset().mockResolvedValue([]);
+    saveView.mockReset();
+    deleteSavedView.mockReset();
+    window.location.hash = '#/equipment';
+  });
+  afterEach(() => {
+    window.location.hash = '';
+  });
+
+  const openPanel = async () => {
+    render(<EquipmentSearch />);
+    await screen.findByRole('link', { name: 'SYN-TAG-0001' });
+    fireEvent.click(screen.getByRole('button', { name: 'Filter' }));
+    const panel = screen.getByRole('dialog', { name: 'Filters' });
+    await within(panel).findByRole('list', { name: 'Manufacturer' });
+    return panel;
+  };
+  const tags = () => screen.queryAllByRole('link', { name: /^SYN-TAG-/ }).map((a) => a.textContent);
+  const box = (panel: HTMLElement, list: string, option: RegExp) => within(within(panel).getByRole('list', { name: list })).getByRole('checkbox', { name: option });
+
+  it('opens from the toolbar and lists every value of a field as a checkbox, with its count', async () => {
+    const panel = await openPanel();
+    expect(screen.getByRole('button', { name: 'Filter' })).toHaveAttribute('aria-expanded', 'true');
+    expect(box(panel, 'Manufacturer', /^Demo Thermal Inc\. \(2\)$/)).not.toBeChecked();
+    expect(box(panel, 'Manufacturer', /^Example Heater Co\. \(1\)$/)).toBeInTheDocument();
+    // every matching row was read at once, in the list's own order
+    expect(fetchSortedPage).toHaveBeenLastCalledWith(expect.objectContaining({ sort: null, pageSize: 100 }), null);
+  });
+
+  it('filters the table as soon as a value is ticked, and shows the count on the button', async () => {
+    const panel = await openPanel();
+    fireEvent.click(box(panel, 'Manufacturer', /^Demo Thermal Inc\./));
+    await waitFor(() => expect(tags()).toEqual(['SYN-TAG-0001', 'SYN-TAG-0003']));
+    expect(screen.getByRole('button', { name: 'Filter, 1 selected' })).toBeInTheDocument();
+  });
+
+  it('widens with a second value of the same field and narrows with another field', async () => {
+    const panel = await openPanel();
+    fireEvent.click(box(panel, 'Manufacturer', /^Demo Thermal Inc\./));
+    fireEvent.click(box(panel, 'Manufacturer', /^Example Heater Co\./));
+    await waitFor(() => expect(tags()).toHaveLength(3));
+    fireEvent.click(box(panel, 'Class', /^LINE_HEATER/));
+    await waitFor(() => expect(tags()).toEqual(['SYN-TAG-0002', 'SYN-TAG-0003']));
+    expect(screen.getByRole('button', { name: 'Filter, 3 selected' })).toBeInTheDocument();
+  });
+
+  it('offers numbers as ranges', async () => {
+    const panel = await openPanel();
+    fireEvent.click(box(panel, 'Verified', /^100%/));
+    await waitFor(() => expect(tags()).toEqual(['SYN-TAG-0003']));
+  });
+
+  it('clears every ticked value at once', async () => {
+    const panel = await openPanel();
+    fireEvent.click(box(panel, 'Manufacturer', /^Example Heater Co\./));
+    await waitFor(() => expect(tags()).toEqual(['SYN-TAG-0002']));
+    fireEvent.click(within(panel).getByRole('button', { name: 'Clear all' }));
+    await waitFor(() => expect(tags()).toHaveLength(3));
+    expect(screen.getByRole('button', { name: 'Filter' })).toBeInTheDocument();
+  });
+
+  it('gives a long list a search box', async () => {
+    fetchSortedPage.mockResolvedValue(page(Array.from({ length: 10 }, (_, i) => searchRow(i + 1, { manufacturer: `Maker ${i + 1}` }))));
+    const panel = await openPanel();
+    fireEvent.change(within(panel).getByRole('searchbox', { name: 'Search Manufacturer' }), { target: { value: 'maker 1' } });
+    const shown = within(within(panel).getByRole('list', { name: 'Manufacturer' })).getAllByRole('checkbox');
+    expect(shown.map((c) => c.getAttribute('aria-label'))).toEqual(['Maker 1 (1)', 'Maker 10 (1)']);
+  });
+
+  it('refuses to read more heaters than it can filter, and says how to narrow the search', async () => {
+    fetchSortedPage.mockResolvedValue(page(rows, true, 5000));
+    render(<EquipmentSearch />);
+    await screen.findByRole('link', { name: 'SYN-TAG-0001' });
+    fireEvent.click(screen.getByRole('button', { name: 'Filter' }));
+    expect(await screen.findByText('Too many heaters to filter')).toBeInTheDocument();
+  });
+
+  it('closes with Escape and gives focus back to the Filter button', async () => {
+    const panel = await openPanel();
+    fireEvent.keyDown(panel, { key: 'Escape' });
+    expect(screen.queryByRole('dialog', { name: 'Filters' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Filter' })).toHaveFocus();
+  });
+
+  describe('saved filters', () => {
+    const saved = {
+      savedViewId: 3,
+      viewName: 'Line heaters by Demo',
+      definitionJson: definitionOf({
+        criteria: criteriaFromQuery(new URLSearchParams('f.manufacturer=demo&size=25')),
+        selection: { equipClass: ['LINE_HEATER'] },
+        columns: ['equipmentTagNumber', 'manufacturer', 'equipClass'],
+      }),
+      isDefault: false,
+      updatedAtUtc: '2026-11-23T10:00:00.000Z',
+    };
+
+    it('lists them at the top of the panel, and choosing one puts the whole view back', async () => {
+      listSavedViews.mockResolvedValue([saved]);
+      const panel = await openPanel();
+      const select = within(panel).getByRole('combobox', { name: 'Saved filters' });
+      await waitFor(() => expect(select).toBeEnabled());
+      fireEvent.change(select, { target: { value: '3' } });
+
+      await waitFor(() => expect(window.location.hash).toContain('f.manufacturer=demo'));
+      expect(window.location.hash).toContain('size=25');
+      expect(screen.getByRole('button', { name: 'Filter, 1 selected' })).toBeInTheDocument();
+      expect(screen.queryByRole('columnheader', { name: /Profit centre/ })).toBeNull();
+    });
+
+    it('saves the current view under a name', async () => {
+      saveView.mockImplementation(async (name: string, definitionJson: string) => ({
+        view: { ...saved, savedViewId: 9, viewName: name, definitionJson },
+        replaced: false,
+      }));
+      const panel = await openPanel();
+      fireEvent.click(box(panel, 'Class', /^LINE_HEATER/));
+      fireEvent.click(within(panel).getByRole('button', { name: 'Save the current filters' }));
+      fireEvent.change(within(panel).getByLabelText('Name'), { target: { value: 'My line heaters' } });
+      fireEvent.click(within(panel).getByRole('button', { name: 'Save filter' }));
+
+      expect(await within(panel).findByText('Saved “My line heaters”.')).toBeInTheDocument();
+      expect(saveView).toHaveBeenCalledWith('My line heaters', expect.stringContaining('"equipClass":["LINE_HEATER"]'));
+      expect(within(panel).getByRole('combobox', { name: 'Saved filters' })).toHaveValue('9');
+    });
+
+    it('asks before deleting one, by name', async () => {
+      listSavedViews.mockResolvedValue([saved]);
+      deleteSavedView.mockResolvedValue(undefined);
+      const panel = await openPanel();
+      const select = within(panel).getByRole('combobox', { name: 'Saved filters' });
+      await waitFor(() => expect(select).toBeEnabled());
+      fireEvent.change(select, { target: { value: '3' } });
+      fireEvent.click(within(panel).getByRole('button', { name: 'Delete the saved filter “Line heaters by Demo”' }));
+      expect(deleteSavedView).not.toHaveBeenCalled();
+      fireEvent.click(within(panel).getByRole('button', { name: 'Delete “Line heaters by Demo”' }));
+
+      expect(await within(panel).findByText('Deleted “Line heaters by Demo”.')).toBeInTheDocument();
+      expect(deleteSavedView).toHaveBeenCalledWith(3);
+      expect(within(panel).queryByRole('option', { name: 'Line heaters by Demo' })).toBeNull();
+    });
+
+    it('says when they cannot be read, and offers to try again', async () => {
+      listSavedViews.mockRejectedValueOnce(new Error('Could not read your saved filters.')).mockResolvedValueOnce([saved]);
+      const panel = await openPanel();
+      expect(await within(panel).findByText(/Could not read your saved filters\./)).toBeInTheDocument();
+      fireEvent.click(within(panel).getByRole('button', { name: 'Try again' }));
+      expect(await within(panel).findByRole('option', { name: 'Line heaters by Demo' })).toBeInTheDocument();
+    });
   });
 });

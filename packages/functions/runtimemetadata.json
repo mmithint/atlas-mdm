@@ -85,11 +85,19 @@
           "isFabricParameter": false
         },
         {
+          "name": "filtersJson",
+          "type": "string",
+          "optional": false,
+          "hasDefault": false,
+          "position": 8,
+          "isFabricParameter": false
+        },
+        {
           "name": "ctx",
           "type": "RayfinContext<Record<string, any>, AudienceType.Sql>",
           "optional": false,
           "hasDefault": false,
-          "position": 8,
+          "position": 9,
           "isFabricParameter": false
         }
       ],
@@ -664,6 +672,94 @@
           "optional": false,
           "hasDefault": false,
           "position": 2,
+          "isFabricParameter": false
+        }
+      ],
+      "contextAudiences": [
+        "Sql"
+      ]
+    },
+    {
+      "functionName": "listSavedViews",
+      "delegateParameters": [
+        {
+          "name": "screenCode",
+          "type": "string",
+          "optional": false,
+          "hasDefault": false,
+          "position": 0,
+          "isFabricParameter": false
+        },
+        {
+          "name": "ctx",
+          "type": "RayfinContext<Record<string, any>, AudienceType.Sql>",
+          "optional": false,
+          "hasDefault": false,
+          "position": 1,
+          "isFabricParameter": false
+        }
+      ],
+      "contextAudiences": [
+        "Sql"
+      ]
+    },
+    {
+      "functionName": "saveView",
+      "delegateParameters": [
+        {
+          "name": "screenCode",
+          "type": "string",
+          "optional": false,
+          "hasDefault": false,
+          "position": 0,
+          "isFabricParameter": false
+        },
+        {
+          "name": "viewName",
+          "type": "string",
+          "optional": false,
+          "hasDefault": false,
+          "position": 1,
+          "isFabricParameter": false
+        },
+        {
+          "name": "definitionJson",
+          "type": "string",
+          "optional": false,
+          "hasDefault": false,
+          "position": 2,
+          "isFabricParameter": false
+        },
+        {
+          "name": "ctx",
+          "type": "RayfinContext<Record<string, any>, AudienceType.Sql>",
+          "optional": false,
+          "hasDefault": false,
+          "position": 3,
+          "isFabricParameter": false
+        }
+      ],
+      "contextAudiences": [
+        "Sql"
+      ]
+    },
+    {
+      "functionName": "deleteSavedView",
+      "delegateParameters": [
+        {
+          "name": "savedViewId",
+          "type": "number",
+          "optional": false,
+          "hasDefault": false,
+          "position": 0,
+          "isFabricParameter": false
+        },
+        {
+          "name": "ctx",
+          "type": "RayfinContext<Record<string, any>, AudienceType.Sql>",
+          "optional": false,
+          "hasDefault": false,
+          "position": 1,
           "isFabricParameter": false
         }
       ],

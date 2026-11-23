@@ -93,4 +93,16 @@ export type AppFunctionsSchema = {
     input: { mode: string; prompt: string };
     output: { ok: boolean; mode: null | 'dns' | 'models' | 'text' | 'agent'; category: null | 'NOT_REGISTERED' | 'NOT_AUTHENTICATED' | 'NOT_ADMIN' | 'BAD_INPUT' | 'NOT_CONFIGURED' | 'NO_SECRET' | 'IDENTITY_ERROR' | 'DNS' | 'NETWORK' | 'TIMEOUT' | 'TLS' | 'REDIRECT' | 'HTTP_401' | 'HTTP_403' | 'HTTP_429' | 'HTTP_OTHER' | 'BAD_RESPONSE' | 'AGENT_NOT_LISTED' | 'AGENT_NO_TASK' | 'AGENT_WAITING' | 'AGENT_FAILED'; host: string; httpStatus: null | number; route: null | string; totalMs: number; dns: null | { addressCount: number; scope: 'PRIVATE' | 'PUBLIC' | 'MIXED' }; models: null | { count: number; ids: string[]; configuredListed: null | false | true }; reply: null | { text: string; truncated: boolean; model: null | string; promptTokens: null | number; completionTokens: null | number }; agent: null | { steps: { step: 'create' | 'delete' | 'models' | 'settings' | 'start' | 'poll' | 'collect'; ok: boolean; httpStatus: null | number; ms: number; count: number }[]; polls: number; config: null | { tools: number; skills: number; filters: number; features: string[]; terminal: boolean; systemPrompt: boolean; approvalMode: null | string }; toolCalls: null | { count: number; names: string[] }; chatDeleted: null | false | true; chatId: null | string }; errorCode: null | string; error: null | string };
   };
+  listSavedViews: {
+    input: { screenCode: string };
+    output: { ok: boolean; status: string; error: null | string; errorCode: null | number; userId: null | string; timing: { connectMs: number; queryMs: number; totalMs: number }; views: { savedViewId: number; viewName: string; definitionJson: string; isDefault: boolean; updatedAtUtc: null | string }[] };
+  };
+  saveView: {
+    input: { screenCode: string; viewName: string; definitionJson: string };
+    output: { ok: boolean; status: string; error: null | string; errorCode: null | number; userId: null | string; timing: { connectMs: number; queryMs: number; totalMs: number }; view: null | { savedViewId: number; viewName: string; definitionJson: string; isDefault: boolean; updatedAtUtc: null | string }; outcome: null | string };
+  };
+  deleteSavedView: {
+    input: { savedViewId: number };
+    output: { ok: boolean; status: string; error: null | string; errorCode: null | number; userId: null | string; timing: { connectMs: number; queryMs: number; totalMs: number }; savedViewId: null | number };
+  };
 };

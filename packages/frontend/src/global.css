@@ -207,6 +207,10 @@
   --color-sidebar-selected-foreground: var(--oxy-blue-700); /* text-selected */
   --color-sidebar-logo: var(--oxy-slate-0); /* white disc behind the logo, in both themes: the mark is drawn for white */
 
+  /* Scrollbars: a thin pill on no track (Oxy border-strong, darker on hover). */
+  --color-scrollbar: var(--oxy-slate-300);
+  --color-scrollbar-hover: var(--oxy-slate-450);
+
   /* ---- Oxy roles ATLAS had no token for, under their Oxy names (light) ---- */
   /* Surfaces and text */
   --color-bg-hover-overlay: rgb(var(--oxy-slate-950-rgb) / 0.05);
@@ -341,6 +345,8 @@
   --spacing-1000: 40px; /* large button height */
   --spacing-sidebar: 248px; /* width of the navigation rail */
   --spacing-sidebar-rail: 64px; /* width of the collapsed navigation rail (icons only) */
+  --spacing-filter-panel: 360px; /* width of the Filter panel beside the Equipment table */
+  --spacing-facet-list: 240px; /* tallest a Filter panel checkbox list gets before it scrolls */
   --spacing-header: 56px; /* height of the top bar and of the menu's logo row, so the two line up */
 
   /* Font Sizes — 100-based scale 
@@ -474,6 +480,9 @@
     --color-sidebar-selected: var(--oxy-blue-800);
     --color-sidebar-selected-foreground: var(--oxy-blue-300);
 
+    --color-scrollbar: var(--oxy-slate-600);
+    --color-scrollbar-hover: var(--oxy-slate-450);
+
     /* ---- Oxy roles ATLAS had no token for (dark) ---- */
     /* Surfaces and text */
     --color-bg-hover-overlay: rgb(var(--oxy-slate-0-rgb) / 0.05);
@@ -585,6 +594,38 @@
   h2,
   h3 {
     font-family: var(--font-heading);
+  }
+
+  /* Modern scrollbars: a thin rounded thumb with no track, darker while hovered. Chromium and
+     Safari draw them from the ::-webkit-scrollbar rules; Firefox, which has no such rules, gets the
+     standard thin scrollbar in the same colours. */
+  @supports not selector(::-webkit-scrollbar) {
+    * {
+      scrollbar-width: thin;
+      scrollbar-color: var(--color-scrollbar) transparent;
+    }
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  ::-webkit-scrollbar-track,
+  ::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+
+  /* A 2px transparent border inside the 10px gutter leaves a 6px pill. */
+  ::-webkit-scrollbar-thumb {
+    border: 2px solid transparent;
+    border-radius: var(--radius-full);
+    background-clip: padding-box;
+    background-color: var(--color-scrollbar);
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: var(--color-scrollbar-hover);
   }
 
   /* Form controls do not inherit the page font by themselves. */

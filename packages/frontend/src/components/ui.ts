@@ -11,12 +11,14 @@
  * 32 default, 40 large. Corners: 8px, 6px on small.
  */
 const buttonCore =
-  'inline-flex items-center justify-center border border-transparent font-medium transition-[color,background-color,border-color,box-shadow] duration-150 motion-reduce:transition-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring focus-visible:ring-4 focus-visible:ring-focus-ring disabled:cursor-not-allowed disabled:border-divider disabled:bg-hover-overlay disabled:text-disabled-foreground disabled:shadow-none';
+  'inline-flex items-center justify-center border font-medium transition-[color,background-color,border-color,box-shadow] duration-150 motion-reduce:transition-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring focus-visible:ring-4 focus-visible:ring-focus-ring disabled:cursor-not-allowed disabled:border-divider disabled:bg-hover-overlay disabled:text-disabled-foreground disabled:shadow-none';
 const sizeDefault = 'h-800 gap-200 rounded-xl px-300 text-300';
 const sizeSmall = 'h-700 gap-100 rounded-lg px-300 text-200';
 const sizeLarge = 'h-1000 gap-200 rounded-xl px-400 text-300';
 
-const filled = 'bg-primary text-primary-foreground hover:bg-primary-hover hover:shadow-primary-hover active:bg-primary-active';
+// The border colour is set by each look, never by the core: two border colours in one class list
+// would leave the winner to the stylesheet's order (that hid the outlined buttons' border).
+const filled = 'border-transparent bg-primary text-primary-foreground hover:bg-primary-hover hover:shadow-primary-hover active:bg-primary-active';
 const outlined =
   'border-secondary-border bg-secondary text-secondary-foreground hover:border-secondary-hover-text hover:text-secondary-hover-text';
 
@@ -26,9 +28,9 @@ export const button = {
   /** Outlined: every other action. */
   secondary: `${buttonCore} ${sizeDefault} ${outlined}`,
   /** Text only: a quiet action that sits among other content. */
-  ghost: `${buttonCore} ${sizeDefault} bg-transparent text-link hover:bg-hover-overlay disabled:bg-transparent`,
+  ghost: `${buttonCore} ${sizeDefault} border-transparent bg-transparent text-link hover:bg-hover-overlay disabled:bg-transparent`,
   /** Filled red: an action that rejects, withdraws or removes. */
-  danger: `${buttonCore} ${sizeDefault} bg-danger-solid text-on-danger hover:bg-danger-solid-hover`,
+  danger: `${buttonCore} ${sizeDefault} border-transparent bg-danger-solid text-on-danger hover:bg-danger-solid-hover`,
   /** A small outlined button for toolbars and table rows. */
   small: `${buttonCore} ${sizeSmall} ${outlined}`,
   /** A large filled button, for a screen with one action (sign in). */
