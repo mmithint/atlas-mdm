@@ -25,7 +25,7 @@ describe('columns', () => {
   it('gives a filter box to the 20 text columns, and none to counts, percentages, decimals and dates', () => {
     expect(FILTER_COLUMNS).toHaveLength(20);
     for (const c of COLUMNS) {
-      const text = ['tag', 'plate', 'facility', 'text'].includes(c.kind);
+      const text = ['tag', 'plate', 'facility', 'text', 'class', 'fired', 'status'].includes(c.kind);
       expect(isFilterColumn(c.column), c.column).toBe(text);
     }
     for (const none of ['openRequestCount', 'verificationPct', 'heatDutyMmbtuHr', 'invalidRuleCount', 'lastChangedAtUtc']) {

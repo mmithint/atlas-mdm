@@ -67,7 +67,7 @@ function RequestsTable({ rows, totalCount }: { rows: readonly RelatedRequestRow[
   return (
     <>
       <div className="overflow-x-auto">
-        <table className="w-full min-w-max border-collapse text-300">
+        <table className="w-full min-w-max border-collapse text-250 leading-250">
           <caption className="sr-only">Change requests on this heater</caption>
           <thead>
             <tr className="bg-muted text-left text-200 uppercase tracking-wide text-muted-foreground">

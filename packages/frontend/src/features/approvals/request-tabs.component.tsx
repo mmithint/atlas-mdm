@@ -21,7 +21,7 @@ import {
 } from './request-model';
 
 const DANGER_BADGE =
-  'inline-flex items-center rounded-sm bg-destructive px-200 py-100 text-200 font-medium text-destructive-foreground';
+  'inline-flex items-center rounded-lg bg-danger-solid px-200-nudge py-100-nudge text-200 leading-200 font-medium text-on-danger';
 
 /** A small coloured label; `danger` is red, the rest are the shared badges. */
 export function Badge({ kind, children }: { kind: BadgeKind; children: ReactNode }) {
@@ -88,7 +88,7 @@ export function RequestTabs({ view, checks, onRecheck }: RequestTabsProps) {
               tabIndex={selected ? 0 : -1}
               onClick={() => setActive(tab.id)}
               onKeyDown={(event) => onKeyDown(event, index)}
-              className={`-mb-px rounded-t-md border-b-2 px-400 py-200 text-300 font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${selected ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'
+              className={`-mb-px rounded-t-md border-b-2 px-400 py-200 text-300 font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${selected ? 'border-ring text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'
                 }`}
             >
               {tab.label}
@@ -244,7 +244,7 @@ function RelatedTable({ rows }: { rows: readonly RelatedRow[] }) {
         <p className="text-300 text-muted-foreground">No other request on this heater or location.</p>
       ) : (
         <div className="overflow-x-auto">
-          <table className="w-full min-w-max border-collapse text-300">
+          <table className="w-full min-w-max border-collapse text-250 leading-250">
             <caption className="sr-only">Related requests</caption>
             <thead>
               <tr className="bg-muted text-left text-200 uppercase tracking-wide text-muted-foreground">
@@ -381,7 +381,7 @@ function ChecksTable({ checks, onRecheck }: { checks: readonly CheckRow[]; onRec
         <p className="mt-300 text-300 text-muted-foreground">No checks were returned for this request.</p>
       ) : (
         <div className="mt-300 overflow-x-auto">
-          <table className="w-full min-w-max border-collapse text-300">
+          <table className="w-full min-w-max border-collapse text-250 leading-250">
             <caption className="sr-only">Approval checks</caption>
             <thead>
               <tr className="bg-muted text-left text-200 uppercase tracking-wide text-muted-foreground">

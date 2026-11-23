@@ -15,7 +15,7 @@ const FALLBACK_REASON = 'You may not decide this request.';
 const COMMENT_MAX = 1000;
 
 const DESTRUCTIVE =
-  'inline-flex items-center justify-center gap-200 rounded-md bg-destructive px-400 py-200 text-300 font-medium text-destructive-foreground transition-colors hover:bg-destructive/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50';
+  'inline-flex items-center justify-center gap-200 rounded-md bg-danger-solid px-400 py-200 text-300 font-medium text-on-danger transition-colors hover:bg-danger-solid-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50';
 
 /** Compact (small padding, no wrapping) versions of the shared buttons, so the whole panel fits one row. */
 const COMPACT_BASE =

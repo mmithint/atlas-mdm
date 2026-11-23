@@ -73,17 +73,17 @@ export function Nav({
                 aria-current={isCurrent ? 'page' : undefined}
                 title={built ? (collapsed ? route.title : undefined) : collapsed ? `${route.title} · built in ${route.builtIn}` : `Built in ${route.builtIn}`}
                 className={clsx(
-                  'flex items-center rounded-md text-300 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-active',
+                  'flex items-center rounded-md text-300 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
                   collapsed ? 'justify-center px-200 py-200' : 'gap-300 border-l-4 px-300 py-200',
                   isCurrent
-                    ? 'border-sidebar-active bg-sidebar-accent font-medium text-sidebar-foreground'
+                    ? 'border-sidebar-active bg-sidebar-selected font-medium text-sidebar-selected-foreground'
                     : 'border-transparent text-sidebar-foreground hover:bg-sidebar-accent',
                   built ? '' : 'opacity-70'
                 )}
               >
                 {Icon ? <Icon aria-hidden="true" className="icon-size-300 shrink-0" /> : null}
                 <span className={collapsed ? 'sr-only' : 'min-w-0 flex-1 truncate'}>{route.title}</span>
-                {built || collapsed ? null : <span className="text-100 uppercase tracking-wide text-sidebar-muted">soon</span>}
+                {built || collapsed ? null : <span className="text-200 uppercase tracking-wide text-sidebar-muted">soon</span>}
               </a>
             </li>
           );

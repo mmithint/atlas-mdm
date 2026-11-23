@@ -156,7 +156,7 @@ function Banner({ banner, onDismiss }: { banner: ResultBanner; onDismiss: () => 
         type="button"
         aria-label="Dismiss this message"
         onClick={onDismiss}
-        className="rounded-md p-100 hover:bg-foreground/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        className="rounded-md p-100 hover:bg-hover-overlay focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       >
         <X aria-hidden="true" className="icon-size-200" />
       </button>

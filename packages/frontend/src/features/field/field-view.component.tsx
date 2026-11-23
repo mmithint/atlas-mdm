@@ -72,7 +72,7 @@ function StepBar({ step }: { step: Step }) {
         <li
           key={s.n}
           aria-current={step === s.n ? 'step' : undefined}
-          className={clsx('flex items-center gap-100 rounded-full border px-300 py-100', step === s.n ? 'border-primary bg-primary text-primary-foreground' : step > s.n ? 'border-success text-foreground' : 'border-border text-muted-foreground')}
+          className={clsx('flex items-center gap-100 rounded-full border px-300 py-100', step === s.n ? 'border-primary bg-primary text-primary-foreground' : step > s.n ? 'border-success-border text-foreground' : 'border-border text-muted-foreground')}
         >
           {step > s.n ? <Check aria-hidden="true" className="icon-size-100" /> : <span>{s.n}</span>}
           {s.label}
@@ -314,7 +314,7 @@ function EquipmentStep(props: {
                       role="radio"
                       aria-checked={equipmentId === h.equipmentId}
                       onClick={() => onPick(h.equipmentId)}
-                      className={clsx('w-full rounded-md border p-300 text-left', equipmentId === h.equipmentId ? 'border-primary ring-2 ring-ring' : 'border-border bg-card hover:bg-accent')}
+                      className={clsx('w-full rounded-md border p-300 text-left', equipmentId === h.equipmentId ? 'border-ring ring-2 ring-ring' : 'border-border bg-card hover:bg-accent')}
                     >
                       <span className="flex flex-wrap items-center justify-between gap-200">
                         <span className="font-mono text-300 font-semibold">{h.equipmentNumber}</span>
@@ -700,7 +700,7 @@ function Done({ result, equipmentId, onAnother, onNewSite }: { result: FieldForm
             <ul className="mt-100 space-y-100">
               {created.map((r) => (
                 <li key={r.fieldCode}>
-                  <a className="text-primary underline" href={hrefFor(`/requests/${r.requestId}`)}>
+                  <a className="text-link underline" href={hrefFor(`/requests/${r.requestId}`)}>
                     {r.requestRef}
                   </a>{' '}
                   · {r.fieldCode} · {r.outcome === 'CREATED' ? 'created' : r.outcome === 'DUPLICATE_SUPPRESSED' ? 'already open with the same value' : 'another open request on this field'}

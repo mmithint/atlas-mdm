@@ -84,7 +84,7 @@ export function NotificationBell({ refreshKey }: { refreshKey: string }) {
         {unread > 0 ? (
           <span
             aria-hidden="true"
-            className="absolute -right-100 -top-100 min-w-500 rounded-full bg-sidebar-active px-100 text-center text-200 font-bold leading-none text-foreground"
+            className="absolute -right-100 -top-100 min-w-500 rounded-full bg-warning-solid px-100 text-center text-200 font-semibold leading-none text-on-warning"
           >
             {unread > 99 ? '99+' : unread}
           </span>
@@ -122,7 +122,7 @@ export function NotificationBell({ refreshKey }: { refreshKey: string }) {
                   <>
                     <span className="flex items-start gap-200">
                       {!n.isRead ? (
-                        <span aria-hidden="true" className="mt-100 inline-block size-200 shrink-0 rounded-full bg-sidebar-active" />
+                        <span aria-hidden="true" className="mt-100 inline-block size-200 shrink-0 rounded-full bg-warning-solid" />
                       ) : null}
                       <span className={clsx('min-w-0 break-words text-300', !n.isRead && 'font-semibold')}>
                         {!n.isRead ? <span className="sr-only">Unread: </span> : null}

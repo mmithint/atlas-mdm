@@ -25,11 +25,28 @@ export const inputCompact =
 
 /** A small coloured label. `warning` = needs a person, `success` = done, `info` = FYI. */
 export const badge = {
-  neutral: 'inline-flex items-center rounded-sm bg-muted px-200 py-100 text-200 font-medium text-muted-foreground',
-  warning: 'inline-flex items-center rounded-sm bg-warning px-200 py-100 text-200 font-medium text-warning-foreground',
-  success: 'inline-flex items-center rounded-sm bg-success px-200 py-100 text-200 font-medium text-success-foreground',
-  info: 'inline-flex items-center rounded-sm bg-info px-200 py-100 text-200 font-medium text-info-foreground',
+  neutral: 'inline-flex items-center gap-100 rounded-lg bg-muted px-200-nudge py-100-nudge text-200 leading-200 font-medium text-muted-foreground',
+  warning: 'inline-flex items-center gap-100 rounded-lg bg-warning px-200-nudge py-100-nudge text-200 leading-200 font-medium text-warning-foreground',
+  success: 'inline-flex items-center gap-100 rounded-lg bg-success px-200-nudge py-100-nudge text-200 leading-200 font-medium text-success-foreground',
+  info: 'inline-flex items-center gap-100 rounded-lg bg-info px-200-nudge py-100-nudge text-200 leading-200 font-medium text-info-foreground',
 } as const;
+
+/**
+ * Categorical badges (Oxy category 1-8): a tinted fill, a matching border and text. For telling
+ * groups apart (equipment classes, tags), never for status. The label always stays visible: colour
+ * alone never carries the meaning. Written out in full so Tailwind sees every class.
+ */
+const categoryBase = 'inline-flex items-center gap-100 rounded-lg border px-200-nudge py-100-nudge text-200 leading-200 font-medium';
+export const categoryBadge = [
+  `${categoryBase} border-category-1-border bg-category-1-bg text-category-1-text`,
+  `${categoryBase} border-category-2-border bg-category-2-bg text-category-2-text`,
+  `${categoryBase} border-category-3-border bg-category-3-bg text-category-3-text`,
+  `${categoryBase} border-category-4-border bg-category-4-bg text-category-4-text`,
+  `${categoryBase} border-category-5-border bg-category-5-bg text-category-5-text`,
+  `${categoryBase} border-category-6-border bg-category-6-bg text-category-6-text`,
+  `${categoryBase} border-category-7-border bg-category-7-bg text-category-7-text`,
+  `${categoryBase} border-category-8-border bg-category-8-bg text-category-8-text`,
+] as const;
 
 /** The card surface used for sections of a page. */
 export const card = 'rounded-lg border border-border bg-card text-card-foreground';

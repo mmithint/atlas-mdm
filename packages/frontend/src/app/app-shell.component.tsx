@@ -120,24 +120,24 @@ export function AppShell() {
         <button
           type="button"
           aria-label="Close the menu"
-          className="fixed inset-0 z-20 bg-foreground/40 md:hidden"
+          className="fixed inset-0 z-20 bg-mask md:hidden"
           onClick={() => setMenuOpen(false)}
         />
       ) : null}
 
       <aside
         className={clsx(
-          'fixed inset-y-0 left-0 z-30 flex w-sidebar flex-col bg-sidebar text-sidebar-foreground transition-[transform,width] duration-200 motion-reduce:transition-none md:relative md:h-full md:shrink-0 md:translate-x-0',
+          'fixed inset-y-0 left-0 z-30 flex w-sidebar flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground transition-[transform,width] duration-200 motion-reduce:transition-none md:relative md:h-full md:shrink-0 md:translate-x-0',
           menuOpen ? 'translate-x-0' : '-translate-x-full',
           collapsed ? 'md:w-sidebar-rail' : 'md:w-sidebar'
         )}
       >
-        <div className={clsx('flex items-center gap-300 border-b border-sidebar-border py-400', collapsed ? 'justify-center px-200' : 'px-400')}>
-          <img src={oxyLogo} alt="Oxy" className="icon-size-700 shrink-0 object-contain" />
+        <div className={clsx('flex h-header shrink-0 items-center gap-300 border-b border-sidebar-border', collapsed ? 'justify-center px-200' : 'px-400')}>
+          <img src={oxyLogo} alt="Oxy" className="icon-size-600 shrink-0 object-contain" />
           {collapsed ? null : (
             <div className="min-w-0 flex-1">
-              <p className="text-500 font-bold leading-none tracking-wide">ATLAS</p>
-              <p className="mt-200 text-200 text-sidebar-muted">Heater master data</p>
+              <p className="text-500 font-bold leading-400 tracking-wide">ATLAS</p>
+              <p className="text-200 leading-200 text-sidebar-muted">Heater master data</p>
             </div>
           )}
           <button
@@ -155,16 +155,16 @@ export function AppShell() {
           aria-label={railCollapsed ? 'Expand the menu' : 'Collapse the menu'}
           aria-expanded={!railCollapsed}
           title={railCollapsed ? 'Expand the menu' : 'Collapse the menu'}
-          className="absolute -right-300 top-[72px] z-10 hidden rounded-md border border-border bg-card p-100 text-muted-foreground shadow-sm hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:inline-flex"
+          className="absolute -right-300 top-[73px] z-10 hidden rounded-md border border-border bg-card p-100 text-muted-foreground shadow-sm hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:inline-flex"
         >
           {railCollapsed ? <PanelLeftOpen aria-hidden="true" className="icon-size-200" /> : <PanelLeftClose aria-hidden="true" className="icon-size-200" />}
         </button>
         <Nav current={current?.id ?? null} canManageAdmin={canManageAdmin} onNavigate={() => setMenuOpen(false)} preview={PREVIEW_MODE} collapsed={collapsed} />
-        {collapsed ? null : <p className="border-t border-sidebar-border px-400 py-300 text-100 text-sidebar-muted">Proof of value build</p>}
+        {collapsed ? null : <p className="border-t border-sidebar-border px-400 py-300 text-200 text-sidebar-muted">Proof of value build</p>}
       </aside>
 
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-        <header className="flex items-center gap-300 border-b border-border bg-card px-400 py-200">
+        <header className="flex h-header shrink-0 items-center gap-300 border-b border-border bg-card px-400">
           <button
             type="button"
             aria-label="Open the menu"

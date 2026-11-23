@@ -171,15 +171,15 @@ function WritePathCard() {
       </p>
 
       <div className="mt-300 grid gap-300 md:grid-cols-4">
-        <label className="block text-sm">
+        <label className="block text-300 leading-300">
           Heater id
           <input className={input} inputMode="numeric" value={heaterId} onChange={(e) => setHeaterId(e.target.value)} />
         </label>
-        <label className="block text-sm">
+        <label className="block text-300 leading-300">
           Request number
           <input className={input} inputMode="numeric" value={requestId} onChange={(e) => setRequestId(e.target.value)} />
         </label>
-        <label className="block text-sm">
+        <label className="block text-300 leading-300">
           Decision
           <select className={input} value={decision} onChange={(e) => setDecision(e.target.value)}>
             <option>APPROVE</option>
@@ -187,7 +187,7 @@ function WritePathCard() {
             <option>RETURN</option>
           </select>
         </label>
-        <label className="block text-sm">
+        <label className="block text-300 leading-300">
           Comment (needed to reject or return)
           <input className={input} value={comment} onChange={(e) => setComment(e.target.value)} />
         </label>
@@ -228,7 +228,7 @@ function WritePathCard() {
         <div className="mt-300">
           <pre
             role="status"
-            className="max-h-96 overflow-auto whitespace-pre-wrap break-words rounded-md border border-border bg-background p-300 text-sm"
+            className="max-h-96 overflow-auto whitespace-pre-wrap break-words rounded-md border border-border bg-background p-300 text-300 leading-300"
           >
             {state.text}
           </pre>
@@ -240,7 +240,7 @@ function WritePathCard() {
                 () => setCopied(false)
               );
             }}
-            className="mt-200 rounded-md border border-border px-300 py-100 text-sm"
+            className="mt-200 rounded-md border border-border px-300 py-100 text-300 leading-300"
           >
             {copied ? 'Copied' : 'Copy result'}
           </button>
@@ -295,7 +295,7 @@ function OxygptCard() {
         question empty to ask for "pong". Do not type client row data. Nothing here is saved by this app.
       </p>
 
-      <label className="mt-300 block text-sm">
+      <label className="mt-300 block text-300 leading-300">
         Question (up to {OXYGPT_MAX_QUESTION} characters)
         <textarea
           className="mt-100 w-full rounded-md border border-border bg-background px-300 py-100"
@@ -327,7 +327,7 @@ function OxygptCard() {
         <div className="mt-300">
           <pre
             role="status"
-            className="max-h-96 overflow-auto whitespace-pre-wrap break-words rounded-md border border-border bg-background p-300 text-sm"
+            className="max-h-96 overflow-auto whitespace-pre-wrap break-words rounded-md border border-border bg-background p-300 text-300 leading-300"
           >
             {state.text}
           </pre>
@@ -339,7 +339,7 @@ function OxygptCard() {
                 () => setCopied(false)
               );
             }}
-            className="mt-200 rounded-md border border-border px-300 py-100 text-sm"
+            className="mt-200 rounded-md border border-border px-300 py-100 text-300 leading-300"
           >
             {copied ? 'Copied' : 'Copy result'}
           </button>
@@ -412,14 +412,14 @@ function SpikeCard({
         <div className="mt-300">
           <pre
             role="status"
-            className="max-h-96 overflow-auto whitespace-pre-wrap break-words rounded-md border border-border bg-background p-300 text-sm"
+            className="max-h-96 overflow-auto whitespace-pre-wrap break-words rounded-md border border-border bg-background p-300 text-300 leading-300"
           >
             {state.text}
           </pre>
           <button
             type="button"
             onClick={() => void onCopy(state.text)}
-            className="mt-200 rounded-md border border-border px-300 py-100 text-sm"
+            className="mt-200 rounded-md border border-border px-300 py-100 text-300 leading-300"
           >
             {copied ? 'Copied' : 'Copy result'}
           </button>

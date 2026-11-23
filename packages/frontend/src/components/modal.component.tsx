@@ -73,7 +73,7 @@ export function Modal({ title, onClose, children, footer, busy = false, size = '
     <div className="fixed inset-0 z-50 flex items-end justify-center p-300 sm:items-center">
       <div
         aria-hidden="true"
-        className="absolute inset-0 bg-foreground/50"
+        className="absolute inset-0 bg-mask"
         onClick={() => {
           if (!busy) onClose();
         }}

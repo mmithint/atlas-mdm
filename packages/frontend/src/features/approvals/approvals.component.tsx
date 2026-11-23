@@ -209,7 +209,7 @@ function TabStrip({
             onClick={() => onSelect(t.id)}
             className={
               isActive
-                ? '-mb-px inline-flex items-center gap-200 border-b-2 border-primary px-300 py-200 text-300 font-semibold text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
+                ? '-mb-px inline-flex items-center gap-200 border-b-2 border-ring px-300 py-200 text-300 font-medium text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
                 : 'inline-flex items-center gap-200 border-b-2 border-transparent px-300 py-200 text-300 font-medium text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
             }
           >
@@ -349,7 +349,7 @@ function RequestTable({
   const approvable = selectableIds(rows).length;
   return (
     <div className="overflow-x-auto md:min-h-0 md:overflow-y-auto">
-      <table className="w-full min-w-max border-collapse text-300">
+      <table className="w-full min-w-max border-collapse text-250 leading-250">
         <caption className="sr-only">Change requests in this tab</caption>
         <thead className="sticky top-0 z-[1] bg-card">
           <tr className="bg-muted text-left text-200 uppercase tracking-wide text-muted-foreground">

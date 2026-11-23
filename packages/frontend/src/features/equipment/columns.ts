@@ -46,6 +46,10 @@ export type CellKind =
   | 'plate' // identifier plate
   | 'facility' // identifier plate that links to the facility drill-down
   | 'text'
+  | 'class' // a class code drawn as a coloured badge with an icon (still a text column for filters)
+  | 'fired' // fired / unfired as a badge with an icon (a text column for filters)
+  | 'status' // a SAP user status as a status badge with its meaning (a text column for filters)
+  | 'verified' // the verified share as a status badge
   | 'decimal'
   | 'percent'
   | 'count'
@@ -66,22 +70,22 @@ export const COLUMNS: readonly ColumnDef[] = [
   { column: 'functionalLocation', label: 'FLOC', kind: 'plate', defaultVisible: false },
   { column: 'superiorFunctionalLocation', label: 'Facility', kind: 'facility', defaultVisible: true },
   { column: 'manufacturer', label: 'Manufacturer', kind: 'text', defaultVisible: true },
-  { column: 'equipClass', label: 'Class', kind: 'text', defaultVisible: true },
+  { column: 'equipClass', label: 'Class', kind: 'class', defaultVisible: true },
   { column: 'profitCenterName', label: 'Profit centre', kind: 'text', defaultVisible: true },
   { column: 'openRequestCount', label: 'Open requests', kind: 'count', defaultVisible: true },
-  { column: 'verificationPct', label: 'Verified', kind: 'percent', defaultVisible: true },
+  { column: 'verificationPct', label: 'Verified', kind: 'verified', defaultVisible: true },
   // available from the column chooser
   { column: 'equipmentDescription', label: 'Description', kind: 'text', defaultVisible: false },
   { column: 'flocDescription', label: 'FLOC description', kind: 'text', defaultVisible: false },
   { column: 'modelNumber', label: 'Model', kind: 'text', defaultVisible: false },
-  { column: 'firedUnfired', label: 'Fired / unfired', kind: 'text', defaultVisible: false },
+  { column: 'firedUnfired', label: 'Fired / unfired', kind: 'fired', defaultVisible: false },
   { column: 'heatDutyMmbtuHr', label: 'Heat duty (MMBTU/hr)', kind: 'decimal', defaultVisible: false },
   { column: 'classType', label: 'Class type', kind: 'text', defaultVisible: false },
   { column: 'objectType', label: 'Object type', kind: 'text', defaultVisible: false },
-  { column: 'flocClass', label: 'FLOC class', kind: 'text', defaultVisible: false },
+  { column: 'flocClass', label: 'FLOC class', kind: 'class', defaultVisible: false },
   { column: 'techObjectType', label: 'Tech. object type', kind: 'text', defaultVisible: false },
-  { column: 'equipmentUserStatus', label: 'User status', kind: 'text', defaultVisible: false },
-  { column: 'flocUserStatus', label: 'FLOC status', kind: 'text', defaultVisible: false },
+  { column: 'equipmentUserStatus', label: 'User status', kind: 'status', defaultVisible: false },
+  { column: 'flocUserStatus', label: 'FLOC status', kind: 'status', defaultVisible: false },
   { column: 'plannerGroup', label: 'Planner group', kind: 'text', defaultVisible: false },
   { column: 'heaterPopulationMethod', label: 'Population method', kind: 'text', defaultVisible: false },
   { column: 'invalidRuleCount', label: 'Invalid rules', kind: 'count', defaultVisible: false },
@@ -96,7 +100,7 @@ export const DEFAULT_COLUMNS: readonly SearchColumn[] = COLUMNS.filter((c) => c.
  * the same list (`@filter_cols`); a unit test (`search-model.spec.ts`) compares the two.
  * In the order of `COLUMNS`, which is also the order filters take in the address.
  */
-const TEXT_KINDS: readonly CellKind[] = ['tag', 'plate', 'facility', 'text'];
+const TEXT_KINDS: readonly CellKind[] = ['tag', 'plate', 'facility', 'text', 'class', 'fired', 'status'];
 export const FILTER_COLUMNS: readonly SearchColumn[] = COLUMNS.filter((c) => TEXT_KINDS.includes(c.kind)).map((c) => c.column);
 
 export const isFilterColumn = (value: string): value is SearchColumn => (FILTER_COLUMNS as readonly string[]).includes(value);

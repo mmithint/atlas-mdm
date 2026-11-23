@@ -2,65 +2,312 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* =====================================================================
+   OXY COLOUR PRIMITIVES (Layer 1), copied verbatim from oxy-tokens.css.
+   Raw ramps: NEVER use these in components or class names. Only the ATLAS
+   tokens below (--color-*) point at them, once for light and once in .dark.
+   ===================================================================== */
+:root {
+  /* blue — Brand primary. Anchor #005096 = 600. 750/800 are desaturated navy steps used for selected surfaces today. */
+  --oxy-blue-50: #EEF6FF;
+  --oxy-blue-100: #D6EAFF;
+  --oxy-blue-200: #ADD4FF;
+  --oxy-blue-300: #79B8FF;
+  --oxy-blue-400: #4895DB;
+  --oxy-blue-500: #1B6BAD;
+  --oxy-blue-600: #005096;
+  --oxy-blue-700: #003D73;
+  --oxy-blue-750: #253F66;
+  --oxy-blue-800: #1F3A5F;
+  --oxy-blue-900: #172D4A;
+  --oxy-blue-950: #0F1F33;
+
+  /* red — Danger only. Anchor #AF111A = 600. Never used as a brand accent. */
+  --oxy-red-50: #FEF2F2;
+  --oxy-red-100: #FDE4E6;
+  --oxy-red-200: #FFC7CE;
+  --oxy-red-300: #F9A0A6;
+  --oxy-red-400: #F87171;
+  --oxy-red-500: #D6343B;
+  --oxy-red-600: #AF111A;
+  --oxy-red-700: #8B1A1A;
+  --oxy-red-800: #6B1116;
+  --oxy-red-900: #521A1E;
+  --oxy-red-950: #3F1F1F;
+
+  /* slate — Cool blue-slate neutral (hue ~215–222°). Extra 7xx–9xx half-steps preserve every current dark surface exactly. */
+  --oxy-slate-0: #FFFFFF;
+  --oxy-slate-50: #F5F7FA;
+  --oxy-slate-100: #EDF0F4;
+  --oxy-slate-150: #E5E7EB;
+  --oxy-slate-200: #D8DDE5;
+  --oxy-slate-300: #B9C1CD;
+  --oxy-slate-400: #9CA3AF;
+  --oxy-slate-450: #8F97A3;
+  --oxy-slate-500: #6B7280;
+  --oxy-slate-550: #5A6270;
+  --oxy-slate-600: #4A5568;
+  --oxy-slate-700: #2A3441;
+  --oxy-slate-750: #232B3A;
+  --oxy-slate-775: #1F2937;
+  --oxy-slate-800: #1F2537;
+  --oxy-slate-825: #1A2332;
+  --oxy-slate-850: #1A1F2E;
+  --oxy-slate-900: #141A26;
+  --oxy-slate-950: #0F1620;
+
+  /* green — Success. */
+  --oxy-green-50: #EDFBF0;
+  --oxy-green-100: #C6EFCE;
+  --oxy-green-200: #A7E8B4;
+  --oxy-green-300: #6FD383;
+  --oxy-green-400: #3FB950;
+  --oxy-green-500: #2EA043;
+  --oxy-green-600: #238636;
+  --oxy-green-700: #1A7234;
+  --oxy-green-800: #065F2F;
+  --oxy-green-900: #1E3A23;
+  --oxy-green-950: #0F2415;
+
+  /* amber — Warning. */
+  --oxy-amber-50: #FFFBEB;
+  --oxy-amber-100: #FEF3C7;
+  --oxy-amber-200: #FFEB9C;
+  --oxy-amber-300: #FCD34D;
+  --oxy-amber-400: #FBBF24;
+  --oxy-amber-500: #F59E0B;
+  --oxy-amber-600: #D97706;
+  --oxy-amber-700: #B45309;
+  --oxy-amber-800: #92400E;
+  --oxy-amber-900: #78350F;
+  --oxy-amber-950: #3F2E0A;
+
+  /* indigo — Category hue (tags, labels, groupings) */
+  --oxy-indigo-100: #E0E7FF;
+  --oxy-indigo-200: #C7D2FE;
+  --oxy-indigo-300: #A5B4FC;
+  --oxy-indigo-700: #4338CA;
+  --oxy-indigo-800: #3730A3;
+  --oxy-indigo-900: #1E1B4B;
+
+  /* purple — Category hue */
+  --oxy-purple-100: #F3E8FF;
+  --oxy-purple-200: #E9D5FF;
+  --oxy-purple-300: #D8B4FE;
+  --oxy-purple-700: #7E22CE;
+  --oxy-purple-800: #6B21A8;
+  --oxy-purple-900: #2E1650;
+
+  /* magenta — Category hue */
+  --oxy-magenta-100: #FCE7F3;
+  --oxy-magenta-200: #FBCFE8;
+  --oxy-magenta-300: #F9A8D4;
+  --oxy-magenta-700: #BE185D;
+  --oxy-magenta-800: #9D174D;
+  --oxy-magenta-900: #3D0F2A;
+
+  /* teal — Category hue */
+  --oxy-teal-100: #CCFBF1;
+  --oxy-teal-200: #99F6E4;
+  --oxy-teal-300: #5EEAD4;
+  --oxy-teal-700: #0F766E;
+  --oxy-teal-800: #115E59;
+  --oxy-teal-900: #0F2E2C;
+
+  /* orange — Category hue */
+  --oxy-orange-100: #FFEDD5;
+  --oxy-orange-200: #FED7AA;
+  --oxy-orange-300: #FDBA74;
+  --oxy-orange-700: #C2410C;
+  --oxy-orange-800: #9A3412;
+  --oxy-orange-900: #3A1C0B;
+
+  /* black — Shadows / masks only */
+  --oxy-black: #000000;
+
+  /* channel triplets (for alpha) */
+  --oxy-slate-0-rgb: 255 255 255;
+  --oxy-slate-50-rgb: 245 247 250;
+  --oxy-slate-950-rgb: 15 22 32;
+  --oxy-slate-825-rgb: 26 35 50;
+  --oxy-blue-600-rgb: 0 80 150;
+  --oxy-black-rgb: 0 0 0;
+}
+
 /* Bridged tokens — kept in `@theme static` so the CSS vars are always
    emitted, not tree-shaken when no Tailwind utility consumes them.
    Required because <VegaVisual> and <DataGrid> read these at runtime via
    `useCssTheme()` and project them into a JS theme object (Vega's SVG output
    cannot resolve `var()` references). */
 @theme static {
-  --color-brand: #0b5c8a; /* bar/area fills, button-like brand surfaces */
-  --color-brand-foreground: #0b5c8a; /* line/point marks, branded text & emphasis */
-  --color-hover: #eef1f4; /* row/cell hover surface in DataGrid + visuals */
+  --color-brand: var(--oxy-blue-600); /* Oxy primary: bar/area fills, button-like brand surfaces */
+  --color-brand-foreground: var(--oxy-blue-600); /* Oxy text-link: line/point marks, ID-plate links */
+  --color-hover: var(--oxy-slate-100); /* Oxy bg-hover: row/cell hover surface */
 }
 
 @theme {
-  /* Color tokens — light theme
+  /* Color tokens — light theme (Oxy palette)
      Usage: bg-*, text-*, border-* (e.g. bg-primary text-primary-foreground)
-     Each token has a -foreground pair for text on that surface. */
-  --color-background: #f5f6f8; /* page background: cool light grey */
-  --color-foreground: #1b2430; /* default text: ink */
+     Each token has a -foreground pair for text on that surface. The Oxy role
+     each one plays is noted after it.
 
-  --color-card: #ffffff; /* card surfaces */
-  --color-card-foreground: #1b2430;
+     NAMING RULE
+     1. Screens and components use ATLAS names (background, card, muted, primary, …) and the
+        short aliases below. Never --oxy-* primitives, never raw hex.
+     2. An Oxy role name (--color-bg-*, --color-text-*, --color-border-*, …) is added only when
+        ATLAS has no token for that role; it holds the value for each theme.
+     3. When an Oxy name would give a doubled class (bg-bg-mask, text-text-link), add a short
+        ATLAS-style alias that points at it and use the alias in class names.
+     4. Values change here and in .dark only; aliases never hold a value of their own. */
+  --color-background: var(--oxy-slate-50); /* bg-app: page background */
+  --color-foreground: var(--oxy-slate-900); /* text-primary: default text */
 
-  --color-popover: #ffffff; /* popover/dropdown surfaces */
-  --color-popover-foreground: #1b2430;
+  --color-card: var(--oxy-slate-0); /* bg-container: cards and panels */
+  --color-card-foreground: var(--oxy-slate-900);
 
-  --color-primary: #0b5c8a; /* primary actions & buttons: steel blue */
-  --color-primary-foreground: #ffffff;
+  --color-popover: var(--oxy-slate-0); /* bg-elevated: popovers and dropdowns */
+  --color-popover-foreground: var(--oxy-slate-900);
 
-  --color-secondary: #eef1f4; /* secondary actions */
-  --color-secondary-foreground: #1b2430;
+  --color-primary: var(--oxy-blue-600); /* primary: Oxy brand blue #005096 */
+  --color-primary-foreground: var(--oxy-slate-0); /* text-on-primary */
 
-  --color-muted: #e9edf1; /* subtle backgrounds */
-  --color-muted-foreground: #566271; /* subdued text */
+  --color-secondary: var(--oxy-slate-0); /* secondary-bg */
+  --color-secondary-foreground: var(--oxy-slate-900); /* secondary-text */
 
-  --color-accent: #e3eaf1; /* accent highlights */
-  --color-accent-foreground: #1b2430;
+  --color-muted: var(--oxy-slate-100); /* bg-nested: table headers, subtle blocks */
+  --color-muted-foreground: var(--oxy-slate-600); /* text-secondary: subdued text */
 
-  --color-destructive: #c50f1f; /* errors & destructive actions */
-  --color-destructive-foreground: #ffffff;
+  --color-accent: var(--oxy-slate-100); /* bg-hover: hover on buttons and menus */
+  --color-accent-foreground: var(--oxy-slate-900);
 
-  --color-border: #d5dbe2; /* default border */
-  --color-input: #c3ccd6; /* input field borders */
-  --color-ring: #0b5c8a; /* focus rings */
+  --color-destructive: var(--oxy-red-600); /* danger-text: error text and borders; solid fills use danger-solid */
+  --color-destructive-foreground: var(--oxy-slate-0); /* text-on-danger */
 
-  /* ATLAS additions. Attention (amber) is for "needs a person": an invalid rule, an open
+  --color-border: var(--oxy-slate-200); /* border-default: decorative borders, dividers */
+  --color-input: var(--oxy-slate-500); /* border-control: input outlines (3:1) */
+  --color-ring: var(--oxy-blue-600); /* border-focus: focus rings */
+
+  /* ATLAS status tints. Attention (amber) is for "needs a person": an invalid rule, an open
      request. Success is for "done and verified". Each has a -foreground pair for text on it. */
-  --color-warning: #fff1d6;
-  --color-warning-foreground: #7a4500;
-  --color-success: #dff3e6;
-  --color-success-foreground: #17643a;
-  --color-info: #e1eefa;
-  --color-info-foreground: #0b4a70;
+  --color-warning: var(--oxy-amber-50); /* warning-bg */
+  --color-warning-foreground: var(--oxy-amber-800); /* warning-text */
+  --color-success: var(--oxy-green-50); /* success-bg */
+  --color-success-foreground: var(--oxy-green-700); /* success-text */
+  --color-info: var(--oxy-blue-50); /* info-bg */
+  --color-info-foreground: var(--oxy-blue-700); /* info-text */
 
-  /* Navigation rail: dark slate in both themes, like an instrument panel. */
-  --color-sidebar: #17212b;
-  --color-sidebar-foreground: #dde5ec;
-  --color-sidebar-muted: #8a99a8;
-  --color-sidebar-accent: #25333f;
-  --color-sidebar-border: #2c3b48;
-  --color-sidebar-active: #f2a93b; /* safety amber: the current page */
+  /* Navigation rail: Oxy chrome (white in light, slate in dark). */
+  --color-sidebar: var(--oxy-slate-0); /* bg-chrome */
+  --color-sidebar-foreground: var(--oxy-slate-900); /* text-primary */
+  --color-sidebar-muted: var(--oxy-slate-600); /* text-secondary */
+  --color-sidebar-accent: var(--oxy-slate-100); /* bg-menu-hover */
+  --color-sidebar-border: var(--oxy-slate-200); /* border-default */
+  --color-sidebar-active: var(--oxy-blue-600); /* border-selected: the current page's edge bar */
+  --color-sidebar-selected: var(--oxy-blue-100); /* bg-selected: the current page */
+  --color-sidebar-selected-foreground: var(--oxy-blue-700); /* text-selected */
+
+  /* ---- Oxy roles ATLAS had no token for, under their Oxy names (light) ---- */
+  /* Surfaces and text */
+  --color-bg-hover-overlay: rgb(var(--oxy-slate-950-rgb) / 0.05);
+  --color-bg-selected: var(--oxy-blue-100);
+  --color-bg-selected-hover: var(--oxy-blue-200);
+  --color-bg-mask: rgb(var(--oxy-slate-950-rgb) / 0.45);
+  --color-text-tertiary: var(--oxy-slate-550);
+  --color-text-disabled: var(--oxy-slate-400);
+  --color-text-selected: var(--oxy-blue-700);
+  --color-text-link: var(--oxy-blue-600);
+  --color-text-link-hover: var(--oxy-blue-700);
+  --color-text-on-primary: var(--oxy-slate-0);
+  --color-text-on-danger: var(--oxy-slate-0);
+  --color-text-on-warning: var(--oxy-slate-950);
+  --color-text-on-success: var(--oxy-slate-0);
+
+  /* Borders, focus and actions */
+  --color-border-subtle: var(--oxy-slate-100);
+  --color-border-control: var(--oxy-slate-500);
+  --color-border-control-hover: var(--oxy-blue-600);
+  --color-border-focus: var(--oxy-blue-600);
+  --color-border-selected: var(--oxy-blue-600);
+  --color-primary-hover: var(--oxy-blue-700);
+  --color-primary-active: var(--oxy-blue-800);
+  --color-primary-subtle-bg: var(--oxy-blue-50);
+  --color-primary-subtle-border: var(--oxy-blue-200);
+  --color-focus-ring: rgb(var(--oxy-blue-600-rgb) / 0.25);
+  --color-secondary-bg: var(--oxy-slate-0);
+  --color-secondary-border: var(--oxy-slate-300);
+  --color-secondary-text: var(--oxy-slate-900);
+  --color-secondary-hover-text: var(--oxy-blue-600);
+
+  /* Status: solid fill, tint background, border, text */
+  --color-success-solid: var(--oxy-green-600);
+  --color-success-solid-hover: var(--oxy-green-700);
+  --color-success-bg: var(--oxy-green-50);
+  --color-success-border: var(--oxy-green-200);
+  --color-success-text: var(--oxy-green-700);
+  --color-warning-solid: var(--oxy-amber-500);
+  --color-warning-solid-hover: var(--oxy-amber-600);
+  --color-warning-bg: var(--oxy-amber-50);
+  --color-warning-border: var(--oxy-amber-300);
+  --color-warning-text: var(--oxy-amber-800);
+  --color-danger-solid: var(--oxy-red-600);
+  --color-danger-solid-hover: var(--oxy-red-700);
+  --color-danger-bg: var(--oxy-red-50);
+  --color-danger-border: var(--oxy-red-300);
+  --color-danger-text: var(--oxy-red-600);
+  --color-info-solid: var(--oxy-blue-600);
+  --color-info-solid-hover: var(--oxy-blue-700);
+  --color-info-bg: var(--oxy-blue-50);
+  --color-info-border: var(--oxy-blue-200);
+  --color-info-text: var(--oxy-blue-700);
+
+  /* Categories (tags, labels, groupings); the label always stays visible */
+  --color-category-1-bg: var(--oxy-blue-50);
+  --color-category-1-border: var(--oxy-blue-200);
+  --color-category-1-text: var(--oxy-blue-700);
+  --color-category-2-bg: var(--oxy-indigo-100);
+  --color-category-2-border: var(--oxy-indigo-200);
+  --color-category-2-text: var(--oxy-indigo-700);
+  --color-category-3-bg: var(--oxy-purple-100);
+  --color-category-3-border: var(--oxy-purple-200);
+  --color-category-3-text: var(--oxy-purple-700);
+  --color-category-4-bg: var(--oxy-magenta-100);
+  --color-category-4-border: var(--oxy-magenta-200);
+  --color-category-4-text: var(--oxy-magenta-700);
+  --color-category-5-bg: var(--oxy-green-50);
+  --color-category-5-border: var(--oxy-green-200);
+  --color-category-5-text: var(--oxy-green-700);
+  --color-category-6-bg: var(--oxy-teal-100);
+  --color-category-6-border: var(--oxy-teal-200);
+  --color-category-6-text: var(--oxy-teal-700);
+  --color-category-7-bg: var(--oxy-orange-100);
+  --color-category-7-border: var(--oxy-orange-200);
+  --color-category-7-text: var(--oxy-orange-700);
+  --color-category-8-bg: var(--oxy-slate-100);
+  --color-category-8-border: var(--oxy-slate-200);
+  --color-category-8-text: var(--oxy-slate-600);
+
+  /* Short aliases for Oxy roles whose class names would double up (naming rule 3).
+     They point at the Oxy token, so .dark needs no copy of them. */
+  --color-mask: var(--color-bg-mask); /* bg-mask: behind dialogs and the phone menu */
+  --color-hover-overlay: var(--color-bg-hover-overlay); /* bg-hover-overlay */
+  --color-selected: var(--color-bg-selected); /* bg-selected */
+  --color-selected-foreground: var(--color-text-selected); /* text-selected-foreground */
+  --color-link: var(--color-text-link); /* text-link */
+  --color-link-hover: var(--color-text-link-hover); /* hover:text-link-hover */
+  --color-subtle-foreground: var(--color-text-tertiary); /* text-subtle-foreground: placeholders, hints */
+  --color-disabled-foreground: var(--color-text-disabled); /* text-disabled-foreground */
+  --color-on-danger: var(--color-text-on-danger); /* text-on-danger */
+  --color-on-warning: var(--color-text-on-warning); /* text-on-warning */
+  --color-on-success: var(--color-text-on-success); /* text-on-success */
+  --color-control: var(--color-border-control); /* border-control: input outlines */
+  --color-control-hover: var(--color-border-control-hover); /* hover:border-control-hover */
+  --color-divider: var(--color-border-subtle); /* border-divider: quiet separators */
+
+  /* Shadows (--shadow-sm replaces Tailwind's default) */
+  --shadow-sm: 0 1px 3px rgb(var(--oxy-slate-950-rgb) / 0.08);
+  --shadow-bar-top: 0 -2px 8px rgb(var(--oxy-slate-950-rgb) / 0.08);
+  --shadow-elevated: 0 6px 16px rgb(var(--oxy-slate-950-rgb) / 0.12);
+  --shadow-primary-hover: 0 4px 12px rgb(var(--oxy-blue-600-rgb) / 0.20);
 
   --radius-none: 0;
   --radius-sm: 2px;
@@ -91,11 +338,13 @@
   --spacing-800: 32px;
   --spacing-sidebar: 248px; /* width of the navigation rail */
   --spacing-sidebar-rail: 64px; /* width of the collapsed navigation rail (icons only) */
+  --spacing-header: 56px; /* height of the top bar and of the menu's logo row, so the two line up */
 
   /* Font Sizes — 100-based scale 
      Usage: text-* (e.g. text-300, text-hero-900) */
   --text-100: 10px;
   --text-200: 12px;
+  --text-250: 13px; /* table body text */
   --text-300: 14px;
   --text-400: 16px;
   --text-500: 20px;
@@ -109,6 +358,7 @@
      Usage: leading-* (e.g. leading-300) */
   --leading-100: 14px;
   --leading-200: 16px;
+  --leading-250: 18px;
   --leading-300: 20px;
   --leading-400: 22px;
   --leading-500: 28px;
@@ -128,11 +378,11 @@
   /* Font Families
      Usage: font-* (e.g. font-heading, font-base) */
   --font-heading:
-    'IBM Plex Sans', 'Segoe UI', 'Segoe UI Web (West European)',
+    'Inter', 'Segoe UI', 'Segoe UI Web (West European)',
     /* headings, titles, display text */ -apple-system, BlinkMacSystemFont,
     Roboto, 'Helvetica Neue', sans-serif;
   --font-base:
-    'IBM Plex Sans', 'Segoe UI', 'Segoe UI Web (West European)',
+    'Inter', 'Segoe UI', 'Segoe UI Web (West European)',
     /* body text, labels, UI controls */ -apple-system, BlinkMacSystemFont,
     Roboto, 'Helvetica Neue', sans-serif;
   --font-monospace:
@@ -142,6 +392,7 @@
     'IBM Plex Mono', Bahnschrift, 'Segoe UI',
     /* KPI values, numeric displays */ 'Segoe UI Web (West European)',
     -apple-system, BlinkMacSystemFont, Roboto, 'Helvetica Neue', sans-serif;
+  --font-numeric--font-feature-settings: 'tnum'; /* font-numeric: digits of equal width, so columns line up */
 
   /* Icon Sizes — 100-based scale
      Usage: icon-size-* custom utility (e.g. icon-size-200) */
@@ -161,49 +412,142 @@
 
 @layer base {
   .dark {
-    /* Color tokens — dark theme */
-    --color-background: #11171e;
-    --color-foreground: #ffffff;
+    /* Color tokens — dark theme (Oxy palette) */
+    --color-background: var(--oxy-slate-950);
+    --color-foreground: var(--oxy-slate-150);
 
-    --color-card: #19222c;
-    --color-card-foreground: #ffffff;
+    --color-card: var(--oxy-slate-850);
+    --color-card-foreground: var(--oxy-slate-150);
 
-    --color-popover: #19222c;
-    --color-popover-foreground: #ffffff;
+    --color-popover: var(--oxy-slate-800);
+    --color-popover-foreground: var(--oxy-slate-150);
 
-    --color-primary: #1e74ad; /* white text on it stays readable (4.6:1) */
-    --color-primary-foreground: #ffffff;
+    --color-primary: var(--oxy-blue-600);
+    --color-primary-foreground: var(--oxy-slate-0);
 
-    --color-secondary: #1f2a35;
-    --color-secondary-foreground: #ffffff;
+    --color-secondary: var(--oxy-slate-850);
+    --color-secondary-foreground: var(--oxy-slate-150);
 
-    --color-muted: #141c24;
-    --color-muted-foreground: #9fb0c0;
+    --color-muted: var(--oxy-slate-775);
+    --color-muted-foreground: var(--oxy-slate-400);
 
-    --color-accent: #2a3846;
-    --color-accent-foreground: #ffffff;
+    --color-accent: var(--oxy-slate-750);
+    --color-accent-foreground: var(--oxy-slate-150);
 
-    --color-destructive: #c50f1f;
-    --color-destructive-foreground: #ffffff;
+    --color-destructive: var(--oxy-red-400); /* danger-text: readable on dark surfaces */
+    --color-destructive-foreground: var(--oxy-slate-0);
 
-    --color-border: #34424f;
-    --color-input: #3f4f5e;
-    --color-ring: #5eb1ea;
+    --color-border: var(--oxy-slate-700);
+    --color-input: var(--oxy-slate-450);
+    --color-ring: var(--oxy-blue-300);
 
-    --color-brand: #1e74ad;
-    --color-brand-foreground: #5eb1ea;
-    --color-hover: #25313d;
+    --color-brand: var(--oxy-blue-600);
+    --color-brand-foreground: var(--oxy-blue-300);
+    --color-hover: var(--oxy-slate-750);
 
-    --color-warning: #3d2c0d;
-    --color-warning-foreground: #f6c971;
-    --color-success: #12301f;
-    --color-success-foreground: #7fd6a2;
-    --color-info: #11293a;
-    --color-info-foreground: #8ccbf0;
+    --color-warning: var(--oxy-amber-950);
+    --color-warning-foreground: var(--oxy-amber-400);
+    --color-success: var(--oxy-green-900);
+    --color-success-foreground: var(--oxy-green-300);
+    --color-info: var(--oxy-blue-800);
+    --color-info-foreground: var(--oxy-blue-300);
 
-    --color-sidebar: #0d1319;
-    --color-sidebar-accent: #1b2732;
-    --color-sidebar-border: #243241;
+    --color-sidebar: var(--oxy-slate-900);
+    --color-sidebar-foreground: var(--oxy-slate-150);
+    --color-sidebar-muted: var(--oxy-slate-400);
+    --color-sidebar-accent: var(--oxy-slate-825);
+    --color-sidebar-border: var(--oxy-slate-700);
+    /* Oxy border-selected is blue-600, only 2.2:1 on the dark rail; blue-300 (Oxy
+       text-selected) keeps the current-page bar above the 3:1 indicator minimum. */
+    --color-sidebar-active: var(--oxy-blue-300);
+    --color-sidebar-selected: var(--oxy-blue-800);
+    --color-sidebar-selected-foreground: var(--oxy-blue-300);
+
+    /* ---- Oxy roles ATLAS had no token for (dark) ---- */
+    /* Surfaces and text */
+    --color-bg-hover-overlay: rgb(var(--oxy-slate-0-rgb) / 0.05);
+    --color-bg-selected: var(--oxy-blue-800);
+    --color-bg-selected-hover: var(--oxy-blue-750);
+    --color-bg-mask: rgb(var(--oxy-black-rgb) / 0.45);
+    --color-text-tertiary: var(--oxy-slate-450);
+    --color-text-disabled: var(--oxy-slate-500);
+    --color-text-selected: var(--oxy-blue-300);
+    --color-text-link: var(--oxy-blue-300);
+    --color-text-link-hover: var(--oxy-blue-200);
+    --color-text-on-primary: var(--oxy-slate-0);
+    --color-text-on-danger: var(--oxy-slate-0);
+    --color-text-on-warning: var(--oxy-slate-950);
+    --color-text-on-success: var(--oxy-slate-950);
+
+    /* Borders, focus and actions */
+    --color-border-subtle: var(--oxy-slate-750);
+    --color-border-control: var(--oxy-slate-450);
+    --color-border-control-hover: var(--oxy-blue-400);
+    --color-border-focus: var(--oxy-blue-300);
+    --color-border-selected: var(--oxy-blue-600);
+    --color-primary-hover: var(--oxy-blue-500);
+    --color-primary-active: var(--oxy-blue-700);
+    --color-primary-subtle-bg: var(--oxy-blue-800);
+    --color-primary-subtle-border: var(--oxy-blue-600);
+    --color-focus-ring: rgb(var(--oxy-blue-600-rgb) / 0.35);
+    --color-secondary-bg: var(--oxy-slate-850);
+    --color-secondary-border: var(--oxy-slate-700);
+    --color-secondary-text: var(--oxy-slate-150);
+    --color-secondary-hover-text: var(--oxy-blue-300);
+
+    /* Status: solid fill, tint background, border, text */
+    --color-success-solid: var(--oxy-green-400);
+    --color-success-solid-hover: var(--oxy-green-300);
+    --color-success-bg: var(--oxy-green-900);
+    --color-success-border: var(--oxy-green-400);
+    --color-success-text: var(--oxy-green-300);
+    --color-warning-solid: var(--oxy-amber-500);
+    --color-warning-solid-hover: var(--oxy-amber-400);
+    --color-warning-bg: var(--oxy-amber-950);
+    --color-warning-border: var(--oxy-amber-500);
+    --color-warning-text: var(--oxy-amber-400);
+    --color-danger-solid: var(--oxy-red-600);
+    --color-danger-solid-hover: var(--oxy-red-500);
+    --color-danger-bg: var(--oxy-red-950);
+    --color-danger-border: var(--oxy-red-400);
+    --color-danger-text: var(--oxy-red-400);
+    --color-info-solid: var(--oxy-blue-600);
+    --color-info-solid-hover: var(--oxy-blue-500);
+    --color-info-bg: var(--oxy-blue-800);
+    --color-info-border: var(--oxy-blue-600);
+    --color-info-text: var(--oxy-blue-300);
+
+    /* Categories (tags, labels, groupings); the label always stays visible */
+    --color-category-1-bg: var(--oxy-blue-900);
+    --color-category-1-border: var(--oxy-blue-700);
+    --color-category-1-text: var(--oxy-blue-300);
+    --color-category-2-bg: var(--oxy-indigo-900);
+    --color-category-2-border: var(--oxy-indigo-800);
+    --color-category-2-text: var(--oxy-indigo-300);
+    --color-category-3-bg: var(--oxy-purple-900);
+    --color-category-3-border: var(--oxy-purple-800);
+    --color-category-3-text: var(--oxy-purple-300);
+    --color-category-4-bg: var(--oxy-magenta-900);
+    --color-category-4-border: var(--oxy-magenta-800);
+    --color-category-4-text: var(--oxy-magenta-300);
+    --color-category-5-bg: var(--oxy-green-950);
+    --color-category-5-border: var(--oxy-green-800);
+    --color-category-5-text: var(--oxy-green-300);
+    --color-category-6-bg: var(--oxy-teal-900);
+    --color-category-6-border: var(--oxy-teal-800);
+    --color-category-6-text: var(--oxy-teal-300);
+    --color-category-7-bg: var(--oxy-orange-900);
+    --color-category-7-border: var(--oxy-orange-800);
+    --color-category-7-text: var(--oxy-orange-300);
+    --color-category-8-bg: var(--oxy-slate-750);
+    --color-category-8-border: var(--oxy-slate-600);
+    --color-category-8-text: var(--oxy-slate-150);
+
+    /* Shadows (--shadow-sm replaces Tailwind's default) */
+    --shadow-sm: 0 1px 3px rgb(var(--oxy-black-rgb) / 0.40);
+    --shadow-bar-top: 0 -2px 8px rgb(var(--oxy-black-rgb) / 0.40);
+    --shadow-elevated: 0 6px 16px rgb(var(--oxy-black-rgb) / 0.45);
+    --shadow-primary-hover: 0 4px 12px rgb(var(--oxy-blue-600-rgb) / 0.20);
   }
 }
 
@@ -215,6 +559,15 @@
   body {
     @apply bg-background text-foreground antialiased;
     font-family: var(--font-base);
+    /* Oxy base interface text: 14px on a 20px line, for anything without a size class. */
+    font-size: var(--text-300);
+    line-height: var(--leading-300);
+  }
+
+  /* Numbers in a table line up: every digit is the same width (Oxy: tabular figures on number columns). */
+  td,
+  th {
+    font-variant-numeric: tabular-nums;
   }
 
   h1,

@@ -22,7 +22,7 @@ export function FieldBlock({ field, entry, onChange }: { field: FormFieldRow; en
   const useList = field.input === 'LIST' && field.options.length > 0 && !entry.dne;
 
   return (
-    <fieldset className={clsx('rounded-md border p-300', entry.mark === 'CORRECTION_REQUIRED' ? 'border-warning' : 'border-border')}>
+    <fieldset className={clsx('rounded-md border p-300', entry.mark === 'CORRECTION_REQUIRED' ? 'border-warning-border' : 'border-border')}>
       <legend className="sr-only">{field.label}</legend>
       <div className="flex flex-wrap items-center gap-200">
         <span className="text-300 font-semibold">{field.label}</span>
@@ -54,7 +54,7 @@ export function FieldBlock({ field, entry, onChange }: { field: FormFieldRow; en
             onClick={() => set({ mark: entry.mark === m ? null : m })}
             className={clsx(
               'rounded-md border px-300 py-200 text-300 font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-              entry.mark === m ? (m === 'CORRECTION_REQUIRED' ? 'border-warning bg-warning text-warning-foreground' : m === 'VERIFIED_CORRECT' ? 'border-success bg-success text-success-foreground' : 'border-border bg-muted') : 'border-border bg-card hover:bg-accent'
+              entry.mark === m ? (m === 'CORRECTION_REQUIRED' ? 'border-warning-border bg-warning text-warning-foreground' : m === 'VERIFIED_CORRECT' ? 'border-success-border bg-success text-success-foreground' : 'border-border bg-muted') : 'border-border bg-card hover:bg-accent'
             )}
           >
             {MARK_LABEL[m]}

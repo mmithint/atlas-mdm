@@ -7,6 +7,8 @@ import { badge, button, card, input, inputCompact } from '@/components/ui';
 import { useHashRoute } from '@/hooks/use-hash-route';
 import { BLANK, formatDecimal, formatPercent, formatUtc, isBlank, orBlank } from '@/lib/format';
 
+import { ClassBadge } from './class-badge.component';
+import { FiredBadge, StatusBadge, VerifiedBadge } from './value-badges.component';
 import { COLUMNS, DEFAULT_COLUMNS, MAX_FILTER_TEXT, PAGE_SIZES, isFilterColumn, labelOf, type ColumnDef, type SearchColumn } from './columns';
 import type { SearchRow } from './equipment-api';
 import {
@@ -83,25 +85,28 @@ export function EquipmentSearch() {
         </div>
       ) : null}
 
-      <section aria-label="Search results" className={`${card} md:flex md:min-h-0 md:flex-1 md:flex-col`}>
-        <div className="flex shrink-0 flex-wrap items-center justify-between gap-300 border-b border-border px-400 py-300">
-          <h1 className="text-600 font-semibold">Equipment</h1>
-          {/* <Summary view={view} filtered={criteria.filters.length > 0} /> */}
-          <div className="flex flex-wrap items-center gap-300">
-            {anyFilter ? (
-              <button type="button" className={button.small} onClick={clear}>
-                <X aria-hidden="true" className="icon-size-200" />
-                Clear filters
-              </button>
-            ) : null}
-            <button type="button" className={button.small} onClick={search} aria-label="Search with the column filters" title="Search with the column filters">
-              <Search aria-hidden="true" className="icon-size-200" />
+      {/* The title and the toolbar sit above the table card, like the other pages' headers. */}
+      <div className="flex shrink-0 flex-wrap items-center justify-between gap-300">
+        <h1 className="text-600 font-semibold">Equipment</h1>
+        {/* <Summary view={view} filtered={criteria.filters.length > 0} /> */}
+        <div className="flex flex-wrap items-center gap-300">
+          {anyFilter ? (
+            <button type="button" className={button.small} onClick={clear}>
+              <X aria-hidden="true" className="icon-size-200" />
+              Clear filters
             </button>
-            <ColumnChooser visible={visible} onChange={setVisible} values={values} onValue={setValue} applied={filtered} onApply={search} />
-          </div>
+          ) : null}
+          <button type="button" className={button.small} onClick={search} aria-label="Search with the column filters" title="Search with the column filters">
+            <Search aria-hidden="true" className="icon-size-200" />
+          </button>
+          <ColumnChooser visible={visible} onChange={setVisible} values={values} onValue={setValue} applied={filtered} onApply={search} />
         </div>
+      </div>
 
-        <div className="p-400 md:flex md:min-h-0 md:flex-1 md:flex-col">
+      {/* The table runs to the card's edges. The card is only as tall as its rows and pager; with more
+          rows than fit, it stops at the bottom of the page and the table scrolls inside it. */}
+      <section aria-label="Search results" className={`${card} overflow-hidden md:flex md:min-h-0 md:flex-col`}>
+        <div className="md:flex md:min-h-0 md:flex-1 md:flex-col">
           {/* The header and the filter boxes stay on screen while loading, on an error and when nothing matches, so a filter can always be changed. */}
           <ResultTable
             rows={view.status === 'ready' ? view.rows : []}
@@ -112,17 +117,17 @@ export function EquipmentSearch() {
             onValue={setValue}
           />
           {view.status === 'loading' ? (
-            <div className="mt-400 shrink-0">
+            <div className="shrink-0 border-t border-border p-400">
               <LoadingState rows={6} label="Searching" />
             </div>
           ) : null}
           {view.status === 'error' ? (
-            <div className="mt-400 shrink-0">
+            <div className="shrink-0 border-t border-border p-400">
               <ErrorState title="The search failed" message={view.message} onRetry={view.retry} />
             </div>
           ) : null}
           {view.status === 'ready' && view.rows.length === 0 ? (
-            <div className="mt-400 shrink-0">
+            <div className="shrink-0 border-t border-border p-400">
               <NothingFound criteria={criteria} />
             </div>
           ) : null}
@@ -281,7 +286,7 @@ function ResultTable({
 }) {
   return (
     <div className="overflow-x-auto md:min-h-0 md:overflow-y-auto">
-      <table className="w-full min-w-max border-collapse text-300">
+      <table className="w-full min-w-max border-collapse text-250 leading-250">
         <caption className="sr-only">Heaters that match the search</caption>
         <thead className="sticky top-0 z-[1] bg-card">
           <tr className="bg-muted text-left text-200 uppercase tracking-wide text-muted-foreground">
@@ -359,6 +364,14 @@ function Cell({ column, row }: { column: ColumnDef; row: SearchRow }): ReactNode
           {String(value)}
         </a>
       );
+    case 'class':
+      return isBlank(value) ? <span className="text-muted-foreground">{BLANK}</span> : <ClassBadge value={String(value)} />;
+    case 'fired':
+      return isBlank(value) ? <span className="text-muted-foreground">{BLANK}</span> : <FiredBadge value={String(value)} />;
+    case 'status':
+      return isBlank(value) ? <span className="text-muted-foreground">{BLANK}</span> : <StatusBadge value={String(value)} />;
+    case 'verified':
+      return typeof value === 'number' ? <VerifiedBadge pct={value} /> : <span className="text-muted-foreground">{BLANK}</span>;
     case 'decimal':
       return <span className="tabular-nums">{formatDecimal(typeof value === 'number' ? value : null)}</span>;
     case 'percent':
@@ -394,7 +407,7 @@ function Pager({
 }) {
   // Rows per page on the left, the page controls on the right.
   return (
-    <nav aria-label="Pages" className="mt-400 flex shrink-0 flex-wrap items-center justify-between gap-300">
+    <nav aria-label="Pages" className="flex shrink-0 flex-wrap items-center justify-between gap-300 border-t border-border px-400 py-300">
       <label className="flex items-center gap-200 whitespace-nowrap text-200 text-muted-foreground">
         Rows per page
         <select className={`${input} w-auto py-100`} value={pageSize} onChange={(e) => onPageSize(Number(e.target.value))}>

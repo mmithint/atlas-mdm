@@ -276,7 +276,7 @@ function FieldsTables({ columns, ...request }: { columns: readonly (readonly Det
 function FieldsTable({ groups, ...request }: { groups: readonly DetailGroup[] } & RequestControls) {
   return (
     <div className={`${card} overflow-hidden`}>
-      <table className="w-full border-collapse text-300">
+      <table className="w-full border-collapse text-250 leading-250">
         <caption className="sr-only">{groups.map((g) => g.title).join(', ')}</caption>
         <thead>
           <tr className="bg-muted text-left text-200 uppercase tracking-wide text-muted-foreground">

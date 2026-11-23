@@ -9,13 +9,13 @@ import { badge, card } from './ui';
  * already use (S-2, S-3).
  */
 
-export const TABLE = 'w-full min-w-max border-collapse text-300';
+export const TABLE = 'w-full min-w-max border-collapse text-250 leading-250';
 export const HEAD_ROW = 'bg-muted text-left text-200 uppercase tracking-wide text-muted-foreground';
 export const TH = 'px-300 py-200 font-semibold';
 export const TD = 'px-300 py-200 align-top';
 export const ROW = 'border-t border-border';
 
-const DANGER_BADGE = 'inline-flex items-center rounded-sm bg-destructive px-200 py-100 text-200 font-medium text-destructive-foreground';
+const DANGER_BADGE = 'inline-flex items-center rounded-lg bg-danger-solid px-200-nudge py-100-nudge text-200 leading-200 font-medium text-on-danger';
 export type Tone = 'neutral' | 'warning' | 'success' | 'info' | 'danger';
 
 export function Pill({ tone, children, title }: { tone: Tone; children: ReactNode; title?: string }) {
@@ -116,7 +116,7 @@ export function Tabs<T extends string>({
               onClick={() => onChange(t.id)}
               className={clsx(
                 '-mb-px border-b-2 px-300 py-200 text-300 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-                selected ? 'border-primary font-medium text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'
+                selected ? 'border-ring font-medium text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'
               )}
             >
               {t.label}
