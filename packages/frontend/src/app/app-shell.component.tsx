@@ -88,6 +88,7 @@ export function AppShell() {
   const current = route.match?.route ?? null;
   const title = current?.title ?? 'Page not found';
   const fills = current !== null && FILL_SCREENS.has(current.id);
+  const fullWidth = fills || current?.id === 'equipment-detail';
 
   useEffect(() => {
     document.title = `${title} · ATLAS`;
@@ -178,8 +179,6 @@ export function AppShell() {
           </button>
           <div className="min-w-0 flex-1">
             <p className="truncate text-300 leading-300 text-muted-foreground">
-              {current?.screen ? <span className="id-plate mr-200">{current.screen}</span> : null}
-              {title}
               {PREVIEW_MODE && current && !isBuilt(current) ? (
                 <span className={`${badge.info} ml-200`} title={`Shown on sample data. Built for real in ${current.builtIn}.`}>
                   Preview · {current.builtIn} · sample data
@@ -225,7 +224,13 @@ export function AppShell() {
         {/* The page area scrolls, not the window. A list screen fills it instead, so only its table scrolls. */}
         <main className="min-h-0 flex-1 overflow-y-auto">
           {/* List screens use the full width for their wide tables; other pages keep a readable maximum width. */}
-          <div className={clsx('mx-auto w-full p-400 md:p-600', fills ? 'md:flex md:h-full md:flex-col' : 'max-w-7xl')}>
+          <div
+            className={clsx(
+              'mx-auto w-full p-400 md:p-600',
+              fills && 'md:flex md:h-full md:flex-col',
+              !fullWidth && 'max-w-7xl'
+            )}
+          >
             <Screen key={demoEpoch} route={route} canManageAdmin={canManageAdmin} />
           </div>
         </main>

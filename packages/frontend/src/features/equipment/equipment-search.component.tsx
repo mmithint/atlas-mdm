@@ -546,7 +546,7 @@ function Cell({ column, row }: { column: ColumnDef; row: SearchRow }): ReactNode
       return isBlank(value) ? (
         <span className="text-muted-foreground">{BLANK}</span>
       ) : (
-        <a className="id-plate text-brand-foreground underline-offset-2 hover:underline" href={hrefFor('/equipment', { facility: String(value) })} title="List every heater at this facility">
+        <a className="id-plate underline-offset-2 hover:underline" href={hrefFor('/equipment', { facility: String(value) })} title="List every heater at this facility">
           {String(value)}
         </a>
       );

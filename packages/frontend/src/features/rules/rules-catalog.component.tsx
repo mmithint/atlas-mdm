@@ -116,7 +116,7 @@ function CatalogTable({ data, text, filter }: { data: CatalogData; text: string;
             return (
               <tr key={r.ruleId} className={`${ROW} hover:bg-hover`}>
                 <td className={TD}>
-                  <a href={hrefFor(`/rules/${encodeURIComponent(r.ruleId)}`)} className="id-plate text-brand-foreground hover:underline">
+                  <a href={hrefFor(`/rules/${encodeURIComponent(r.ruleId)}`)} className="id-plate hover:underline">
                     {r.ruleId}
                   </a>
                   <p className="mt-100 text-200 text-muted-foreground">{r.ruleName}</p>

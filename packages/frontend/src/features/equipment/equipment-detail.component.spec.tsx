@@ -61,40 +61,67 @@ describe('S-5 Equipment detail', () => {
     expect(screen.getAllByText('SYN-EQ-0001').length).toBeGreaterThan(0);
   });
 
-  it('lists the catalogue fields, key fields first, with the unit and no trailing zeros', async () => {
+  it('groups the equipment data into responsive cards, with the unit and no trailing zeros', async () => {
     fetchHeater.mockResolvedValue(heaterDetail());
     renderDetail();
     await screen.findByRole('heading', { level: 1 });
 
-    const left = screen.getByRole('table', { name: 'Identity, Location, Key fields' });
-    const right = screen.getByRole('table', { name: 'Classification, Business, Additional details' });
-    for (const title of ['Identity', 'Location', 'Key fields']) expect(within(left).getByText(title)).toBeInTheDocument();
-    for (const title of ['Classification', 'Business', 'Additional details']) expect(within(right).getByText(title)).toBeInTheDocument();
+    for (const title of ['Identity', 'Location', 'Key fields', 'Classification', 'Business', 'Additional details']) {
+      expect(screen.getByRole('region', { name: title })).toBeInTheDocument();
+    }
 
-    const duty = within(left).getByRole('row', { name: /Heat duty/ });
-    expect(within(duty).getAllByText(/2\.5 MMBTU\/hr/).length).toBeGreaterThan(0);
-    expect(within(duty).queryByText(/2\.5000/)).toBeNull();
-    // all four catalogue fields of the fixture are in the tables, next to the heater's own columns
-    expect(within(left).getByRole('row', { name: /Manufacturer/ })).toBeInTheDocument();
-    expect(within(right).getByRole('button', { name: 'Request a change to FLOC class' })).toBeInTheDocument();
+    const keyFields = screen.getByRole('region', { name: 'Key fields' });
+    expect(within(keyFields).getByText(/2\.5 MMBTU\/hr/)).toBeInTheDocument();
+    expect(within(keyFields).queryByText(/2\.5000/)).toBeNull();
+    expect(within(keyFields).getByText('Manufacturer')).toBeInTheDocument();
+    const additionalDetails = screen.getByRole('region', { name: 'Additional details' });
+    expect(within(additionalDetails).getByRole('button', { name: 'Request a change to FLOC class' })).toBeInTheDocument();
   });
 
-  it('shows only the field and its current value, with no baseline or approval-route columns', async () => {
+  it('uses accessible field-value groups and makes editable fields explicit', async () => {
     fetchHeater.mockResolvedValue(heaterDetail());
     renderDetail();
     await screen.findByRole('heading', { level: 1 });
-    for (const table of screen.getAllByRole('table')) {
-      expect(within(table).getAllByRole('columnheader').map((h) => h.textContent)).toEqual(['Field', 'Current value']);
-    }
+    expect(screen.getByRole('heading', { name: 'Equipment information' })).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: /Request a change to/ })).toHaveLength(4);
+    expect(screen.queryByText('Responsible')).toBeNull();
+    expect(screen.queryByText('Accountable')).toBeNull();
+  });
+
+  it('defaults to the scan-friendly cards and keeps the grouped list available', async () => {
+    fetchHeater.mockResolvedValue(heaterDetail());
+    renderDetail();
+    await screen.findByRole('heading', { level: 1 });
+
+    const layoutSwitch = screen.getByRole('group', { name: 'Equipment information layout' });
+    const listButton = within(layoutSwitch).getByRole('button', { name: 'List view' });
+    const cardButton = within(layoutSwitch).getByRole('button', { name: 'Card view' });
+    expect(listButton).toHaveAttribute('aria-pressed', 'false');
+    expect(cardButton).toHaveAttribute('aria-pressed', 'true');
+    const identity = screen.getByRole('region', { name: 'Identity' });
+    expect(within(identity).getByText('Equipment number')).toBeInTheDocument();
+    expect(within(identity).getByText('Engineering tag')).toBeInTheDocument();
+    expect(within(identity).getByText('SYN-EQ-0001')).toHaveClass('id-plate');
+    expect(within(identity).getByText('SYN-SN-0001')).toHaveClass('id-plate');
+    expect(within(identity).queryByRole('button')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Request a change to Engineering tag' })).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: /Request a change to/ })).toHaveLength(4);
+
+    fireEvent.click(listButton);
+    expect(listButton).toHaveAttribute('aria-pressed', 'true');
+    expect(cardButton).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByRole('region', { name: 'Additional details' })).toBeInTheDocument();
   });
 
   it("shows the heater's own columns in the Identity, Location, Classification and Business groups", async () => {
     fetchHeater.mockResolvedValue(heaterDetail());
     renderDetail();
     await screen.findByRole('heading', { level: 1 });
-    const identity = screen.getByRole('row', { name: /Equipment number/ });
+    const identity = screen.getByRole('region', { name: 'Identity' });
     expect(within(identity).getByText('SYN-EQ-0001')).toBeInTheDocument();
-    expect(within(identity).queryByRole('button')).toBeNull(); // read-only: no request button
+    expect(within(identity).queryByRole('button')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Request a change to Engineering tag' })).toBeInTheDocument();
+    expect(within(identity).queryByRole('button', { name: 'Request a change to Equipment number' })).toBeNull();
   });
 
   it('shows the FLOC hierarchy and links the facility to the drill-down', async () => {
@@ -105,32 +132,32 @@ describe('S-5 Equipment detail', () => {
     expect(screen.getByRole('link', { name: 'SYN-FL-AREA-01' })).toHaveAttribute('href', '#/equipment?facility=SYN-FL-AREA-01');
   });
 
-  it('says what is still to come, without the history card that is now a real section', async () => {
+  it('keeps the page focused on available workflows instead of prototype placeholders', async () => {
     fetchHeater.mockResolvedValue(heaterDetail());
     renderDetail();
     await screen.findByRole('heading', { level: 1 });
-    for (const name of ['Rule results', 'Verification', 'Evidence']) {
-      expect(screen.getByRole('region', { name: `${name}, not built yet` })).toBeInTheDocument();
-    }
-    expect(screen.queryByRole('region', { name: 'History and requests, not built yet' })).toBeNull();
+    expect(screen.getByRole('heading', { name: 'Change requests' })).toBeInTheDocument();
+    expect(screen.queryByText('Still to come on this page')).toBeNull();
   });
 
-  it('says so when the golden record has no approved change yet', async () => {
+  it('shows record provenance and says when there is no approved change yet', async () => {
     fetchHeater.mockResolvedValue(heaterDetail());
     renderDetail();
-    expect(await screen.findByText(/none yet \(the values are the SAP baseline\)/)).toBeInTheDocument();
+    expect(await screen.findByText('No approved changes yet')).toBeInTheDocument();
+    expect(screen.getByText('Version 1')).toBeInTheDocument();
+    expect(screen.getByText(/1 Jan 2000/)).toBeInTheDocument();
   });
 
   it('says there is no such heater, and does not ask the server for a broken id', async () => {
     renderDetail('abc');
-    expect(await screen.findByText('No such heater')).toBeInTheDocument();
+    expect(await screen.findByText('Equipment not found')).toBeInTheDocument();
     expect(fetchHeater).not.toHaveBeenCalled();
   });
 
   it('says there is no such heater for an unknown id', async () => {
     fetchHeater.mockResolvedValue(null);
     renderDetail('999999');
-    expect(await screen.findByText('No such heater')).toBeInTheDocument();
+    expect(await screen.findByText('Equipment not found')).toBeInTheDocument();
     expect(fetchHeater).toHaveBeenCalledWith(999999);
   });
 
@@ -150,6 +177,8 @@ describe('S-5 Equipment detail', () => {
       renderDetail();
       await screen.findByRole('heading', { level: 1 });
       await waitFor(() => expect(header()).toBeEnabled());
+      expect(header()).toHaveAttribute('title', 'Propose an update to any editable field.');
+      expect(screen.queryByText('Propose an update to any editable field.')).toBeNull();
       for (const b of screen.getAllByRole('button', { name: /Request a change to/ })) expect(b).toBeEnabled();
     });
 
@@ -223,7 +252,7 @@ describe('S-5 Equipment detail', () => {
       expect(await screen.findByRole('heading', { level: 1, name: 'SYN-TAG-0001' })).toBeInTheDocument();
       await waitFor(() => expect(header()).toHaveAttribute('title', expect.stringMatching(/options said no/)));
       expect(header()).toBeDisabled();
-      expect(screen.getAllByRole('table')).toHaveLength(2);
+      expect(screen.getByRole('region', { name: 'Identity' })).toBeInTheDocument();
     });
 
     it('waits while the options load, with a reason', async () => {

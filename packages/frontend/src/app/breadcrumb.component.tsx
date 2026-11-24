@@ -4,7 +4,7 @@ import { hrefFor } from './router';
 import { breadcrumbOf, type ScreenId } from './routes';
 
 /**
- * Where this page sits, under the page title in the header: Home, the list it belongs to, then the page.
+ * Where this page sits in the header: Home, the list it belongs to, then the page.
  * Every step but the last is a link; the last is the page itself (aria-current).
  */
 export function Breadcrumb({ current }: { current: ScreenId }) {

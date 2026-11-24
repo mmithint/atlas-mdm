@@ -24,6 +24,7 @@ describe('S-5 Requests on this heater', () => {
 
     const table = await screen.findByRole('table', { name: 'Change requests on this heater' });
     expect(fetchEquipmentRequests).toHaveBeenCalledWith(1);
+    expect(screen.getByLabelText('2 change requests')).toHaveTextContent('2 requests');
     const first = within(table).getByRole('row', { name: /CR-000005/ });
     expect(within(first).getByRole('link', { name: 'CR-000005' })).toHaveAttribute('href', '#/requests/5');
     expect(within(first).getByText('Manufacturer')).toBeInTheDocument();
@@ -67,7 +68,7 @@ describe('S-5 Requests on this heater', () => {
     render(<EquipmentRequests equipmentId={1} reloadKey={0} />);
     expect(await screen.findByRole('alert')).toHaveTextContent('the read failed');
     expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Requests on this heater' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Change requests' })).toBeInTheDocument();
   });
 
   it('reads again when reloadKey changes (a request was just created)', async () => {

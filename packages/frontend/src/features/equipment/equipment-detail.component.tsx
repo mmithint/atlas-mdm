@@ -1,4 +1,4 @@
-import { ArrowLeft, Pencil } from 'lucide-react';
+import { Briefcase, Fingerprint, Key, LayoutGrid, List, ListPlus, MapPin, Pencil, Tags } from 'lucide-react';
 import { useMemo, useState, type ReactNode } from 'react';
 
 import { useProfile } from '@/app/profile.context';
@@ -16,10 +16,9 @@ import { RequestDialog } from './request-dialog.component';
 import { buildFieldChoices, submitBlockReason, type AccessInput } from './request-dialog-model';
 
 /**
- * S-5 Equipment detail (POC-APP-06): the golden record of one heater, who answers and who
- * signs off for every field, the change requests on it, and honest placeholders for what later
- * phases add (rule results, verification, evidence). Reading changes nothing; "Request change"
- * (APP-4) opens a dialog whose submit goes through the request function and procedure.
+ * S-5 Equipment detail (POC-APP-06): the golden record of one heater and the change requests
+ * associated with it. Reading changes nothing; "Request change" (APP-4) opens a dialog whose
+ * submit goes through the request function and procedure.
  */
 export function EquipmentDetail({ idText }: { idText: string }) {
   const valid = /^\d+$/.test(idText);
@@ -28,24 +27,17 @@ export function EquipmentDetail({ idText }: { idText: string }) {
 
   return (
     <div className="space-y-400">
-      <nav aria-label="Breadcrumb">
-        <a className="inline-flex items-center gap-100 text-300 font-medium text-brand-foreground underline-offset-2 hover:underline" href={hrefFor('/equipment')}>
-          <ArrowLeft aria-hidden="true" className="icon-size-200" />
-          Equipment
-        </a>
-      </nav>
-
-      {state.status === 'loading' ? <LoadingState rows={6} label="Loading the heater" /> : null}
+      {state.status === 'loading' ? <LoadingState rows={6} label="Loading the equipment record" /> : null}
       {state.status === 'error' ? (
-        <ErrorState title="The heater could not be loaded" message={state.message} onRetry={state.retry} />
+        <ErrorState title="The equipment record could not be loaded" message={state.message} onRetry={state.retry} />
       ) : null}
       {state.status === 'ready' && state.data === null ? (
         <EmptyState
-          title="No such heater"
-          hint={`There is no heater with the id "${idText}". It may have been removed, or the link is wrong.`}
+          title="Equipment not found"
+          hint={`There is no equipment record with the id "${idText}". It may have been removed, or the link is wrong.`}
           action={
             <a className={button.secondary} href={hrefFor('/equipment')}>
-              Search for a heater
+              Back to equipment
             </a>
           }
         />
@@ -99,54 +91,54 @@ function Heater({ detail }: { detail: HeaterDetail }) {
 
   return (
     <>
-      <header className="flex flex-wrap items-start justify-between gap-300">
-        <div className="min-w-0 flex">
-          <h1 className="break-words text-600 font-semibold">{title}</h1>
-          {/* <p className="mt-100 text-300 text-muted-foreground">{orBlank(heater.equipmentDescription)}</p> */}
-          <p className="ml-4 flex flex-wrap items-center gap-200">
-            {heater.equipmentNumber ? <span className="id-plate">{heater.equipmentNumber}</span> : null}
-            {heater.functionalLocation ? <span className="id-plate">{heater.functionalLocation}</span> : null}
-          </p>
+      <header className={`${card} overflow-hidden`}>
+        <div className="flex flex-col gap-300 p-400 sm:px-600 sm:pb-300 sm:pt-400 lg:flex-row lg:items-start lg:justify-between">
+          <div className="min-w-0 space-y-100">
+            <p className="text-200 font-semibold uppercase tracking-wide text-muted-foreground">Equipment record</p>
+            <div className="flex flex-wrap items-center gap-200">
+              <h1 className="min-w-0 break-words text-600 font-semibold leading-600">{title}</h1>
+              {heater.equipmentUserStatus ? <span className={badge.neutral}>{heater.equipmentUserStatus}</span> : null}
+            </div>
+            {heater.equipmentDescription ? (
+              <p className="max-w-3xl text-300 leading-300 text-muted-foreground">{heater.equipmentDescription}</p>
+            ) : null}
+          </div>
+
+          <button
+            type="button"
+            className={`${button.primary} w-full shrink-0 lg:w-auto`}
+            disabled={blockReason !== null}
+            title={blockReason ?? 'Propose an update to any editable field.'}
+            onClick={() => setDialog({ fieldCode: null })}
+          >
+            <Pencil aria-hidden="true" className="icon-size-200" />
+            Request change
+          </button>
         </div>
-        <button
-          type="button"
-          className={button.primary}
-          disabled={blockReason !== null}
-          title={blockReason ?? 'Propose a change to one of the fields below'}
-          onClick={() => setDialog({ fieldCode: null })}
-        >
-          <Pencil aria-hidden="true" className="icon-size-200" />
-          Request change
-        </button>
+
+        <dl className="grid gap-x-600 gap-y-300 px-400 pb-300 sm:grid-cols-2 sm:px-600 lg:grid-cols-3">
+          <RecordFact label="Equipment number" value={tag(heater.equipmentNumber)} />
+          <RecordFact label="Functional location" value={plate(heater.functionalLocation)} />
+          <RecordFact label="Facility" value={plate(heater.superiorFunctionalLocation)} />
+        </dl>
+
+        <dl className="grid gap-300 px-400 pb-400 pt-200 text-200 text-muted-foreground sm:grid-cols-3 sm:px-600">
+          <RecordMeta label="Golden record" value={heater.goldenVersionId ? `Version ${heater.goldenVersionId}` : BLANK} />
+          <RecordMeta label="Last approved change" value={heater.lastChangedAtUtc ? formatUtc(heater.lastChangedAtUtc) : 'No approved changes yet'} />
+          <RecordMeta label="SAP baseline" value={formatUtc(heater.baselineAsOfUtc)} />
+        </dl>
       </header>
 
-      <FieldsTables
+      <FieldsGroups
         columns={columns}
         requestBlock={(code) => blockReason ?? choiceByCode.get(code)?.unavailableReason ?? null}
         onRequest={(code) => setDialog({ fieldCode: code })}
       />
       {fields.length === 0 ? (
-        <EmptyState title="No catalogue fields to show" hint="The field catalogue is empty. Run the seed 0106 (field catalogue) in the database." />
+        <EmptyState title="No catalogue fields configured" hint="No additional catalogue fields are available for this equipment record." />
       ) : null}
 
-      {/* <p className="text-200 text-muted-foreground">
-        Golden record version {orBlank(heater.goldenVersionId)}. Last approved change:{' '}
-        {heater.lastChangedAtUtc ? formatUtc(heater.lastChangedAtUtc) : 'none yet (the values are the SAP baseline)'}.
-        SAP baseline taken {formatUtc(heater.baselineAsOfUtc)}.
-      </p> */}
-
       <EquipmentRequests equipmentId={heater.equipmentId} reloadKey={requestsReload} />
-
-      <section aria-labelledby="later-title" className="space-y-300">
-        <h2 id="later-title" className="text-400 font-semibold">
-          Still to come on this page
-        </h2>
-        <div className="grid gap-300 md:grid-cols-3">
-          <Later title="Rule results" phase="APP-5" text="Valid or Invalid badges from the business rules, each with a Fix button." />
-          <Later title="Verification" phase="APP-9" text="How many of the five key fields were verified, and when." />
-          <Later title="Evidence" phase="APP-7" text="Photos from the field and the P&ID drawings for this site." />
-        </div>
-      </section>
 
       {dialog !== null && options.status === 'ready' ? (
         <RequestDialog
@@ -162,7 +154,7 @@ function Heater({ detail }: { detail: HeaterDetail }) {
   );
 }
 
-/** One line of a table: a label and what to show as its value. */
+/** One field-value pair in a detail group. */
 interface DetailRow {
   label: string;
   value: ReactNode;
@@ -178,14 +170,32 @@ interface DetailGroup {
 const plate = (value: string | null | undefined): ReactNode => (value ? <span className="id-plate">{value}</span> : BLANK);
 const tag = (value: string | null | undefined): ReactNode => (value ? <span className={identifierBadge}>{value}</span> : BLANK);
 
+function RecordFact({ label, value }: { label: string; value: ReactNode }) {
+  return (
+    <div className="min-w-0">
+      <dt className="text-200 font-medium text-muted-foreground">{label}</dt>
+      <dd className="mt-100 min-w-0 break-words text-300 font-medium text-foreground">{value}</dd>
+    </div>
+  );
+}
+
+function RecordMeta({ label, value }: { label: string; value: ReactNode }) {
+  return (
+    <div className="flex min-w-0 flex-wrap items-baseline gap-x-100">
+      <dt>{label}:</dt>
+      <dd className="font-medium text-foreground">{value}</dd>
+    </div>
+  );
+}
+
 function summaryGroups(heater: HeaterDetail['heater'], levels: readonly string[]) {
   const facility = heater.superiorFunctionalLocation;
   const identity: DetailGroup = {
     title: 'Identity',
     rows: [
-      { label: 'Equipment number', value: plate(heater.equipmentNumber) },
+      { label: 'Equipment number', value: tag(heater.equipmentNumber) },
       { label: 'Engineering tag', value: tag(heater.equipmentTagNumber) },
-      { label: 'Serial number', value: plate(heater.manufacturerSerialNumber) },
+      { label: 'Serial number', value: tag(heater.manufacturerSerialNumber) },
       { label: 'Description', value: orBlank(heater.equipmentDescription) },
     ],
   };
@@ -197,7 +207,7 @@ function summaryGroups(heater: HeaterDetail['heater'], levels: readonly string[]
       {
         label: 'Facility (parent FLOC)',
         value: facility ? (
-          <a className="id-plate text-brand-foreground underline-offset-2 hover:underline" href={hrefFor('/equipment', { facility })} title="List every heater at this facility">
+          <a className="id-plate underline-offset-2 hover:underline" href={hrefFor('/equipment', { facility })} title="List every heater at this facility">
             {facility}
           </a>
         ) : (
@@ -242,7 +252,7 @@ function catalogueGroup(title: string, fields: readonly FieldRow[]): DetailGroup
   };
 }
 
-/** The two tables shown side by side, each a list of groups. Groups without rows are left out. */
+/** The two responsive columns of field groups. Groups without rows are left out. */
 function buildColumns(heater: HeaterDetail['heater'], levels: readonly string[], fields: readonly FieldRow[]): DetailGroup[][] {
   const { identity, location, classification, business } = summaryGroups(heater, levels);
   const keyFields = catalogueGroup('Key fields', fields.filter((f) => f.group === 'KEY'));
@@ -259,85 +269,174 @@ interface RequestControls {
   onRequest: (fieldCode: string) => void;
 }
 
-function FieldsTables({ columns, ...request }: { columns: readonly (readonly DetailGroup[])[] } & RequestControls) {
+function FieldsGroups({ columns, ...request }: { columns: readonly (readonly DetailGroup[])[] } & RequestControls) {
+  const [layout, setLayout] = useState<'list' | 'cards'>('cards');
+  const scanGroups = useMemo(() => columns.flat(), [columns]);
+
   return (
     <section aria-labelledby="fields-title" className="space-y-300">
-      <h2 id="fields-title" className="text-400 font-semibold">
-        Fields
-      </h2>
-      <div className="grid items-start gap-300 md:grid-cols-2">
-        {columns.map((groups) => (
-          <FieldsTable key={groups.map((g) => g.title).join()} groups={groups} {...request} />
-        ))}
+      <div className="flex flex-wrap items-start justify-between gap-300">
+        <div>
+          <h2 id="fields-title" className="text-400 font-semibold">
+            Equipment information
+          </h2>
+          <p className="mt-100 text-200 text-muted-foreground">Review the current record in the layout that works best for you.</p>
+        </div>
+
+        <div
+          role="group"
+          aria-label="Equipment information layout"
+          className="inline-flex rounded-lg border border-border bg-muted p-100"
+        >
+          <button
+            type="button"
+            aria-label="List view"
+            aria-pressed={layout === 'list'}
+            className={`inline-flex h-700 items-center gap-100 rounded-md px-200 text-200 font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring ${
+              layout === 'list' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:bg-hover hover:text-foreground'
+            }`}
+            onClick={() => setLayout('list')}
+          >
+            <List aria-hidden="true" className="icon-size-100" />
+            List
+          </button>
+          <button
+            type="button"
+            aria-label="Card view"
+            aria-pressed={layout === 'cards'}
+            className={`inline-flex h-700 items-center gap-100 rounded-md px-200 text-200 font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring ${
+              layout === 'cards' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:bg-hover hover:text-foreground'
+            }`}
+            onClick={() => setLayout('cards')}
+          >
+            <LayoutGrid aria-hidden="true" className="icon-size-100" />
+            Cards
+          </button>
+        </div>
       </div>
+
+      {layout === 'list' ? (
+        <div className="grid items-start gap-300 lg:grid-cols-2">
+          {columns.map((groups, columnIndex) => (
+            <div key={columnIndex} className="space-y-300">
+              {groups.map((group) => (
+                <FieldGroup key={group.title} group={group} {...request} />
+              ))}
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="space-y-300">
+          {scanGroups.map((group) => (
+            <ScanGroup key={group.title} group={group} {...request} />
+          ))}
+        </div>
+      )}
     </section>
   );
 }
 
-function FieldsTable({ groups, ...request }: { groups: readonly DetailGroup[] } & RequestControls) {
+function FieldGroup({ group, ...request }: { group: DetailGroup } & RequestControls) {
+  const headingId = `field-group-${group.title.toLowerCase().replace(/\s+/g, '-')}`;
   return (
-    <div className={`${card} overflow-hidden`}>
-      <table className="w-full border-collapse text-250 leading-250">
-        <caption className="sr-only">{groups.map((g) => g.title).join(', ')}</caption>
-        <thead>
-          <tr className="bg-muted text-left text-200 uppercase tracking-wide text-muted-foreground">
-            <th scope="col" className="px-400 py-200 font-semibold">Field</th>
-            <th scope="col" className="px-400 py-200 font-semibold">Current value</th>
-          </tr>
-        </thead>
-        {groups.map((g) => (
-          <tbody key={g.title}>
-            <tr>
-              <th scope="rowgroup" colSpan={2} className="bg-accent px-400 py-100 text-left text-200 font-semibold text-accent-foreground">
-                {g.title}
-              </th>
-            </tr>
-            {g.rows.map((row) => (
-              <FieldLine key={row.fieldCode ?? row.label} row={row} {...request} />
-            ))}
-          </tbody>
+    <section aria-labelledby={headingId} className={`${card} overflow-hidden`}>
+      <div className="flex items-center justify-between gap-200 border-b border-border bg-muted px-400 py-300">
+        <h3 id={headingId} className="text-300 font-semibold">{group.title}</h3>
+        <span className={badge.neutral}>{group.rows.length}</span>
+      </div>
+      <dl className="divide-y divide-divider">
+        {group.rows.map((row) => (
+          <FieldLine key={row.fieldCode ?? row.label} row={row} {...request} />
         ))}
-      </table>
-    </div>
+      </dl>
+    </section>
   );
 }
 
 function FieldLine({ row, requestBlock, onRequest }: { row: DetailRow } & RequestControls) {
   const { fieldCode } = row;
+  const block = fieldCode === undefined ? null : requestBlock(fieldCode);
   return (
-    <tr className="border-t border-divider align-top hover:bg-hover">
-      <th scope="row" className="px-400 py-300 text-left font-medium">
-        {row.label}
-      </th>
-      <td className="px-400 py-300">
-        <div className="flex items-start justify-between gap-200">
-          <span className="min-w-0 break-words">{row.value}</span>
-          {fieldCode !== undefined ? (
-            <button
-              type="button"
-              className={button.small}
-              disabled={requestBlock(fieldCode) !== null}
-              aria-label={`Request a change to ${row.label}`}
-              title={requestBlock(fieldCode) ?? `Request a change to ${row.label}`}
-              onClick={() => onRequest(fieldCode)}
-            >
-              <Pencil aria-hidden="true" className="icon-size-100" />
-            </button>
-          ) : null}
-        </div>
-      </td>
-    </tr>
+    <div className="grid gap-200 px-400 py-300 transition-colors hover:bg-hover sm:grid-cols-2 sm:items-start">
+      <dt className="text-250 font-medium leading-250 text-muted-foreground">{row.label}</dt>
+      <dd className="flex min-w-0 items-center justify-between gap-200 text-300 leading-300 text-foreground">
+        <span className="min-w-0 break-words">{row.value}</span>
+        {fieldCode !== undefined ? (
+          <button
+            type="button"
+            className={`${button.small} shrink-0`}
+            disabled={block !== null}
+            aria-label={`Request a change to ${row.label}`}
+            title={block ?? `Request a change to ${row.label}`}
+            onClick={() => onRequest(fieldCode)}
+          >
+            <Pencil aria-hidden="true" className="icon-size-100" />
+            Change
+          </button>
+        ) : null}
+      </dd>
+    </div>
   );
 }
 
-function Later({ title, phase, text }: { title: string; phase: string; text: string }) {
+function groupIcon(title: string): ReactNode {
+  const iconClass = 'icon-size-200';
+  switch (title) {
+    case 'Identity':
+      return <Fingerprint aria-hidden="true" className={iconClass} />;
+    case 'Location':
+      return <MapPin aria-hidden="true" className={iconClass} />;
+    case 'Key fields':
+      return <Key aria-hidden="true" className={iconClass} />;
+    case 'Classification':
+      return <Tags aria-hidden="true" className={iconClass} />;
+    case 'Business':
+      return <Briefcase aria-hidden="true" className={iconClass} />;
+    default:
+      return <ListPlus aria-hidden="true" className={iconClass} />;
+  }
+}
+
+function ScanGroup({ group, ...request }: { group: DetailGroup } & RequestControls) {
+  const headingId = `scan-field-group-${group.title.toLowerCase().replace(/\s+/g, '-')}`;
   return (
-    <section className="rounded-lg border border-dashed border-border bg-card p-400" aria-label={`${title}, not built yet`}>
-      <div className="flex items-center justify-between gap-200">
-        <h3 className="text-300 font-semibold">{title}</h3>
-        <span className={badge.neutral}>{phase}</span>
+    <section aria-labelledby={headingId} className={`${card} overflow-hidden`}>
+      <div className="flex items-center gap-200 border-b border-border px-400 py-300">
+        <span className="flex h-700 w-700 shrink-0 items-center justify-center rounded-lg bg-info text-info-foreground">
+          {groupIcon(group.title)}
+        </span>
+        <h3 id={headingId} className="text-300 font-semibold">{group.title}</h3>
       </div>
-      <p className="mt-200 text-200 text-muted-foreground">{text}</p>
+      <dl className="grid gap-x-600 gap-y-400 px-500 py-500 sm:grid-cols-2 lg:grid-cols-4">
+        {group.rows.map((row) => (
+          <ScanField key={row.fieldCode ?? row.label} row={row} {...request} />
+        ))}
+      </dl>
     </section>
+  );
+}
+
+function ScanField({ row, requestBlock, onRequest }: { row: DetailRow } & RequestControls) {
+  const { fieldCode } = row;
+  const block = fieldCode === undefined ? null : requestBlock(fieldCode);
+  return (
+    <div className="min-w-0">
+      <dt className="text-200 font-semibold leading-200 text-muted-foreground">{row.label}</dt>
+      <dd className="mt-200 flex min-w-0 items-center gap-100 text-300 leading-300 text-foreground">
+        <span className="min-w-0 break-words">{row.value}</span>
+        {fieldCode !== undefined ? (
+          <button
+            type="button"
+            className="inline-flex h-700 w-700 shrink-0 items-center justify-center rounded-lg border border-transparent text-brand-foreground transition-colors hover:border-border hover:bg-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:cursor-not-allowed disabled:text-disabled-foreground"
+            disabled={block !== null}
+            aria-label={`Request a change to ${row.label}`}
+            title={block ?? `Request a change to ${row.label}`}
+            onClick={() => onRequest(fieldCode)}
+          >
+            <Pencil aria-hidden="true" className="icon-size-100" />
+          </button>
+        ) : null}
+      </dd>
+    </div>
   );
 }

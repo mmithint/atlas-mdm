@@ -261,7 +261,7 @@ function RelatedTable({ rows }: { rows: readonly RelatedRow[] }) {
               {rows.map((row) => (
                 <tr key={row.requestId} className="border-t border-divider align-top hover:bg-hover">
                   <th scope="row" className="px-300 py-200 text-left font-medium">
-                    <a className="id-plate text-brand-foreground underline-offset-2 hover:underline" href={hrefFor(`/requests/${row.requestId}`)}>
+                    <a className="id-plate underline-offset-2 hover:underline" href={hrefFor(`/requests/${row.requestId}`)}>
                       {row.requestRef}
                     </a>
                   </th>

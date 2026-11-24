@@ -86,6 +86,10 @@ describe('App shell', () => {
     const crumbs = screen.getByRole('navigation', { name: 'Breadcrumb' });
     expect(within(crumbs).getByRole('link', { name: 'Home' })).toHaveAttribute('href', '#/');
     expect(within(crumbs).getByText('Rules')).toHaveAttribute('aria-current', 'page');
+    const header = screen.getByLabelText('Signed in as').closest('header');
+    expect(header).not.toBeNull();
+    expect(within(header!).queryByText('S-9')).toBeNull();
+    expect(within(header!).getAllByText('Rules')).toHaveLength(1);
 
     window.location.hash = '#/rules/RULE_X';
     expect(await within(screen.getByRole('navigation', { name: 'Breadcrumb' })).findByRole('link', { name: 'Rules' })).toHaveAttribute('href', '#/rules');
@@ -172,5 +176,12 @@ describe('App shell', () => {
     renderShell(async () => PROFILE);
     await screen.findByLabelText('Signed in as');
     expect(document.title).toBe('Rules · ATLAS');
+  });
+
+  it('lets the equipment detail screen use the full content width', async () => {
+    window.location.hash = '#/equipment/1';
+    renderShell(async () => PROFILE);
+    await screen.findByLabelText('Signed in as');
+    expect(screen.getByRole('main').firstElementChild).not.toHaveClass('max-w-7xl');
   });
 });

@@ -434,7 +434,7 @@ function Line({
       ) : null}
 
       <td className="whitespace-nowrap px-200 py-300">
-        <a className="id-plate font-medium text-brand-foreground underline-offset-2 hover:underline" href={hrefFor(`/requests/${row.requestId}`)}>
+        <a className="id-plate font-medium underline-offset-2 hover:underline" href={hrefFor(`/requests/${row.requestId}`)}>
           {row.requestRef}
         </a>
         {/* <div className="mt-100">

@@ -38,13 +38,20 @@ export function EquipmentRequests({ equipmentId, reloadKey }: { equipmentId: num
 
   return (
     <section aria-labelledby="requests-title" className={card}>
-      <div className="border-b border-border px-400 py-300">
-        <h2 id="requests-title" className="text-400 font-semibold">
-          Requests on this heater
-        </h2>
-        {/* <p className="mt-100 text-200 text-muted-foreground">
-          Every change proposed to this heater or to its functional location, open requests first. Open one to see who approved what.
-        </p> */}
+      <div className="flex flex-wrap items-start justify-between gap-300 border-b border-border px-400 py-300">
+        <div>
+          <h2 id="requests-title" className="text-400 font-semibold">
+            Change requests
+          </h2>
+          <p className="mt-100 text-200 text-muted-foreground">
+            Proposed updates for this equipment and its functional location, with open requests first.
+          </p>
+        </div>
+        {state.status === 'ready' ? (
+          <span className={badge.neutral} aria-label={`${state.data.totalCount} change requests`}>
+            {state.data.totalCount} {state.data.totalCount === 1 ? 'request' : 'requests'}
+          </span>
+        ) : null}
       </div>
 
       <div className="p-400">
@@ -53,7 +60,7 @@ export function EquipmentRequests({ equipmentId, reloadKey }: { equipmentId: num
           <ErrorState title="The requests could not be loaded" message={state.message} onRetry={state.retry} />
         ) : null}
         {state.status === 'ready' && state.data.rows.length === 0 ? (
-          <EmptyState title="No requests yet" hint="Nobody has proposed a change to this heater or its location." />
+          <EmptyState title="No requests yet" hint="Nobody has proposed a change to this equipment record or its location." />
         ) : null}
         {state.status === 'ready' && state.data.rows.length > 0 ? (
           <RequestsTable rows={state.data.rows} totalCount={state.data.totalCount} />
@@ -66,61 +73,63 @@ export function EquipmentRequests({ equipmentId, reloadKey }: { equipmentId: num
 function RequestsTable({ rows, totalCount }: { rows: readonly RelatedRequestRow[]; totalCount: number }) {
   return (
     <>
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-max border-collapse text-250 leading-250">
-          <caption className="sr-only">Change requests on this heater</caption>
-          <thead>
-            <tr className="bg-muted text-left text-200 uppercase tracking-wide text-muted-foreground">
-              <th scope="col" className="px-300 py-200 font-semibold">Request</th>
-              <th scope="col" className="px-300 py-200 font-semibold">Field</th>
-              <th scope="col" className="px-300 py-200 font-semibold">Status</th>
-              <th scope="col" className="px-300 py-200 font-semibold">Source</th>
-              <th scope="col" className="px-300 py-200 font-semibold">Submitted</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((r) => {
-              const status = statusBadge(r.requestStatus);
-              return (
-                <tr key={r.requestId} className="border-t border-divider align-top hover:bg-hover">
-                  <th scope="row" className="px-300 py-200 text-left font-medium">
-                    <a
-                      className="id-plate text-brand-foreground underline-offset-2 hover:underline"
-                      href={hrefFor(`/requests/${r.requestId}`)}
-                    >
-                      {r.requestRef}
-                    </a>
-                  </th>
-                  <td className="px-300 py-200">
-                    <span className="flex flex-wrap items-center gap-200">
-                      {r.fieldLabel ?? r.fieldCode ?? BLANK}
-                      {r.equipmentId === null ? (
-                        <span className={badge.neutral} title="This request is about the functional location, not the heater itself">
-                          location
-                        </span>
-                      ) : null}
-                    </span>
-                  </td>
-                  <td className="px-300 py-200">
-                    <span className="flex flex-wrap items-center gap-200">
-                      <span className={status.className}>{status.text}</span>
-                      {r.otherOpenRequestsSameField > 0 ? (
-                        <span
-                          className={badge.warning}
-                          title={`${r.otherOpenRequestsSameField} other open request(s) target the same field`}
-                        >
-                          overlaps another open request
-                        </span>
-                      ) : null}
-                    </span>
-                  </td>
-                  <td className="px-300 py-200">{orBlank(r.sourceLabel)}</td>
-                  <td className="px-300 py-200 text-muted-foreground">{formatUtc(r.requestedAtUtc)}</td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+      <div className="overflow-hidden rounded-lg border border-border">
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-max border-collapse text-250 leading-250">
+            <caption className="sr-only">Change requests on this heater</caption>
+            <thead>
+              <tr className="bg-muted text-left text-200 uppercase tracking-wide text-muted-foreground">
+                <th scope="col" className="px-300 py-200 font-semibold">Request</th>
+                <th scope="col" className="px-300 py-200 font-semibold">Field</th>
+                <th scope="col" className="px-300 py-200 font-semibold">Status</th>
+                <th scope="col" className="px-300 py-200 font-semibold">Source</th>
+                <th scope="col" className="px-300 py-200 font-semibold">Submitted</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r) => {
+                const status = statusBadge(r.requestStatus);
+                return (
+                  <tr key={r.requestId} className="border-t border-divider align-top hover:bg-hover">
+                    <th scope="row" className="px-300 py-200 text-left font-medium">
+                      <a
+                        className="id-plate underline-offset-2 hover:underline"
+                        href={hrefFor(`/requests/${r.requestId}`)}
+                      >
+                        {r.requestRef}
+                      </a>
+                    </th>
+                    <td className="px-300 py-200">
+                      <span className="flex flex-wrap items-center gap-200">
+                        {r.fieldLabel ?? r.fieldCode ?? BLANK}
+                        {r.equipmentId === null ? (
+                          <span className={badge.neutral} title="This request is about the functional location, not the heater itself">
+                            location
+                          </span>
+                        ) : null}
+                      </span>
+                    </td>
+                    <td className="px-300 py-200">
+                      <span className="flex flex-wrap items-center gap-200">
+                        <span className={status.className}>{status.text}</span>
+                        {r.otherOpenRequestsSameField > 0 ? (
+                          <span
+                            className={badge.warning}
+                            title={`${r.otherOpenRequestsSameField} other open request(s) target the same field`}
+                          >
+                            overlaps another open request
+                          </span>
+                        ) : null}
+                      </span>
+                    </td>
+                    <td className="px-300 py-200">{orBlank(r.sourceLabel)}</td>
+                    <td className="px-300 py-200 text-muted-foreground">{formatUtc(r.requestedAtUtc)}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       </div>
       {totalCount > rows.length ? (
         <p className="mt-300 text-200 text-muted-foreground">

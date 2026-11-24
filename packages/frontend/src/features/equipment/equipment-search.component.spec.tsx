@@ -46,7 +46,7 @@ describe('S-4 Equipment search', () => {
 
     const tag = await screen.findByRole('link', { name: 'SYN-TAG-0001' });
     expect(tag).toHaveAttribute('href', '#/equipment/1');
-    expect(tag).toHaveClass('rounded-lg', 'border-info-border', 'bg-info');
+    expect(tag).toHaveClass('id-plate');
     const facility = screen.getAllByRole('link', { name: 'SYN-FL-AREA-01' })[0];
     expect(facility).toHaveAttribute('href', '#/equipment?facility=SYN-FL-AREA-01');
   });

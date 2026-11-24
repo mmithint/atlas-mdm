@@ -92,8 +92,8 @@ export const ROUTES: readonly RouteDef[] = [
   {
     id: 'equipment-detail',
     screen: 'S-5',
-    title: 'Heater',
-    summary: 'Everything about one heater: its golden record, who owns each field, and what is still to come.',
+    title: 'Equipment details',
+    summary: 'The golden record, grouped field values, provenance and change requests for one equipment item.',
     pattern: '/equipment/:id',
     inMenu: false,
     needsAdmin: false,

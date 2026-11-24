@@ -651,17 +651,56 @@
 }
 
 /* Identifiers (engineering tag, serial number, equipment number, FLOC) are what field
-   people search for, so they are set like an engraved nameplate: monospace, a thin
-   border, a slightly raised surface. Use on a <span> or <a>. */
+   people search for. A static identifier is a neutral grey chip; the same class on a
+   link or button becomes blue so colour communicates that it is actionable. */
 @utility id-plate {
+  display: inline-flex;
+  align-items: center;
   font-family: var(--font-monospace);
   font-size: var(--text-200);
+  font-weight: 500;
+  line-height: var(--leading-200);
   letter-spacing: 0.02em;
-  padding: 1px var(--spacing-200-nudge);
+  padding: var(--spacing-100-nudge) var(--spacing-200-nudge);
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  background: var(--color-card);
+  border-radius: var(--radius-lg);
+  background: var(--color-muted);
+  color: var(--color-muted-foreground);
   white-space: nowrap;
+}
+
+/* Keep the interactive override in the utilities layer with id-plate. A lower
+   cascade layer cannot override a utility, even with a more specific selector. */
+@layer utilities {
+  a.id-plate,
+  button.id-plate {
+    cursor: pointer;
+    border-color: var(--color-info-border);
+    background: var(--color-info-bg);
+    color: var(--color-info-text);
+    transition: color 150ms, background-color 150ms, border-color 150ms;
+  }
+
+  a.id-plate:hover,
+  button.id-plate:hover {
+    border-color: var(--color-border-selected);
+    background: var(--color-selected);
+    color: var(--color-selected-foreground);
+  }
+
+  a.id-plate:focus-visible,
+  button.id-plate:focus-visible {
+    outline: var(--spacing-100-nudge) solid var(--color-ring);
+    outline-offset: var(--spacing-100-nudge);
+    box-shadow: 0 0 0 var(--spacing-100) var(--color-focus-ring);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    a.id-plate,
+    button.id-plate {
+      transition: none;
+    }
+  }
 }
 
 html,
