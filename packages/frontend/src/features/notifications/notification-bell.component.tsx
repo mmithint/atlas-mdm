@@ -25,7 +25,23 @@ type Settled =
  * There is NO "mark as read" yet (it comes with the notifications page, APP-8). So the number means "not yet
  * marked as read", it does not go down by itself, and the popover says so instead of pretending it can be cleared.
  */
-export function NotificationBell({ refreshKey }: { refreshKey: string }) {
+/** Where the pop-up opens: under the bell (header), or beside the navigation rail at its foot (sidebar). */
+const POPOVER = {
+  header: 'absolute right-0 top-full mt-100 w-screen max-w-sm',
+  // A phone shows the rail as a full-height drawer, so the pop-up is a sheet along the foot of the screen there.
+  sidebar: 'fixed inset-x-400 bottom-400 md:absolute md:inset-x-auto md:bottom-0 md:left-full md:ml-300 md:w-screen md:max-w-sm',
+} as const;
+
+export function NotificationBell({
+  refreshKey,
+  placement = 'header',
+  showLabel = false,
+}: {
+  refreshKey: string;
+  placement?: keyof typeof POPOVER;
+  /** Write "Notifications" beside the bell (the expanded rail). */
+  showLabel?: boolean;
+}) {
   const [open, setOpen] = useState(false);
   const [opened, setOpened] = useState(0);
   const [settled, setSettled] = useState<Settled | null>(null);
@@ -78,13 +94,21 @@ export function NotificationBell({ refreshKey }: { refreshKey: string }) {
           if (!open) setOpened((n) => n + 1);
           setOpen(!open);
         }}
-        className="relative rounded-md p-200 hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        className={clsx(
+          'relative inline-flex items-center gap-200 rounded-md p-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+          placement === 'sidebar' ? 'hover:bg-sidebar-accent' : 'hover:bg-accent',
+          showLabel && 'w-full text-300'
+        )}
       >
-        <Bell aria-hidden="true" className="icon-size-300" />
+        <Bell aria-hidden="true" className="icon-size-300 shrink-0" />
+        {showLabel ? <span className="flex-1 text-left">Notifications</span> : null}
         {unread > 0 ? (
           <span
             aria-hidden="true"
-            className="absolute -right-100 -top-100 min-w-500 rounded-full bg-warning-solid px-100 text-center text-200 font-semibold leading-none text-on-warning"
+            className={clsx(
+              'min-w-500 rounded-full bg-warning-solid px-100 text-center text-200 font-semibold leading-none text-on-warning',
+              showLabel ? 'py-100' : 'absolute -right-100 -top-100'
+            )}
           >
             {unread > 99 ? '99+' : unread}
           </span>
@@ -95,7 +119,7 @@ export function NotificationBell({ refreshKey }: { refreshKey: string }) {
         <div
           role="region"
           aria-label="Your notifications"
-          className="absolute right-0 top-full z-40 mt-100 w-screen max-w-sm rounded-lg border border-border bg-popover text-popover-foreground shadow-elevated"
+          className={clsx('z-50 rounded-lg border border-border bg-popover text-popover-foreground shadow-elevated', POPOVER[placement])}
         >
           <div className="border-b border-border px-300 py-200">
             <p className="text-300 font-semibold">Notifications</p>

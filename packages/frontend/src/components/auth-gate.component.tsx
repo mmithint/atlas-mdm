@@ -90,7 +90,7 @@ export function AuthGate({ children }: AuthGateProps) {
   if (error && !canSignIn) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background p-4">
-        <div className="w-full max-w-md rounded-xl border border-border bg-card p-6 text-center shadow-elevated">
+        <div className="w-full max-w-md rounded-lg border border-border bg-card p-6 text-center shadow-elevated">
           <p className="mb-2 text-200 leading-200 font-semibold uppercase tracking-wider text-link">
             Fabric App
           </p>
@@ -106,7 +106,7 @@ export function AuthGate({ children }: AuthGateProps) {
   if (!isAuthenticated && canSignIn) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background p-4">
-        <div className="w-full max-w-md rounded-xl border border-border bg-card p-6 text-center shadow-elevated">
+        <div className="w-full max-w-md rounded-lg border border-border bg-card p-6 text-center shadow-elevated">
           <div
             aria-hidden="true"
             className="mx-auto mb-4 grid h-10 w-10 grid-cols-2 gap-0.5"

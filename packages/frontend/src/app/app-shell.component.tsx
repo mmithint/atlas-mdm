@@ -1,4 +1,4 @@
-import { Menu, Moon, PanelLeftClose, PanelLeftOpen, Sun, UserRound, X } from 'lucide-react';
+import { Menu, PanelLeftClose, PanelLeftOpen, X } from 'lucide-react';
 import clsx from 'clsx';
 import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
 
@@ -7,8 +7,8 @@ import { badge } from '@/components/ui';
 import { NotificationBell } from '@/features/notifications/notification-bell.component';
 import { useAuth } from '@/hooks/auth.context';
 import { useHashRoute } from '@/hooks/use-hash-route';
-import { useTheme } from '@/hooks/theme.context';
 
+import { AccountMenu } from './account-menu.component';
 import { Breadcrumb } from './breadcrumb.component';
 import { Nav } from './nav.component';
 import { PREVIEW_MODE } from './preview';
@@ -57,16 +57,14 @@ const DemoControls =
   import.meta.env.DEV && import.meta.env.MODE === 'mock' ? lazy(() => import('@/dev-mock/demo-controls.component')) : null;
 
 /**
- * The frame around every screen: the navigation rail (dark, like an instrument panel),
- * a header with the signed-in person and their roles, a notice when the profile needs
- * attention, and the current screen. On a phone the rail slides in from the left; on a wide
- * screen it folds to icons only. The window itself never scrolls: the page area under the header does.
+ * The frame around every screen: one navigation rail containing global controls and account
+ * context, plus the current screen. On a phone the rail slides in from the left; on a wide
+ * screen it folds to icons only. The window itself never scrolls; the page area does.
  */
 export function AppShell() {
   const route = useHashRoute();
   const { state, reload } = useProfile();
   const { session } = useAuth();
-  const { isDark, toggleTheme } = useTheme();
   const [menuOpen, setMenuOpen] = useState(false);
   const [railCollapsed, setRailCollapsed] = useState(readRailCollapsed);
   const toggleRail = () =>
@@ -88,7 +86,7 @@ export function AppShell() {
   const current = route.match?.route ?? null;
   const title = current?.title ?? 'Page not found';
   const fills = current !== null && FILL_SCREENS.has(current.id);
-  const fullWidth = fills || current?.id === 'equipment-detail';
+  const fullWidth = fills || current?.id === 'equipment-detail' || current?.id === 'home' || current?.id === 'field';
 
   useEffect(() => {
     document.title = `${title} · ATLAS`;
@@ -158,67 +156,29 @@ export function AppShell() {
           aria-label={railCollapsed ? 'Expand the menu' : 'Collapse the menu'}
           aria-expanded={!railCollapsed}
           title={railCollapsed ? 'Expand the menu' : 'Collapse the menu'}
-          className="absolute -right-300 top-[73px] z-10 hidden cursor-pointer rounded-md border border-border bg-card p-100 text-muted-foreground shadow-sm hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:inline-flex"
+          className="absolute -right-300 top-[43px] z-10 hidden cursor-pointer rounded-md border border-border bg-card p-100 text-muted-foreground shadow-sm hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:inline-flex"
         >
           {railCollapsed ? <PanelLeftOpen aria-hidden="true" className="icon-size-200" /> : <PanelLeftClose aria-hidden="true" className="icon-size-200" />}
         </button>
         <Nav current={current?.id ?? null} canManageAdmin={canManageAdmin} onNavigate={() => setMenuOpen(false)} preview={PREVIEW_MODE} collapsed={collapsed} />
-        {collapsed ? null : <p className="border-t border-sidebar-border px-400 py-300 text-200 text-sidebar-muted">Proof of value build</p>}
-      </aside>
-
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-        <header className="flex h-header shrink-0 items-center gap-300 border-b border-border bg-card px-400">
-          <button
-            type="button"
-            aria-label="Open the menu"
-            aria-expanded={menuOpen}
-            className="rounded-md p-200 hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:hidden"
-            onClick={() => setMenuOpen(true)}
-          >
-            <Menu aria-hidden="true" className="icon-size-300" />
-          </button>
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-300 leading-300 text-muted-foreground">
-              {PREVIEW_MODE && current && !isBuilt(current) ? (
-                <span className={`${badge.info} ml-200`} title={`Shown on sample data. Built for real in ${current.builtIn}.`}>
-                  Preview · {current.builtIn} · sample data
-                </span>
-              ) : null}
-            </p>
-            {current ? <Breadcrumb current={current.id} /> : null}
-          </div>
-          {DemoControls ? (
+        <div
+          className={clsx(
+            'shrink-0 border-t border-sidebar-border',
+            collapsed ? 'flex flex-col items-center gap-200 p-200' : 'space-y-300 p-300'
+          )}
+        >
+          {!collapsed && DemoControls ? (
             <Suspense fallback={null}>
               <DemoControls onChange={onDemoChange} />
             </Suspense>
           ) : null}
-          {profile ? <NotificationBell refreshKey={`${route.path}#${demoEpoch}`} /> : null}
-          <button
-            type="button"
-            onClick={toggleTheme}
-            aria-label={isDark ? 'Switch to the light theme' : 'Switch to the dark theme'}
-            className="rounded-md p-200 hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          >
-            {isDark ? <Sun aria-hidden="true" className="icon-size-300" /> : <Moon aria-hidden="true" className="icon-size-300" />}
-          </button>
-          <div className="flex min-w-0 items-center gap-200 border-l border-border pl-300">
-            <span
-              aria-hidden="true"
-              className="flex icon-size-600 shrink-0 items-center justify-center rounded-full bg-primary text-200 font-semibold text-primary-foreground"
-            >
-              {initials ?? <UserRound className="icon-size-200" />}
-            </span>
-            <div className="min-w-0">
-              <p className="truncate text-300 font-medium" aria-label="Signed in as">
-                {name}
-              </p>
-              <p className="truncate text-200 text-muted-foreground" aria-label="Your roles">
-                {roleLine}
-              </p>
-            </div>
-          </div>
-        </header>
+          {/* Notifications, then the person: their avatar opens a menu with the light or dark theme. */}
+          {profile ? <NotificationBell refreshKey={`${route.path}#${demoEpoch}`} placement="sidebar" showLabel={!collapsed} /> : null}
+          <AccountMenu name={name} roleLine={roleLine} initials={initials} collapsed={collapsed} />
+        </div>
+      </aside>
 
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         <ProfileNotice />
 
         {/* The page area scrolls, not the window. A list screen fills it instead, so only its table scrolls. */}
@@ -231,6 +191,23 @@ export function AppShell() {
               !fullWidth && 'max-w-7xl'
             )}
           >
+            <div className="mb-400 flex min-w-0 items-center gap-200">
+              <button
+                type="button"
+                aria-label="Open the menu"
+                aria-expanded={menuOpen}
+                className="shrink-0 rounded-md p-200 hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:hidden"
+                onClick={() => setMenuOpen(true)}
+              >
+                <Menu aria-hidden="true" className="icon-size-300" />
+              </button>
+              <div className="min-w-0 flex-1">{current ? <Breadcrumb current={current.id} /> : null}</div>
+              {PREVIEW_MODE && current && !isBuilt(current) ? (
+                <span className={badge.info} title={`Shown on sample data. Built for real in ${current.builtIn}.`}>
+                  Preview · {current.builtIn} · sample data
+                </span>
+              ) : null}
+            </div>
             <Screen key={demoEpoch} route={route} canManageAdmin={canManageAdmin} />
           </div>
         </main>

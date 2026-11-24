@@ -290,18 +290,6 @@ function FieldsGroups({ columns, ...request }: { columns: readonly (readonly Det
         >
           <button
             type="button"
-            aria-label="List view"
-            aria-pressed={layout === 'list'}
-            className={`inline-flex h-700 items-center gap-100 rounded-md px-200 text-200 font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring ${
-              layout === 'list' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:bg-hover hover:text-foreground'
-            }`}
-            onClick={() => setLayout('list')}
-          >
-            <List aria-hidden="true" className="icon-size-100" />
-            List
-          </button>
-          <button
-            type="button"
             aria-label="Card view"
             aria-pressed={layout === 'cards'}
             className={`inline-flex h-700 items-center gap-100 rounded-md px-200 text-200 font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring ${
@@ -311,6 +299,18 @@ function FieldsGroups({ columns, ...request }: { columns: readonly (readonly Det
           >
             <LayoutGrid aria-hidden="true" className="icon-size-100" />
             Cards
+          </button>
+          <button
+            type="button"
+            aria-label="List view"
+            aria-pressed={layout === 'list'}
+            className={`inline-flex h-700 items-center gap-100 rounded-md px-200 text-200 font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring ${
+              layout === 'list' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:bg-hover hover:text-foreground'
+            }`}
+            onClick={() => setLayout('list')}
+          >
+            <List aria-hidden="true" className="icon-size-100" />
+            List
           </button>
         </div>
       </div>

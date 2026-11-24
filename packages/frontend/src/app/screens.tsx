@@ -5,7 +5,7 @@ import { Approvals } from '@/features/approvals/approvals.component';
 import { RequestDetail } from '@/features/approvals/request-detail.component';
 import { EquipmentDetail } from '@/features/equipment/equipment-detail.component';
 import { EquipmentSearch } from '@/features/equipment/equipment-search.component';
-import { FieldView } from '@/features/field/field-view.component';
+import { FieldVerify } from '@/features/field-verify/field-verify.component';
 import { Home } from '@/features/home/home.component';
 import { RulePage } from '@/features/rules/rule-page.component';
 import { RulesCatalog } from '@/features/rules/rules-catalog.component';
@@ -27,8 +27,8 @@ const PREVIEW_SCREENS: Partial<Record<ScreenId, (params: Record<string, string>)
   // S-9 Rules (APP-5 catalogue and run, APP-6 editor): sample data from dev-mock/demo-rules.ts
   rules: () => <RulesCatalog />,
   rule: (params) => <RulePage key={params['id']} ruleId={params['id'] ?? ''} />,
-  // S-6 Field view (APP-7), in TrueContext form order: sample data from dev-mock/demo-field-form.ts
-  field: () => <FieldView />,
+  // S-6 Field view (APP-7): the four-step verification on sample data (features/field-verify/config.ts)
+  field: () => <FieldVerify />,
   // S-13 Admin (APP-9), admins only (the route check above still applies): sample data from dev-mock/demo-admin.ts
   admin: () => <Admin />,
 };

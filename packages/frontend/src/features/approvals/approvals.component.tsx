@@ -9,6 +9,7 @@ import { useHashRoute } from '@/hooks/use-hash-route';
 import { useLoad } from '@/hooks/use-load';
 import { BLANK, formatUtc, isBlank, orBlank } from '@/lib/format';
 
+import { ApprovalStats } from './approval-stats.component';
 import { BulkConfirmDialog, BulkResultDialog } from './bulk-dialogs.component';
 import { bulkApproveRequests, fetchQueue, type BulkAnswer, type QueuePage, type QueueRow } from './queue-api';
 import {
@@ -102,6 +103,8 @@ export function Approvals() {
       <header className="shrink-0">
         <h1 className="text-600 font-semibold">Approvals</h1>
       </header>
+
+      <ApprovalStats counts={known?.counts ?? null} facets={known?.facets ?? []} criteria={criteria} onSelectTab={select} onChange={go} />
 
       <section aria-label="Requests" className={`${card} md:flex md:min-h-0 md:flex-1 md:flex-col`}>
         {/* The tabs and the actions share one row; the row owns the rule under them. */}

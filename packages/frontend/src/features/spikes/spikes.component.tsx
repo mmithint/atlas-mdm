@@ -160,7 +160,7 @@ function WritePathCard() {
   const button = 'rounded-md bg-primary px-400 py-200 font-medium text-primary-foreground disabled:opacity-50';
 
   return (
-    <section aria-labelledby="app3-title" className="rounded-xl border border-border bg-card p-500 md:col-span-2">
+    <section aria-labelledby="app3-title" className="rounded-lg border border-border bg-card p-500 md:col-span-2">
       <h2 id="app3-title" className="font-semibold">
         APP-3 · Request write path (scratch)
       </h2>
@@ -283,7 +283,7 @@ function OxygptCard() {
   const busy = state.status === 'running';
 
   return (
-    <section aria-labelledby="s5-title" className="rounded-xl border border-border bg-card p-500 md:col-span-2">
+    <section aria-labelledby="s5-title" className="rounded-lg border border-border bg-card p-500 md:col-span-2">
       <h2 id="s5-title" className="font-semibold">
         S5 · OxyGPT connection (Admin only)
       </h2>
@@ -394,7 +394,7 @@ function SpikeCard({
   return (
     <section
       aria-labelledby={`${id}-title`}
-      className="rounded-xl border border-border bg-card p-500"
+      className="rounded-lg border border-border bg-card p-500"
     >
       <h2 id={`${id}-title`} className="font-semibold">
         {title}

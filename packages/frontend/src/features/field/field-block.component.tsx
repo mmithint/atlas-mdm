@@ -29,7 +29,7 @@ export function FieldBlock({ field, entry, onChange }: { field: FormFieldRow; en
         {field.mandatory ? <Pill tone="warning" title="Set by the admin: mark it before Review">Required</Pill> : null}
         {field.isKey ? <Pill tone="info" title="Counts towards the heater's verification % (WA-07)">Key field</Pill> : null}
         {field.source === 'EXTRA' ? <Pill tone="neutral" title="On the TrueContext form, not in field catalogue v1">Recorded only</Pill> : null}
-        {field.adminOnly ? <Pill tone="neutral" title="Only an admin or a rule may change it">Admin-only change</Pill> : null}
+        {field.adminOnly ? <Pill tone="neutral" title="Only an admin or a rule may change it">Admin change only</Pill> : null}
       </div>
       <p className="mt-100 text-300">
         <span className="text-muted-foreground">Current value: </span>
