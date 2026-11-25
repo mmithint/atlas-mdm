@@ -86,7 +86,7 @@ export function AppShell() {
   const current = route.match?.route ?? null;
   const title = current?.title ?? 'Page not found';
   const fills = current !== null && FILL_SCREENS.has(current.id);
-  const fullWidth = fills || current?.id === 'equipment-detail' || current?.id === 'home' || current?.id === 'field';
+  const fullWidth = fills || current?.id === 'equipment-detail' || current?.id === 'home' || current?.id === 'field' || current?.id === 'request';
 
   useEffect(() => {
     document.title = `${title} · ATLAS`;

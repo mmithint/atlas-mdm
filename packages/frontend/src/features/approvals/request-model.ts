@@ -356,3 +356,135 @@ export function describeRoute(route: {
   const classes = route.classScope === 'ANY' ? 'any class' : 'listed classes only';
   return `Route ${route.routeId}: ${readable(route.entityType)} ${readable(route.requestAction)}, ${field}, ${classes}`;
 }
+
+// ---- dates, conflicts, reasons and the progress of a request ---------------------------
+
+/** "24 Nov": the day, in UTC like every time on screen. */
+export function dayText(iso: string | null | undefined): string {
+  if (isBlank(iso)) return BLANK;
+  const d = new Date(String(iso));
+  return Number.isNaN(d.getTime()) ? BLANK : d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' });
+}
+
+/** "24 Nov, 11:43": the day and the minute, in UTC. */
+export function stampText(iso: string | null | undefined): string {
+  if (isBlank(iso)) return BLANK;
+  const d = new Date(String(iso));
+  return Number.isNaN(d.getTime())
+    ? BLANK
+    : d.toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'UTC' });
+}
+
+/** A request is "stale" once it has been open longer than this (7 days): the age turns amber. */
+export const STALE_HOURS = 7 * 24;
+
+interface Target {
+  requestId: number;
+  fieldCode: string | null;
+  equipmentId: number | null;
+  functionalLocation: string | null;
+}
+
+/**
+ * The other OPEN requests that change the same field of the same heater (or location): approving this one may
+ * overwrite or duplicate their change. The server lists related requests; this only picks the conflicting ones.
+ */
+export function conflictsOf<T extends Target & { isOpen: boolean }>(request: Target, related: readonly T[]): T[] {
+  if (request.fieldCode === null) return [];
+  return related.filter(
+    (r) =>
+      r.requestId !== request.requestId &&
+      r.isOpen &&
+      r.fieldCode === request.fieldCode &&
+      (request.equipmentId !== null ? r.equipmentId === request.equipmentId : r.functionalLocation === request.functionalLocation)
+  );
+}
+
+/** Quick reasons under the reason box of a Return or Reject; the person can edit them. */
+export const CANNED_REASONS: readonly string[] = ['Photo unclear', 'Wrong field', 'Value does not match the nameplate', 'Needs more detail'];
+/** The fewest characters a Return or Reject reason may have, so the requester knows what to fix. */
+export const MIN_REASON = 10;
+
+export const STAGE_LABELS = { responsible: 'Responsible review', accountable: 'Accountable sign-off' } as const;
+
+/** What happens after an approval, for the note under the decision buttons; null when no approval is expected. */
+export function nextStepText(request: { requestStatus: string; approvalStage: string | null; accountableGroup: string }): string | null {
+  if (request.requestStatus === 'PENDING_RESPONSIBLE') return `After approval: goes to ${request.accountableGroup} for sign-off, then the SAP export queue.`;
+  if (request.requestStatus === 'PENDING_ACCOUNTABLE') return 'After approval: the golden record is updated and the change joins the SAP export queue.';
+  return null;
+}
+
+export type StepState = 'done' | 'current' | 'upcoming' | 'returned' | 'rejected' | 'stopped';
+
+export interface StageStep {
+  key: 'SUBMITTED' | 'RESPONSIBLE' | 'ACCOUNTABLE' | 'EXPORT';
+  label: string;
+  /** Who and when (a finished step), or who is expected (the current and the next ones). */
+  sub: string;
+  state: StepState;
+}
+
+interface StageRequest {
+  requestStatus: string;
+  approvalStage: string | null;
+  requestedBy: string;
+  requestedAtUtc: string | null;
+  responsibleGroup: string;
+  accountableGroup: string;
+  exportedAtUtc: string | null;
+}
+
+interface StageEvent {
+  eventId: number;
+  eventType: string;
+  approvalStage: string | null;
+  actor: string;
+  occurredAtUtc: string | null;
+}
+
+/**
+ * Where the request sits in Submitted, Responsible review, Accountable sign-off and SAP export, from its status and
+ * its history. A request that was returned, rejected or withdrawn stops at the stage where that happened.
+ */
+export function stageSteps(r: StageRequest, events: readonly StageEvent[]): StageStep[] {
+  const sorted = [...events].sort((a, b) => a.eventId - b.eventId);
+  const lastOf = (type: string) => [...sorted].reverse().find((e) => e.eventType === type);
+  const who = (e: StageEvent | undefined, fallback: string) => (e ? `${actorText(e.actor)} · ${stampText(e.occurredAtUtc)}` : fallback);
+
+  const status = r.requestStatus;
+  const ended = status === 'RETURNED' || status === 'REJECTED' || status === 'CANCELLED';
+  const endType = status === 'RETURNED' ? 'RETURNED' : status === 'REJECTED' ? 'REJECTED' : 'CANCELLED';
+  const endEvent = ended ? lastOf(endType) : undefined;
+  const endedAt = (endEvent?.approvalStage ?? r.approvalStage) === 'ACCOUNTABLE' ? 2 : 1;
+  const endState: StepState = status === 'RETURNED' ? 'returned' : status === 'REJECTED' ? 'rejected' : 'stopped';
+  const endWord = status === 'RETURNED' ? 'Returned' : status === 'REJECTED' ? 'Rejected' : 'Withdrawn';
+
+  const stage = (key: 'RESPONSIBLE' | 'ACCOUNTABLE', order: 1 | 2, label: string, group: string, approvedType: string): StageStep => {
+    let state: StepState = 'upcoming';
+    if (status === 'PENDING_RESPONSIBLE') state = order === 1 ? 'current' : 'upcoming';
+    else if (status === 'PENDING_ACCOUNTABLE') state = order === 1 ? 'done' : 'current';
+    else if (status === 'APPROVED') state = 'done';
+    else if (ended) state = order < endedAt ? 'done' : order === endedAt ? endState : 'upcoming';
+    const stopped = state === 'returned' || state === 'rejected' || state === 'stopped';
+    const sub = state === 'done' ? who(lastOf(approvedType), group) : stopped ? `${endWord} · ${actorText(endEvent?.actor)}` : group;
+    return { key, label, sub, state };
+  };
+
+  const exported = status === 'APPROVED';
+  return [
+    {
+      key: 'SUBMITTED',
+      label: 'Submitted',
+      sub: `${actorText(r.requestedBy)} · ${stampText(r.requestedAtUtc)}`,
+      state: status === 'DRAFT' ? 'current' : 'done',
+    },
+    stage('RESPONSIBLE', 1, STAGE_LABELS.responsible, r.responsibleGroup, 'RESPONSIBLE_APPROVED'),
+    stage('ACCOUNTABLE', 2, STAGE_LABELS.accountable, r.accountableGroup, 'ACCOUNTABLE_APPROVED'),
+    {
+      key: 'EXPORT',
+      label: 'SAP export',
+      sub: !exported ? 'EVOLVE file, then synced' : r.exportedAtUtc ? `Exported ${dayText(r.exportedAtUtc)}` : 'Waiting for the EVOLVE file',
+      state: !exported ? 'upcoming' : r.exportedAtUtc ? 'done' : 'current',
+    },
+  ];
+}

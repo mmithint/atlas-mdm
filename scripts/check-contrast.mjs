@@ -99,6 +99,8 @@ const PAIRS = [
   ['foreground', 'muted', TEXT, 'text on nested blocks'],
   ['accent-foreground', 'accent', TEXT, 'text on hover'],
   ['foreground', 'hover', TEXT, 'text on a hovered row'],
+  ['foreground', 'row-hover>card', TEXT, 'text on a hovered table row'],
+  ['muted-foreground', 'row-hover>card', TEXT, 'muted text on a hovered table row'],
   ['foreground', 'bg-hover-overlay>card', TEXT, 'text on the hover overlay'],
   ['text-tertiary', 'card', TEXT, 'placeholder and subtle text'],
   ['brand-foreground', 'card', TEXT, 'ID-plate links'],

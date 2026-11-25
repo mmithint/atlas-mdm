@@ -31,6 +31,8 @@ export const button = {
   ghost: `${buttonCore} ${sizeDefault} border-transparent bg-transparent text-link hover:bg-hover-overlay disabled:bg-transparent`,
   /** Filled red: an action that rejects, withdraws or removes. */
   danger: `${buttonCore} ${sizeDefault} border-transparent bg-danger-solid text-on-danger hover:bg-danger-solid-hover`,
+  /** Red outline: a final action that should not compete with the primary one (Reject beside Approve). */
+  dangerOutline: `${buttonCore} ${sizeDefault} border-danger-border bg-card text-danger-text hover:bg-danger-bg`,
   /** A small outlined button for toolbars and table rows. */
   small: `${buttonCore} ${sizeSmall} ${outlined}`,
   /** A large filled button, for a screen with one action (sign in). */

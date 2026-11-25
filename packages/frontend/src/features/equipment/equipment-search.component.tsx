@@ -512,7 +512,7 @@ function ResultTable({
         </thead>
         <tbody>
           {rows.map((row) => (
-            <tr key={row.equipmentId} className="border-t border-divider hover:bg-hover">
+            <tr key={row.equipmentId} className="border-t border-divider hover:bg-row-hover">
               {columns.map((c) => (
                 <td key={c.column} className="whitespace-nowrap px-200 py-200 align-middle">
                   <Cell column={c} row={row} />

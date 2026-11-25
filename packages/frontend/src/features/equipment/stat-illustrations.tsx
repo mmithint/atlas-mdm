@@ -81,7 +81,24 @@ const thermometer: Drawing = (a) => (
   </>
 );
 
-const DRAWINGS: Record<string, Drawing> = { all: heater, verified, low: gauge, open: request, duty: thermometer };
+/** Returned to me: a document with a return arrow. */
+const returned: Drawing = (a) => (
+  <>
+    <path d="M8 10a2 2 0 0 1 2-2h12l8 8v22a2 2 0 0 1-2 2H10a2 2 0 0 1-2-2z" stroke="currentColor" {...line} />
+    <path d="M22 8v8h8M13 22h10M13 27h6" stroke="currentColor" {...line} />
+    <path d="M30 22h6a6 6 0 0 1 0 12h-8M33 19l-3 3 3 3" stroke={a} {...line} strokeWidth={2} />
+  </>
+);
+
+/** Approved: a shield with a check. */
+const approved: Drawing = (a) => (
+  <>
+    <path d="M24 5l15 5v11c0 10-6.5 17-15 21C15 38 9 31 9 21V10z" stroke="currentColor" {...line} />
+    <path d="M16.5 24l5 5 10-10" stroke={a} {...line} strokeWidth={2} />
+  </>
+);
+
+const DRAWINGS: Record<string, Drawing> = { all: heater, verified, low: gauge, open: request, duty: thermometer, returned, approved };
 
 /** `onSelected`: drawn on a selected (navy) card, so the accent takes the card's light blue instead of the tone. */
 export function StatIllustration({ id, tone, className, onSelected = false }: { id: string; tone: StatTone; className?: string; onSelected?: boolean }) {

@@ -90,7 +90,7 @@ function RequestsTable({ rows, totalCount }: { rows: readonly RelatedRequestRow[
               {rows.map((r) => {
                 const status = statusBadge(r.requestStatus);
                 return (
-                  <tr key={r.requestId} className="border-t border-divider align-top hover:bg-hover">
+                  <tr key={r.requestId} className="border-t border-divider align-top hover:bg-row-hover">
                     <th scope="row" className="px-300 py-200 text-left font-medium">
                       <a
                         className="id-plate underline-offset-2 hover:underline"

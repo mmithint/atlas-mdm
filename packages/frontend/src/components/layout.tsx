@@ -13,7 +13,7 @@ export const TABLE = 'w-full min-w-max border-collapse text-250 leading-250';
 export const HEAD_ROW = 'bg-muted text-left text-200 uppercase tracking-wide text-muted-foreground';
 export const TH = 'px-300 py-200 font-semibold';
 export const TD = 'px-300 py-200 align-top';
-export const ROW = 'border-t border-divider hover:bg-hover';
+export const ROW = 'border-t border-divider hover:bg-row-hover';
 
 export type Tone = 'neutral' | 'warning' | 'success' | 'info' | 'danger';
 

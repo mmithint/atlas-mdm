@@ -40,15 +40,7 @@ export interface FilterPanelProps {
  * Beside the table on a wide screen; over the page, as a dialog, on a smaller one.
  */
 export function FilterPanel({ id, overlay, all, selection, matchCount, onChange, onClose, top }: FilterPanelProps) {
-  const titleId = useId();
-  const panel = useRef<HTMLElement>(null);
-  const heading = useRef<HTMLHeadingElement>(null);
   const count = selectedCount(selection);
-
-  useEffect(() => {
-    heading.current?.focus();
-  }, []);
-
   const rows = all.status === 'ready' ? all.rows : null;
   const facets = useMemo(
     () =>
@@ -57,6 +49,103 @@ export function FilterPanel({ id, overlay, all, selection, matchCount, onChange,
         : FACETS.map((facet) => ({ facet, options: facetOptions(rows, facet, selection) })).filter((f) => facetUseful(f.options)),
     [rows, selection]
   );
+
+  return (
+    <PanelShell
+      id={id}
+      overlay={overlay}
+      count={count}
+      onClear={() => onChange({})}
+      onClose={onClose}
+      top={top}
+      footer={
+        <>
+          <p className="text-200 text-muted-foreground" aria-live="polite">
+            {count === 0
+              ? 'Tick values to filter the list.'
+              : matchCount === null
+                ? `${count} selected`
+                : `${matchCount} ${matchCount === 1 ? 'heater matches' : 'heaters match'}`}
+          </p>
+          {overlay ? (
+            <button type="button" className={button.primary} onClick={onClose}>
+              {matchCount === null || count === 0 ? 'Show heaters' : `Show ${matchCount} ${matchCount === 1 ? 'heater' : 'heaters'}`}
+            </button>
+          ) : null}
+        </>
+      }
+    >
+      {all.status === 'loading' || all.status === 'idle' ? (
+        <div className="p-400">
+          <LoadingState rows={6} label="Loading the filter values" />
+        </div>
+      ) : null}
+      {all.status === 'error' ? (
+        <div className="p-400">
+          <ErrorState title="The filter values could not be loaded" message={all.message} onRetry={all.retry} />
+        </div>
+      ) : null}
+      {all.status === 'too-many' ? (
+        <div className="p-400">
+          <EmptyState
+            title="Too many heaters to filter"
+            hint={`The filters work on up to ${MAX_FILTERED_ROWS.toLocaleString()} heaters at a time, and this search matches ${all.total.toLocaleString()}. Narrow it first with a box under a column header or a facility.`}
+          />
+        </div>
+      ) : null}
+      {all.status === 'ready' && facets.length === 0 ? (
+        <div className="p-400">
+          <EmptyState title="Nothing to filter" hint="Every heater in this search has the same values, so there is nothing to choose between." />
+        </div>
+      ) : null}
+      {facets.map(({ facet, options }, i) => (
+        <FacetSection
+          key={facet.id}
+          panelId={id}
+          facet={facet}
+          options={options}
+          startOpen={i < OPEN_AT_START || options.some((o) => o.checked)}
+          onToggle={(value) => onChange(toggled(selection, facet.id, value))}
+          onClear={() => onChange(cleared(selection, facet.id))}
+        />
+      ))}
+    </PanelShell>
+  );
+}
+
+/**
+ * The frame of a filter panel, shared by the Equipment and Approvals screens: a header with Clear all and Close, an
+ * optional strip above the lists, the scrolling lists, and a footer. Beside the table on a wide screen; over the page,
+ * as a dialog with a dimmed backdrop, on a smaller one.
+ */
+export function PanelShell({
+  id,
+  overlay,
+  count,
+  onClear,
+  onClose,
+  top,
+  footer,
+  children,
+}: {
+  id: string;
+  /** True below the large breakpoint: the panel floats over the page instead of sitting beside the table. */
+  overlay: boolean;
+  /** How many filters are applied: Clear all shows while there are any. */
+  count: number;
+  onClear: () => void;
+  onClose: () => void;
+  top?: ReactNode;
+  footer: ReactNode;
+  children: ReactNode;
+}) {
+  const titleId = useId();
+  const panel = useRef<HTMLElement>(null);
+  const heading = useRef<HTMLHeadingElement>(null);
+
+  useEffect(() => {
+    heading.current?.focus();
+  }, []);
 
   const onKeyDown = (event: KeyboardEvent<HTMLElement>) => {
     if (event.key === 'Escape') {
@@ -98,7 +187,7 @@ export function FilterPanel({ id, overlay, all, selection, matchCount, onChange,
           Filters
         </h2>
         {count > 0 ? (
-          <button type="button" className={button.ghost} onClick={() => onChange({})}>
+          <button type="button" className={button.ghost} onClick={onClear}>
             Clear all
           </button>
         ) : null}
@@ -109,57 +198,9 @@ export function FilterPanel({ id, overlay, all, selection, matchCount, onChange,
 
       {top}
 
-      <div className="min-h-0 flex-1 overflow-y-auto">
-        {all.status === 'loading' || all.status === 'idle' ? (
-          <div className="p-400">
-            <LoadingState rows={6} label="Loading the filter values" />
-          </div>
-        ) : null}
-        {all.status === 'error' ? (
-          <div className="p-400">
-            <ErrorState title="The filter values could not be loaded" message={all.message} onRetry={all.retry} />
-          </div>
-        ) : null}
-        {all.status === 'too-many' ? (
-          <div className="p-400">
-            <EmptyState
-              title="Too many heaters to filter"
-              hint={`The filters work on up to ${MAX_FILTERED_ROWS.toLocaleString()} heaters at a time, and this search matches ${all.total.toLocaleString()}. Narrow it first with a box under a column header or a facility.`}
-            />
-          </div>
-        ) : null}
-        {all.status === 'ready' && facets.length === 0 ? (
-          <div className="p-400">
-            <EmptyState title="Nothing to filter" hint="Every heater in this search has the same values, so there is nothing to choose between." />
-          </div>
-        ) : null}
-        {facets.map(({ facet, options }, i) => (
-          <FacetSection
-            key={facet.id}
-            panelId={id}
-            facet={facet}
-            options={options}
-            startOpen={i < OPEN_AT_START || options.some((o) => o.checked)}
-            onToggle={(value) => onChange(toggled(selection, facet.id, value))}
-            onClear={() => onChange(cleared(selection, facet.id))}
-          />
-        ))}
-      </div>
+      <div className="min-h-0 flex-1 overflow-y-auto">{children}</div>
 
-      <footer className="flex shrink-0 items-center justify-between gap-300 border-t border-border px-400 py-300">
-        <p className="text-200 text-muted-foreground" aria-live="polite">
-          {count === 0
-            ? 'Tick values to filter the list.'
-            : matchCount === null
-              ? `${count} selected`
-              : `${matchCount} ${matchCount === 1 ? 'heater matches' : 'heaters match'}`}
-        </p>
-        {overlay ? (
-          <button type="button" className={button.primary} onClick={onClose}>
-            {matchCount === null || count === 0 ? 'Show heaters' : `Show ${matchCount} ${matchCount === 1 ? 'heater' : 'heaters'}`}
-          </button>
-        ) : null}
-      </footer>
+      <footer className="flex shrink-0 items-center justify-between gap-300 border-t border-border px-400 py-300">{footer}</footer>
     </aside>
   );
 
@@ -172,7 +213,7 @@ export function FilterPanel({ id, overlay, all, selection, matchCount, onChange,
   );
 }
 
-function FacetSection({
+export function FacetSection({
   panelId,
   facet,
   options,
@@ -181,7 +222,7 @@ function FacetSection({
   onClear,
 }: {
   panelId: string;
-  facet: Facet;
+  facet: Pick<Facet, 'id' | 'label'>;
   options: readonly FacetOption[];
   startOpen: boolean;
   onToggle: (value: string) => void;

@@ -114,7 +114,7 @@ function HeaterList({ draft, update }: { draft: Draft; update: (change: (d: Draf
             {rows.map((h) => {
               const chosen = draft.equipmentNo === h.equipmentNo;
               return (
-                <tr key={h.equipmentNo} className={clsx('cursor-pointer border-t border-divider', chosen ? 'bg-sidebar-selected' : 'hover:bg-hover')} onClick={() => update((d) => ({ ...d, equipmentNo: h.equipmentNo }))}>
+                <tr key={h.equipmentNo} className={clsx('cursor-pointer border-t border-divider', chosen ? 'bg-sidebar-selected' : 'hover:bg-row-hover')} onClick={() => update((d) => ({ ...d, equipmentNo: h.equipmentNo }))}>
                   <td className={TD}>
                     <input type="radio" name={`${id}-heater`} className="icon-size-200 accent-primary" checked={chosen} onChange={() => update((d) => ({ ...d, equipmentNo: h.equipmentNo }))} aria-label={`${h.equipmentNo}, ${h.tag}`} />
                   </td>

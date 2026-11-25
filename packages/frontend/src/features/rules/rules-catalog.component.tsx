@@ -114,7 +114,7 @@ function CatalogTable({ data, text, filter }: { data: CatalogData; text: string;
             const state = STATE_DISPLAY[r.state];
             const test = TEST_DISPLAY[r.testStatus];
             return (
-              <tr key={r.ruleId} className={`${ROW} hover:bg-hover`}>
+              <tr key={r.ruleId} className={ROW}>
                 <td className={TD}>
                   <a href={hrefFor(`/rules/${encodeURIComponent(r.ruleId)}`)} className="id-plate hover:underline">
                     {r.ruleId}

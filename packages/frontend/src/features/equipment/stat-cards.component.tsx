@@ -46,7 +46,7 @@ export function StatCards({
         {STATS.map((s) => (
           <div key={s.id} className={`${card} flex animate-pulse flex-col gap-200 px-400 py-300 motion-reduce:animate-none`}>
             <span className="flex items-start justify-between gap-200">
-              <span className="icon-size-500 rounded-lg bg-muted" />
+              <span className="icon-size-500 rounded-badge bg-muted" />
               <span className="w-1/4 rounded-lg bg-muted text-200 leading-200">&nbsp;</span>
             </span>
             <span className="flex flex-col gap-100">
@@ -130,7 +130,7 @@ function StatCard({ value, disabled, empty, onClick }: { value: StatValue; disab
       <span className="flex items-start justify-between gap-200">
         {/* The icon badge: the drawing, small, on a tint of the card's status colour; on a selected (navy) card
             the badge and the pill turn into translucent white chips with white and light-blue marks. */}
-        <span aria-hidden="true" className={clsx('flex icon-size-500 shrink-0 items-center justify-center rounded-lg', PILL[def.tone], ON_SELECTED)}>
+        <span aria-hidden="true" className={clsx('flex icon-size-500 shrink-0 items-center justify-center rounded-badge', PILL[def.tone], ON_SELECTED)}>
           <StatIllustration id={def.id} tone={def.tone} onSelected={active} className="icon-size-300" />
         </span>
         {share !== null ? <span className={clsx('rounded-lg px-200 py-100 text-200 font-medium leading-200', PILL[def.tone], ON_SELECTED)}>{share}%</span> : null}
